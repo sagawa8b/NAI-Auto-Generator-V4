@@ -1,0 +1,19 @@
+# NAI-Auto-Generator requirements
+
+# API 호출 관련
+requests>=2.28.0
+
+# 암호화 해시를 위한 argon2 (argon2-cffi)
+argon2-cffi>=21.3.0
+
+# 이미지 처리 (Pillow)
+Pillow>=9.0.0
+
+# GUI를 위한 PyQt5
+PyQt5>=5.15.0
+
+# onnxruntime (V4 호환을 위해 1.13.1 고정)
+onnxruntime==1.13.1
+
+# NumPy 버전 낮추기 (numpy 2.x 미만)
+numpy<2

@@ -1,45 +1,96 @@
-# NAI-Auto-Generator
-<img width="957" alt="제목 없음" src="https://github.com/DCP-arca/NAI-Auto-Generator/assets/127241088/7ba7ec50-f9b2-4e64-94c2-2644e668a5ff">
-
-# 특징
-1. NAI UI를 유사하게 구현한 윈도우 어플리케이션.
-2. 세팅 값을 텍스트 파일로 쉽게 내보내고 들여올 수 있음.
-3. img2img, 멀티 vibe 기능 사용 가능.
-  * 폴더를 드래그 드랍하거나, 열기 버튼을 눌러 폴더 안의 이미지를 순차적/랜덤으로 불러오기 가능.
-4. 와일드카드 기능 사용 가능. (ex- \_\_와일드카드 이름\_\_, \_\_폴더이름1/폴더이름2/와일드카드 이름\_\_)
-5. 프롬프트 내 인스턴스 랜덤 구문 사용 가능. (ex- <1|2|3>)
-  * 1.1.0 부터 와일드카드와 인스턴스 구문은 서로 교차해서 사용 가능.
-6. 웹페이지 이미지나 파일을 드래그 드랍하여 세팅 정보를 바로 가져오기 가능.
-7. 자동 생성 기능 지원.
-8. 정보를 가져오는 이미지 정보 확인기 / 단부루 태그를 읽어오는 태그 확인기 지원
-9. v4 지원, v4 캐릭터 프롬프트 지원
+# NAI-Auto-Generator V4
+Novel AI의 이미지 생성을 자동으로 생성 할 수 있도록 하게 구현한 윈도우 어플리케이션.
 
 
-# 활용
+버전업 히스토리
 
-![img-ezgif com-video-to-gif-converter](https://github.com/DCP-arca/NAI-Auto-Generator/assets/127241088/4e246046-b5a5-41d5-abd8-4f0e0622715f)
+version 1.5.3.20
 
-img2img와 vibe transfer를 지원합니다.
-폴더모드를 눌러 폴더 내부의 이미지들을 자동으로 선택하게 할 수도 있습니다.
+- 버그 투성이 릴리즈
 
 
 
-![drag_drop-ezgif com-video-to-gif-converter](https://github.com/DCP-arca/NAI-Auto-Generator/assets/127241088/ae88a709-05fc-4387-9cbb-c61be980622d)
+version 1.5.3.21
 
-웹(주로 arca.live)/이미지파일/세팅텍스트파일을 드래그 드랍해서 세팅 가져올 수 있습니다.
+- 장시간 사용 시 안정성 향상
 
+- 시나리오별 프롬프트 생성을 위한 순차적 와일드카드 적용
 
-
-![splitter-ezgif com-video-to-gif-converter](https://github.com/DCP-arca/NAI-Auto-Generator/assets/127241088/851aa7c4-c756-4e5e-835a-936be201716c)
-
-이미지 뷰어는 하단의 >>를 눌러 키고 끌 수 있으며, 이동가능합니다.
+- 폴더 지정시 다운되는 문제 해결
 
 
 
-![tagger-ezgif com-video-to-gif-converter](https://github.com/DCP-arca/NAI-Auto-Generator/assets/127241088/0f4ef2e2-121d-4435-b92a-279b2406ef4c)
-![infogetter-ezgif com-video-to-gif-converter](https://github.com/DCP-arca/NAI-Auto-Generator/assets/127241088/18f837f4-f2df-42ef-99e5-c92cf51c1283)
+version 1.5.3.23
 
-하단의 Info/Tag 버튼이나, 상단의 메뉴바, 또는 직접 .exe를 실행하여, 정보를 가져오는 이미지 정보 확인기 / 단부루 태그를 읽어오는 태그 확인기를 사용할 수 있습니다.
+- 세션 관리 시스템 개선: 통합된 NAISessionManager 클래스 추가로 세션 안정성 향상
+
+- 토큰 갱신 로직 최적화: 불필요한 재인증 감소로 계정 보안 강화 및 서버 부하 감소
+
+- 이미지 생성 추적: 세션당 최대 이미지(450개) 도달 시 자동 토큰 갱신
+
+- 연결 복구 메커니즘: 네트워크 중단 감지 및 자동 복구 기능 추가
+
+
+
+version 1.5.3.25
+
+- 세션 관리 시스템 대규모 개선
+
+- Anlas 표시 복구 
+
+- 세션 만료 시 불필요한 로그인 요청 반복 문제 해결
+
+- 연속 생성 중 세션 오류로 인한 작업 중단 개선
+
+- 각 세션의 이미지 생성 한계와 지속 시간 자동 학습
+
+
+
+version 1.5.3.26
+
+- 메타데이터 표시 개선
+
+- Advanced 설정 UI 업데이트
+
+- "bytes-like object is required, not tuple" 오류 수정
+
+- Legacy Prompt Conditioning Mode 기능 신설
+
+
+
+version 1.5.3.27/28
+
+- 시스템 로그 기능 추가 및 업데이트
+
+- 랜덤 프롬프트 체크 해제 해도 기억하도록 수정
+
+- 인터넷 연결이 끊어졌을때 내부적으로 에러 처리되는 로직 개선
+
+- Numeric Emphasis 가중치 하이라이트 기능 추가
+
+- 태그 자동완성 기능 이슈 해결
+
+
+
+version 1.5.4.02
+
+- 자동생성에 아이콘 버튼 추가 (20/30/50/100)
+
+
+
+version 1.5.4.03
+
+- 샘플러 업데이트
+
+
+
+version 1.5.4.15
+
+- 설정 파일 저장/불러오기 개선
+
+- 세팅별 연속 생성 수정
+
+- 이미지 메타 데이터 처리 개선
 
 
 # 주의사항
@@ -49,6 +100,11 @@ img2img와 vibe transfer를 지원합니다.
 
 
 # 크레딧
+원작자
+https://github.com/DCP-arca/NAI-Auto-Generator/
+
+
+참고
 https://github.com/neggles/sd-webui-stealth-pnginfo/
 
 https://huggingface.co/baqu2213/
@@ -56,11 +112,3 @@ https://huggingface.co/baqu2213/
 https://github.com/pythongosssss/ComfyUI-WD14-Tagger/
 
 https://huggingface.co/SmilingWolf
-
-
-# 릴리즈
-https://github.com/DCP-arca/NAI-Auto-Generator/releases
-
-onefile버전을 받으면 하나의 .exe파일로 지원합니다.
-반대쪽 버전을 받으면 용량이 크지만, 어플리케이션 시작이 조금 더 빠르며, 이미지 정보확인기와 태그 확인기를 exe로 단일 실행할 수 있습니다.
-
