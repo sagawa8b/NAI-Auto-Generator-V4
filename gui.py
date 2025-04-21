@@ -916,7 +916,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         loadSettingsAction.triggered.connect(self.on_click_load_settings)
 
         loginAction = QAction('로그인(Log in)', self)
-        loginAction.setShortcut('Ctrl+L')
+        loginAction.setShortcut('Ctrl+I')
         loginAction.triggered.connect(self.show_login_dialog)
 
         optionAction = QAction('옵션(Option)', self)
@@ -1073,19 +1073,19 @@ class NAIAutoGeneratorWindow(QMainWindow):
             self.settings.setValue("character_prompts", character_data)
 
     def set_data(self, data_dict):
-        # uncond_scale shown as * 100
-        # 제거
-        #uncond_scale = data_dict['uncond_scale']
-        #data_dict['uncond_scale'] = str(int(float(uncond_scale) * 100))
-
         dict_ui = self.dict_ui_settings
-
-        dict_ui["sampler"].setCurrentText(data_dict["sampler"])
-
+        
+        # 샘플러 설정
+        if "sampler" in data_dict:
+            from gui_init import set_sampler_by_api_value
+            set_sampler_by_api_value(self, data_dict["sampler"])
+        else:
+            dict_ui["sampler"].setCurrentIndex(0)  # 기본값
+        
         # 텍스트 필드별 다른 메서드 사용
         dict_ui["prompt"].setPlainText(str(data_dict["prompt"]))
         dict_ui["negative_prompt"].setPlainText(str(data_dict["negative_prompt"]))
-
+        
         # 일반 텍스트 필드용
         text_fields = ["width", "height", "steps", "seed", "scale", "cfg_rescale",
                       "strength", "noise", "reference_information_extracted", "reference_strength"]
@@ -1094,7 +1094,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 dict_ui[key].setText(str(data_dict[key]))
             else:
                 print(key)
-
+        
         # 체크박스 설정
         dict_ui["autoSmea"].setChecked(bool(data_dict.get("autoSmea", True)))
 
