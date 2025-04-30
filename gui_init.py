@@ -338,6 +338,39 @@ def init_main_widget(parent):
     horizontal_container.addWidget(advanced_group, 4)    # 비율 4
     horizontal_container.addWidget(generate_group, 3)    # 비율 3
     
+    # 폴더 열기 그룹 생성
+    folder_group = QGroupBox("폴더 열기")
+    folder_layout = QVBoxLayout()
+    folder_group.setLayout(folder_layout)
+    folder_layout.setContentsMargins(5, 5, 5, 5)
+    folder_layout.setSpacing(3)
+
+    # 결과 폴더 버튼
+    results_folder_btn = QPushButton("생성 결과 폴더")
+    results_folder_btn.clicked.connect(lambda: parent.on_click_open_folder("path_results"))
+    folder_layout.addWidget(results_folder_btn)
+
+    # 와일드카드 폴더 버튼
+    wildcards_folder_btn = QPushButton("와일드카드 폴더")
+    wildcards_folder_btn.clicked.connect(lambda: parent.on_click_open_folder("path_wildcards"))
+    folder_layout.addWidget(wildcards_folder_btn)
+
+    # 세팅 파일 폴더 버튼
+    settings_folder_btn = QPushButton("세팅 파일 폴더")
+    settings_folder_btn.clicked.connect(lambda: parent.on_click_open_folder("path_settings"))
+    folder_layout.addWidget(settings_folder_btn)
+
+    # 여백 추가
+    folder_layout.addStretch(1)
+
+    # 폴더 그룹 크기 정책 설정
+    folder_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
+    # 폴더 그룹 추가
+    horizontal_container.addWidget(folder_group, 2)  # 비율 2로 설정 (기존 그룹보다 작게)
+    
+    
+    
     # 수평 레이아웃을 메인 레이아웃에 추가
     left_layout.addLayout(horizontal_container)
         
@@ -521,7 +554,7 @@ def init_responsive_prompt_group(parent):
     return prompt_group
 
 
-# gui_init.py 파일에 아래 함수 추가
+
 def show_custom_message(parent, title, message, icon_type=None):
     """
     시스템 기본 스타일의 메시지 대화상자를 표시합니다.
