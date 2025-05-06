@@ -548,12 +548,12 @@ class NAIGenerator():
         # V4 API에서만 사용하는 특별한 파라미터들
         special_params = ["legacy_v3_extend", "noise_schedule", "params_version", 
                           "characterPrompts", "v4_prompt", "v4_negative_prompt",
-                          "use_character_coords"]  # use_character_coords 추가
+                          "use_character_coords", "model"]  # model 추가
         
         for k, v in param_dict.items():
             if k:
                 if k in special_params:
-                    # 특별 파라미터는 직접 설정 (use_character_coords는 별도 처리)
+                    # 특별 파라미터는 직접 설정 (model 포함)
                     if k != "use_character_coords":  # use_character_coords는 내부에서만 사용
                         self.parameters[k] = v
                     continue
@@ -588,8 +588,16 @@ class NAIGenerator():
         request_id = str(uuid.uuid4())[:8]
         logger.info(f"Image generation request started [ID: {request_id}] - {action.name}")
 
-        # 모델 선택 (V4 모델만 지원)
-        model = "nai-diffusion-4-full" if action != NAIAction.infill else "nai-diffusion-4-full-inpainting"
+        # 모델 선택 (파라미터에서 가져오기)
+        model = self.parameters.get("model", "nai-diffusion-4-5-curated")
+        
+        # Infill 모드일 경우 모델명에 inpainting 추가
+        if action == NAIAction.infill:
+            # 모델 이름에서 버전 추출
+            if "4-5" in model:
+                model = "nai-diffusion-4-5-full-inpainting"
+            else:
+                model = "nai-diffusion-4-full-inpainting"
         
         # 시드 설정
         if self.parameters["extra_noise_seed"] == -1:
@@ -607,7 +615,7 @@ class NAIGenerator():
         }
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
-        # 중요 파라미터 로깅
+        # 로깅
         log_params = {
             "action": action.name,
             "model": model,

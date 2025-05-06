@@ -333,13 +333,8 @@ def init_main_widget(parent):
     advanced_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
     generate_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
-    # 세 그룹을 하나의 수평 레이아웃에 추가
-    horizontal_container.addWidget(img_option_group, 4)  # 비율 4
-    horizontal_container.addWidget(advanced_group, 4)    # 비율 4
-    horizontal_container.addWidget(generate_group, 3)    # 비율 3
-    
     # 폴더 열기 그룹 생성
-    folder_group = QGroupBox("폴더 열기")
+    folder_group = QGroupBox("Folder Open")
     folder_layout = QVBoxLayout()
     folder_group.setLayout(folder_layout)
     folder_layout.setContentsMargins(5, 5, 5, 5)
@@ -365,10 +360,12 @@ def init_main_widget(parent):
 
     # 폴더 그룹 크기 정책 설정
     folder_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-
-    # 폴더 그룹 추가
-    horizontal_container.addWidget(folder_group, 2)  # 비율 2로 설정 (기존 그룹보다 작게)
     
+    # 위젯들을 수평 레이아웃에 원하는 순서로 추가
+    horizontal_container.addWidget(img_option_group, 4)  # Image Options (비율 4)
+    horizontal_container.addWidget(advanced_group, 4)    # Advanced Settings (비율 4)
+    horizontal_container.addWidget(folder_group, 2)      # Folder Open (비율 2)
+    horizontal_container.addWidget(generate_group, 3)    # Generate (비율 3)
     
     
     # 수평 레이아웃을 메인 레이아웃에 추가
@@ -652,6 +649,25 @@ def init_advanced_group(parent):
     advanced_layout = QVBoxLayout()
     advanced_group.setLayout(advanced_layout)
 
+    # 모델 선택 추가
+    hbox_model = QHBoxLayout()
+    hbox_model.addWidget(QLabel("Model:"))
+    parent.dict_ui_settings["model"] = QComboBox()
+    
+    # 모델 목록 추가
+    from consts import NAI_MODELS, DEFAULT_MODEL
+    for model_id, model_name in NAI_MODELS.items():
+        parent.dict_ui_settings["model"].addItem(model_name, model_id)
+    
+    # 기본 모델 선택
+    for i in range(parent.dict_ui_settings["model"].count()):
+        if parent.dict_ui_settings["model"].itemData(i) == DEFAULT_MODEL:
+            parent.dict_ui_settings["model"].setCurrentIndex(i)
+            break
+    
+    hbox_model.addWidget(parent.dict_ui_settings["model"])
+    advanced_layout.addLayout(hbox_model)
+    
     # CFG Scale 설정
     hbox_scale = QHBoxLayout()
     hbox_scale.addWidget(QLabel("Prompt Guidance:"))

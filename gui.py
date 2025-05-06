@@ -1080,7 +1080,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
             from gui_init import set_sampler_by_api_value
             set_sampler_by_api_value(self, data_dict["sampler"])
         else:
-            dict_ui["sampler"].setCurrentIndex(0)  # 기본값
+            dict_ui["sampler"].setCurrentIndex(0)
+        
+        # 모델 설정
+        if "model" in data_dict:
+            model_id = data_dict["model"]
+            for i in range(dict_ui["model"].count()):
+                if dict_ui["model"].itemData(i) == model_id:
+                    dict_ui["model"].setCurrentIndex(i)
+                    break
         
         # 텍스트 필드별 다른 메서드 사용
         dict_ui["prompt"].setPlainText(str(data_dict["prompt"]))
@@ -1170,7 +1178,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
             "scale": self.dict_ui_settings["scale"].text(),
             "cfg_rescale": self.dict_ui_settings["cfg_rescale"].text(),
             "autoSmea": str(self.dict_ui_settings["autoSmea"].isChecked()),
-            #"uncond_scale": str(float(self.dict_ui_settings["uncond_scale"].text()) / 100),
             "strength": self.dict_ui_settings["strength"].text(),
             "noise": self.dict_ui_settings["noise"].text(),
             "reference_information_extracted": self.dict_ui_settings["reference_information_extracted"].text(),
@@ -1178,7 +1185,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
             "quality_toggle": str(self.settings.value("quality_toggle", True)),
             "dynamic_thresholding": str(self.settings.value("dynamic_thresholding", False)),
             "anti_artifacts": str(self.settings.value("anti_artifacts", 0.0)),
-            "v4_model_preset": self.settings.value("v4_model_preset", "Artistic")
+            "v4_model_preset": self.settings.value("v4_model_preset", "Artistic"),
+            "model": self.dict_ui_settings["model"].currentData()  # 모델 ID 추가
         }
         
         # 샘플러 UI 이름을 API 값으로 변환

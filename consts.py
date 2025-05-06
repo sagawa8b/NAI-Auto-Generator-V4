@@ -39,11 +39,20 @@ def prettify_naidict(d, additional_dict=None):
             f"Undesired Content Strength: {d.get('uncond_scale', 0)}\n"
         )
         
+        # 모델 정보 결정
+        model_id = d.get('model', 'nai-diffusion-4-5-curated')
+        model_display_name = "NAI Diffusion V4 Full"
+        
+        if model_id == "nai-diffusion-4-5-curated":
+            model_display_name = "NAI Diffusion V4.5 Curated"
+        elif model_id == "nai-diffusion-4-full":
+            model_display_name = "NAI Diffusion V4 Full"
+        
         # 기본 정보
         result += (
             "\nGeneration Information\n\n"
             f"Software: NovelAI\n"
-            f"Source: NovelAI Diffusion V4 (NAI Diffusion V4 Full)\n"
+            f"Source: {model_display_name}\n"
             f"Request Type: {'Image to Image' if d.get('image') else 'Text to Image'}\n"
             f"Model Preset: {d.get('v4_model_preset', 'Artistic')}\n"
             f"Legacy Mode: {'Enabled' if d.get('legacy', False) else 'Disabled'}\n"
@@ -101,7 +110,14 @@ def prettify_naidict(d, additional_dict=None):
         
     return result
 
+# 모델 목록 정의 추가
+NAI_MODELS = {
+    "nai-diffusion-4-full": "NAI Diffusion V4 Full",
+    "nai-diffusion-4-5-curated": "NAI Diffusion V4.5 Curated"
+}
 
+# 기본 모델 설정
+DEFAULT_MODEL = "nai-diffusion-4-5-curated"  # V4.5 Curated를 기본값으로 설정
 
 
 
@@ -125,7 +141,7 @@ class S:
     }
 
     ABOUT = """NAI Auto Generator v4
-    version 1.5.4.30a
+    version 1.5.5.06a
 
 본진 : 
   아카라이브 AI그림 채널 https://arca.live/b/aiart
