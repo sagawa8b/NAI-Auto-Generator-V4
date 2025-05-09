@@ -141,7 +141,7 @@ class S:
     }
 
     ABOUT = """NAI Auto Generator v4
-    version 1.5.5.06a
+    version 1.5.5.09a
 
 본진 : 
   아카라이브 AI그림 채널 https://arca.live/b/aiart

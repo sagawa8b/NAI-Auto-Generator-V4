@@ -2,13 +2,53 @@ import sys
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
                             QPushButton, QPlainTextEdit, QScrollArea, QFrame, 
                             QGridLayout, QDialog, QCheckBox, QButtonGroup, QSizePolicy,
-                            QSplitter)
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QColor, QPalette, QBrush
+                            QSplitter, QApplication)
+from PyQt5.QtCore import Qt, pyqtSignal, QSize, QPoint, QRect, QEvent, QSettings
+from PyQt5.QtGui import QColor, QPalette, QBrush, QCursor, QResizeEvent
 from completer import CompletionTextEdit
 
 from logger import get_logger
 logger = get_logger()
+
+
+class ResizeHandle(QWidget):
+    """위젯의 크기를 조절할 수 있는 핸들 위젯"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent_widget = parent
+        self.setCursor(Qt.SizeHorCursor)
+        self.setFixedWidth(8)  # 핸들 너비 설정
+        self.setStyleSheet("background-color: #cccccc;")
+        self.dragging = False
+        self.drag_start_x = 0
+        self.original_width = 0
+        
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.dragging = True
+            self.drag_start_x = event.globalX()
+            self.original_width = self.parent_widget.width()
+            self.setCursor(Qt.SizeHorCursor)
+            event.accept()
+    
+    def mouseMoveEvent(self, event):
+        if self.dragging:
+            diff = event.globalX() - self.drag_start_x
+            new_width = max(230, self.original_width + diff)  # 최소 너비 유지
+            self.parent_widget.setFixedWidth(new_width)
+            event.accept()
+    
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self.dragging:
+            self.dragging = False
+            self.setCursor(Qt.SizeHorCursor)
+            
+            # 크기 변경 후 설정 저장
+            if hasattr(self.parent_widget, 'save_widget_size'):
+                self.parent_widget.save_widget_size()
+            
+            event.accept()
 
 
 class PositionSelectorDialog(QDialog):
@@ -79,11 +119,13 @@ class PositionSelectorDialog(QDialog):
             import traceback
             traceback.print_exc()
 
+
 class CharacterPromptWidget(QFrame):
     """캐릭터 프롬프트를 입력하고 관리하는 위젯"""
     
     deleted = pyqtSignal(object)  # 삭제 시그널
     moved = pyqtSignal(object, int)  # 이동 시그널 (위젯, 방향)
+    width_changed = pyqtSignal(int, int)  # 너비 변경 시그널 (인덱스, 너비)
     
     def __init__(self, parent=None, index=0):
         super().__init__(parent)
@@ -91,6 +133,9 @@ class CharacterPromptWidget(QFrame):
         self.index = index
         self.position = None  # 캐릭터 위치 (None = AI 선택)
         self.show_negative = False  # 네거티브 프롬프트 표시 여부
+        
+        # 설정 객체
+        self.settings = QSettings("dcp_arca", "nag_gui")
         
         # 스타일 설정 - 더 간결한 디자인
         self.setFrameShape(QFrame.StyledPanel)
@@ -100,10 +145,38 @@ class CharacterPromptWidget(QFrame):
         # 수직 레이아웃으로 설계
         self.setup_ui()
         
-        # 위젯 크기 정책 설정 - 가로 크기 제한
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        self.setMinimumWidth(230)  # 최소 너비 감소
-        self.setMaximumWidth(280)  # 최대 너비 지정
+        # 위젯 크기 정책 설정 - 가로 크기 조절 가능
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        self.setMinimumWidth(230)  # 최소 너비 제한
+        
+        # 저장된 너비 불러오기
+        self.load_widget_size()
+        
+        # 리사이즈 핸들 추가
+        self.resize_handle = ResizeHandle(self)
+        self.resize_handle.show()
+    
+    def load_widget_size(self):
+        """저장된 위젯 크기 불러오기"""
+        saved_width = self.settings.value(f"character_widget_{self.index}_width", 280, type=int)
+        self.setFixedWidth(saved_width)
+    
+    def save_widget_size(self):
+        """위젯 크기 저장"""
+        self.settings.setValue(f"character_widget_{self.index}_width", self.width())
+        # 다른 위젯에도 같은 크기 적용 신호 발생
+        self.width_changed.emit(self.index, self.width())
+    
+    def resizeEvent(self, event):
+        """리사이즈 이벤트 처리"""
+        super().resizeEvent(event)
+        # 리사이즈 핸들 위치 조정
+        self.resize_handle.setGeometry(
+            self.width() - self.resize_handle.width(),
+            0,
+            self.resize_handle.width(),
+            self.height()
+        )
     
     # 새로운 메서드 추가
     def update_title(self):
@@ -172,7 +245,7 @@ class CharacterPromptWidget(QFrame):
         # QPlainTextEdit 대신 CompletionTextEdit 사용
         self.prompt_edit = CompletionTextEdit()
         self.prompt_edit.setPlaceholderText("이 캐릭터에 대한 프롬프트 입력...")
-        self.prompt_edit.setMinimumHeight(70)  # 높이 감소
+        self.prompt_edit.setMinimumHeight(100)  # 높이 증가
         self.prompt_edit.setStyleSheet("background-color: white; color: black; border: 1px solid #bbbbbb;")
         self.layout.addWidget(self.prompt_edit)
         
@@ -200,7 +273,7 @@ class CharacterPromptWidget(QFrame):
         # 네거티브 프롬프트 입력에도 CompletionTextEdit 사용
         self.neg_prompt_edit = CompletionTextEdit()
         self.neg_prompt_edit.setPlaceholderText("이 캐릭터에 대한 네거티브 프롬프트 입력...")
-        self.neg_prompt_edit.setMinimumHeight(40)  # 높이 감소
+        self.neg_prompt_edit.setMinimumHeight(80)  # 높이 증가
         self.neg_prompt_edit.setStyleSheet("background-color: white; color: black; border: 1px solid #bbbbbb;")
         neg_container_layout.addWidget(self.neg_prompt_edit)
         
@@ -267,6 +340,7 @@ class CharacterPromptWidget(QFrame):
                 self.position_btn.setStyleSheet("background-color: #559977; color: black; padding: 2px;")
                 self.position_btn.setToolTip(f"위치: {int(self.position[0]*100)}%, {int(self.position[1]*100)}%")
 
+
 class CharacterPromptsContainer(QWidget):
     """캐릭터 프롬프트 컨테이너 위젯"""
     
@@ -275,6 +349,7 @@ class CharacterPromptsContainer(QWidget):
         self.parent = parent
         self.character_widgets = []
         self.use_ai_positions = True
+        self.settings = QSettings("dcp_arca", "nag_gui")
         self.setup_ui()
     
     def setup_ui(self):
@@ -312,9 +387,15 @@ class CharacterPromptsContainer(QWidget):
         self.clear_button.clicked.connect(self.clear_characters)
         controls_layout.addWidget(self.clear_button)
         
+        # 동일 너비 설정 버튼 추가
+        self.apply_width_button = QPushButton("너비 동기화")
+        self.apply_width_button.setToolTip("모든 캐릭터 프롬프트 위젯의 너비를 동일하게 설정")
+        self.apply_width_button.clicked.connect(self.apply_same_width_to_all)
+        controls_layout.addWidget(self.apply_width_button)
+        
         self.main_layout.addLayout(controls_layout)
         
-        # 수평 스크롤 영역
+        # 수평 스크롤 영역 (개선된 버전)
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.NoFrame)
@@ -325,17 +406,57 @@ class CharacterPromptsContainer(QWidget):
         self.characters_container = QWidget()
         self.characters_layout = QHBoxLayout(self.characters_container)
         self.characters_layout.setContentsMargins(0, 0, 0, 0)
-        self.characters_layout.setSpacing(6)  # 캐릭터 위젯 사이의 간격 축소
+        self.characters_layout.setSpacing(8)  # 캐릭터 위젯 사이의 간격 확대
         self.characters_layout.addStretch()  # 오른쪽 끝에 빈 공간 추가
         
         self.scroll_area.setWidget(self.characters_container)
         
         # 스크롤 영역을 직접 메인 레이아웃에 추가하고 높이 설정
-        self.scroll_area.setMinimumHeight(200)
+        self.scroll_area.setMinimumHeight(250)  # 최소 높이 증가
         self.main_layout.addWidget(self.scroll_area)
         
-        # self.splitter 변수를 유지하되 실제 스플리터는 생성하지 않음 (호환성 유지)
-        self.splitter = None
+        # 이전에 저장된 스크롤 영역 높이 불러오기
+        saved_height = self.settings.value("character_scroll_height", 250, type=int)
+        self.scroll_area.setMinimumHeight(saved_height)
+        
+        # splitter 설정 (스크롤 영역 높이 조절 용)
+        self.splitter = QSplitter(Qt.Vertical)
+        
+        # 마우스 휠 이벤트를 가로 스크롤로 변환하는 이벤트 필터 설치
+        self.scroll_area.viewport().installEventFilter(self)
+    
+    def eventFilter(self, obj, event):
+        """마우스 휠 이벤트를 가로 스크롤로 변환"""
+        if obj is self.scroll_area.viewport() and event.type() == QEvent.Wheel:
+            # Shift 키가 눌려있지 않을 때만 가로 스크롤로 변환
+            if not event.modifiers() & Qt.ShiftModifier:
+                # 원래의 세로 스크롤 값
+                delta = event.angleDelta().y()
+                
+                # 세로 스크롤 값을 가로 스크롤로 변환하여 적용
+                hbar = self.scroll_area.horizontalScrollBar()
+                hbar.setValue(hbar.value() - delta)
+                
+                # 이벤트 처리 완료
+                return True
+        
+        # 기본 이벤트 처리
+        return super().eventFilter(obj, event)
+    
+    def apply_same_width_to_all(self):
+        """모든 캐릭터 위젯에 동일한 너비 적용"""
+        if not self.character_widgets:
+            return
+            
+        # 가장 큰 너비 찾기
+        max_width = max(widget.width() for widget in self.character_widgets)
+        
+        # 모든 위젯에 적용
+        for widget in self.character_widgets:
+            widget.setFixedWidth(max_width)
+            widget.save_widget_size()
+        
+        QApplication.processEvents()  # UI 즉시 업데이트
     
     def toggle_ai_positions(self, state):
         """AI 위치 선택 여부 토글"""
@@ -374,6 +495,7 @@ class CharacterPromptsContainer(QWidget):
         widget = CharacterPromptWidget(self, len(self.character_widgets))
         widget.deleted.connect(self.remove_character)
         widget.moved.connect(self.move_character)
+        widget.width_changed.connect(self.on_width_changed)
         widget.position_btn.setEnabled(not self.use_ai_positions)
         
         # 태그 자동 완성 적용 (태그 목록이 있는 경우)
@@ -389,6 +511,10 @@ class CharacterPromptsContainer(QWidget):
         
         # 인덱스 업데이트
         self.update_indices()
+    
+    def on_width_changed(self, index, width):
+        """너비 변경 이벤트 처리 - 설정에 저장"""
+        self.settings.setValue(f"character_widget_{index}_width", width)
     
     def remove_character(self, widget):
         """캐릭터 프롬프트 삭제"""
@@ -509,6 +635,6 @@ class CharacterPromptsContainer(QWidget):
         """창 크기 변경 시 처리"""
         super().resizeEvent(event)
         
-        # 스플리터 제거로 인한 오류 방지
-        if hasattr(self, 'splitter') and self.splitter is not None:
-            self.splitter.setSizes([self.splitter.sizes()[0], 0])
+        # 스크롤 영역 높이 저장
+        if self.scroll_area.height() > 0:
+            self.settings.setValue("character_scroll_height", self.scroll_area.height())
