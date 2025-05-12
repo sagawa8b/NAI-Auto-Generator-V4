@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
                              QTextBrowser, QComboBox, QSplitter, QCheckBox, 
                              QRadioButton, QButtonGroup, QSizePolicy, QMessageBox, 
                              QFileDialog, QApplication, QCompleter, QFrame)
-from PyQt5.QtCore import Qt, pyqtSignal  # pyqtSignal 추가
+from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QSize
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QMouseEvent, QBrush, QPalette
 from consts import RESOLUTION_FAMILIY
 from completer import CompletionTextEdit
@@ -121,7 +121,17 @@ def init_main_widget(parent):
     # 7. 왼쪽 레이아웃에 스플리터 추가
     left_layout.addWidget(prompt_char_splitter)
 
-
+    def adjust_group_size(group_box, size):
+        """이미지 위젯 크기가 변경될 때 그룹박스 크기도 조정"""
+        # 여백과 버튼 영역을 고려한 추가 공간
+        padding_width = 30
+        padding_height = 80
+        
+        # 그룹박스 크기 조정
+        group_box.setMinimumSize(
+            size.width() + padding_width,
+            size.height() + padding_height
+        )
 
     # 이미지 옵션, 고급 설정, 생성 버튼을 수평으로 배치할 컨테이너
     horizontal_container = QHBoxLayout()
@@ -321,6 +331,26 @@ def init_main_widget(parent):
     """)
     generate_layout.addWidget(parent.button_expand)
 
+    # 이미지 크기 리셋 버튼 추가
+    parent.button_reset_size = QPushButton("이미지 크기 초기화")
+    parent.button_reset_size.setToolTip("결과 이미지 창을 기본 크기로 복원합니다")
+    parent.button_reset_size.clicked.connect(lambda: parent.image_result.reset_to_default_size())
+    parent.button_reset_size.setStyleSheet("""
+        QPushButton {
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 4px;
+        }
+        QPushButton:hover {
+            background-color: #e0e0e0;
+        }
+        QPushButton:pressed {
+            background-color: #d0d0d0;
+        }
+    """)
+    generate_layout.addWidget(parent.button_reset_size)
+
     # 공백 추가 (버튼 아래 여백)
     generate_layout.addStretch(1)
 
@@ -462,19 +492,38 @@ def init_main_widget(parent):
     result_image_group = QGroupBox("결과 이미지 (Result Image)")
     result_image_layout = QVBoxLayout()
     result_image_group.setLayout(result_image_layout)
-
+    
     # 이미지 보기
-    parent.image_result = ImageResultWidget()
+    parent.image_result = ResizableImageWidget()
     result_image_layout.addWidget(parent.image_result)
-
-    # 이미지 저장 버튼
+    
+    # 크기 변경 시그널 연결
+    parent.image_result.size_changed.connect(
+        lambda size: adjust_group_size(result_image_group, size))
+    
+    # 이미지 버튼 영역
     hbox_image_buttons = QHBoxLayout()
-    button_save_image = QPushButton("이미지 저장 (Save Image)")
+    
+    # 이미지 저장 버튼
+    button_save_image = QPushButton("이미지 저장")
     button_save_image.clicked.connect(lambda: parent.image_result.save_image())
     hbox_image_buttons.addWidget(button_save_image)
     
+    # 기본 크기로 복원 버튼 추가
+    button_reset_size = QPushButton("이미지 창을 기본 크기로 복원")
+    button_reset_size.setToolTip("이미지 창을 기본 크기(512x512)로 되돌립니다")
+    button_reset_size.clicked.connect(lambda: parent.image_result.reset_to_default_size())
+    hbox_image_buttons.addWidget(button_reset_size)
+    
     result_image_layout.addLayout(hbox_image_buttons)
+    
     right_layout.addWidget(result_image_group)
+    
+    # 저장된 크기 기준으로 초기 그룹 크기 설정
+    initial_width = parent.image_result.width() + 30  # 여백 고려
+    initial_height = parent.image_result.height() + 80  # 버튼 영역과 여백 고려
+    result_image_group.setMinimumSize(initial_width, initial_height)
+
 
     # 2.2: 결과 프롬프트 그룹
     result_prompt_group = QGroupBox("결과 프롬프트 (Result Prompt)")
@@ -975,18 +1024,107 @@ class ImageToImageWidget(QGroupBox):
         self.image_label.setPixmap(scaled_pixmap)
 
 
-class ImageResultWidget(QLabel):
-    def __init__(self):
-        super().__init__()
-        self.setAlignment(Qt.AlignCenter)
-        self.setMinimumSize(512, 512)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.setStyleSheet("background-color: rgba(0, 0, 0, 128);")
-        self.setText("결과 이미지가 없습니다")
-        self.image_path = None
-        self.original_image_data = None  # 원본 이미지 데이터 저장 변수
+def set_sampler_by_api_value(parent, api_value):
+    """API 값으로 샘플러 콤보박스 설정"""
+    # API 값에서 UI 이름으로 역매핑
+    ui_name = None
+    for name, value in parent.sampler_mapping.items():
+        if value == api_value:
+            ui_name = name
+            break
+    
+    # 매핑된 UI 이름이 있으면 선택, 없으면 기본값(첫 번째 항목) 선택
+    if ui_name and ui_name in parent.sampler_mapping:
+        parent.dict_ui_settings["sampler"].setCurrentText(ui_name)
+    else:
+        # 기본값 선택
+        parent.dict_ui_settings["sampler"].setCurrentIndex(0)
+    
 
+class ResizableImageWidget(QFrame):
+    """크기 조절이 가능한 이미지 결과 위젯"""
+    
+    # 크기 변경 시그널
+    size_changed = pyqtSignal(QSize)
+    
+    # 기본 크기 상수 정의
+    DEFAULT_WIDTH = 512
+    DEFAULT_HEIGHT = 512
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFrameShape(QFrame.StyledPanel)
+        self.setFrameShadow(QFrame.Sunken)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumSize(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT)
+        
+        # 설정 객체
+        self.settings = QSettings("dcp_arca", "nag_gui")
+        
+        # 레이아웃 설정
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 이미지 라벨
+        self.image_label = QLabel()
+        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setText("결과 이미지가 없습니다")
+        self.image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128);")
+        self.layout.addWidget(self.image_label)
+        
+        # 이미지 데이터
+        self.image_path = None
+        self.original_image_data = None
+        
+        # 리사이즈 핸들 설정
+        self.setMouseTracking(True)
+        self.resizing = False
+        self.resize_start_pos = None
+        self.original_size = None
+        self.resize_margin = 10  # 가장자리 마진
+        
+        # 저장된 크기 불러오기
+        self.load_widget_size()
+    
+    def load_widget_size(self):
+        """저장된 위젯 크기 불러오기"""
+        saved_width = self.settings.value("result_image_width", self.DEFAULT_WIDTH, type=int)
+        saved_height = self.settings.value("result_image_height", self.DEFAULT_HEIGHT, type=int)
+        
+        # 최소 크기보다 작으면 최소 크기로 설정
+        saved_width = max(saved_width, self.minimumWidth())
+        saved_height = max(saved_height, self.minimumHeight())
+        
+        self.resize(saved_width, saved_height)
+        
+        # 부모 위젯에게 크기 변경 알림
+        self.size_changed.emit(QSize(saved_width, saved_height))
+    
+    def save_widget_size(self):
+        """위젯 크기 저장"""
+        self.settings.setValue("result_image_width", self.width())
+        self.settings.setValue("result_image_height", self.height())
+    
+    def reset_to_default_size(self):
+        """위젯 크기를 기본값으로 리셋"""
+        # 기본 크기로 설정
+        self.resize(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT)
+        
+        # 설정 저장
+        self.settings.setValue("result_image_width", self.DEFAULT_WIDTH)
+        self.settings.setValue("result_image_height", self.DEFAULT_HEIGHT)
+        
+        # 이미지 크기 조정
+        self.refresh_size()
+        
+        # 부모 위젯에게 크기 변경 알림
+        self.size_changed.emit(QSize(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT))
+        
+        # 로그 출력
+        print(f"이미지 크기 기본값으로 재설정: {self.DEFAULT_WIDTH}x{self.DEFAULT_HEIGHT}")
+    
     def set_custom_pixmap(self, src):
+        """이미지 설정"""
         self.image_path = src
         self.original_image_data = None  # 초기화
 
@@ -997,10 +1135,11 @@ class ImageResultWidget(QLabel):
                     # 원본 이미지 데이터 저장
                     with open(src, 'rb') as f:
                         self.original_image_data = f.read()
-                    self.setPixmap(pixmap.scaled(
-                        self.width(), self.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    self.image_label.setPixmap(pixmap.scaled(
+                        self.image_label.width(), self.image_label.height(), 
+                        Qt.KeepAspectRatio, Qt.SmoothTransformation))
                 else:
-                    self.setText("이미지 로드 실패")
+                    self.image_label.setText("이미지 로드 실패")
                     self.image_path = None
             else:
                 # 바이트 데이터인 경우
@@ -1009,19 +1148,21 @@ class ImageResultWidget(QLabel):
                 image.loadFromData(src)
                 pixmap = QPixmap.fromImage(image)
                 if not pixmap.isNull():
-                    self.setPixmap(pixmap.scaled(
-                        self.width(), self.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    self.image_label.setPixmap(pixmap.scaled(
+                        self.image_label.width(), self.image_label.height(), 
+                        Qt.KeepAspectRatio, Qt.SmoothTransformation))
                 else:
-                    self.setText("이미지 로드 실패")
+                    self.image_label.setText("이미지 로드 실패")
                     self.image_path = None
                     self.original_image_data = None
         except Exception as e:
             print(e)
-            self.setText("이미지 로드 오류: " + str(e))
+            self.image_label.setText("이미지 로드 오류: " + str(e))
             self.image_path = None
             self.original_image_data = None
-
+    
     def refresh_size(self):
+        """이미지 크기 새로고침"""
         if not self.image_path and not self.original_image_data:
             return  # 이미지가 없으면 아무 작업도 하지 않음
             
@@ -1030,23 +1171,25 @@ class ImageResultWidget(QLabel):
                 # 파일 경로가 있는 경우
                 pixmap = QPixmap(self.image_path)
                 if not pixmap.isNull():
-                    self.setPixmap(pixmap.scaled(
-                        self.width(), self.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    self.image_label.setPixmap(pixmap.scaled(
+                        self.image_label.width(), self.image_label.height(), 
+                        Qt.KeepAspectRatio, Qt.SmoothTransformation))
             elif self.original_image_data:
                 # 저장된 원본 데이터가 있는 경우
                 image = QImage()
                 image.loadFromData(self.original_image_data)
                 pixmap = QPixmap.fromImage(image)
                 if not pixmap.isNull():
-                    self.setPixmap(pixmap.scaled(
-                        self.width(), self.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                    self.image_label.setPixmap(pixmap.scaled(
+                        self.image_label.width(), self.image_label.height(), 
+                        Qt.KeepAspectRatio, Qt.SmoothTransformation))
         except Exception as e:
             logger.error(f"Error refreshing image size: {e}")
-
+    
     def save_image(self):
         """이미지 저장 기능"""
         if not self.image_path and not self.original_image_data:
-            show_custom_message(self, "경고", "저장할 이미지가 없습니다.", "warning")
+            QMessageBox.warning(self, "경고", "저장할 이미지가 없습니다.")
             return
             
         # 파일 저장 대화상자 열기
@@ -1073,30 +1216,74 @@ class ImageResultWidget(QLabel):
                         img.save(filename)
                     else:
                         # pixmap에서 이미지 저장
-                        pixmap = self.pixmap()
+                        pixmap = self.image_label.pixmap()
                         if pixmap and not pixmap.isNull():
                             pixmap.save(filename)
                 
                 # 성공 메시지 표시
-                show_custom_message(self, "정보", f"이미지가 성공적으로 저장되었습니다.\n{filename}")
+                QMessageBox.information(self, "정보", f"이미지가 성공적으로 저장되었습니다.\n{filename}")
             except Exception as e:
                 # 오류 메시지 표시
-                show_custom_message(self, "오류", f"이미지 저장 중 오류가 발생했습니다.\n{str(e)}", "error")
-                
-
-def set_sampler_by_api_value(parent, api_value):
-    """API 값으로 샘플러 콤보박스 설정"""
-    # API 값에서 UI 이름으로 역매핑
-    ui_name = None
-    for name, value in parent.sampler_mapping.items():
-        if value == api_value:
-            ui_name = name
-            break
+                QMessageBox.critical(self, "오류", f"이미지 저장 중 오류가 발생했습니다.\n{str(e)}")
     
-    # 매핑된 UI 이름이 있으면 선택, 없으면 기본값(첫 번째 항목) 선택
-    if ui_name and ui_name in parent.sampler_mapping:
-        parent.dict_ui_settings["sampler"].setCurrentText(ui_name)
-    else:
-        # 기본값 선택
-        parent.dict_ui_settings["sampler"].setCurrentIndex(0)
+    def mousePressEvent(self, event):
+        """마우스 클릭 이벤트"""
+        # 오른쪽 아래 모서리 근처에서만 리사이즈 가능
+        if self.is_in_resize_area(event.pos()):
+            self.resizing = True
+            self.resize_start_pos = event.globalPos()
+            self.original_size = self.size()
+            self.setCursor(Qt.SizeFDiagCursor)
+        else:
+            super().mousePressEvent(event)
     
+    def mouseMoveEvent(self, event):
+        """마우스 이동 이벤트"""
+        if self.resizing:
+            # 리사이즈 중
+            diff = event.globalPos() - self.resize_start_pos
+            new_width = max(self.minimumWidth(), self.original_size.width() + diff.x())
+            new_height = max(self.minimumHeight(), self.original_size.height() + diff.y())
+            new_size = QSize(new_width, new_height)
+            
+            self.resize(new_width, new_height)
+            self.refresh_size()  # 이미지 크기 업데이트
+            
+            # 부모 위젯에게 크기 변경 알림
+            self.size_changed.emit(new_size)
+        elif self.is_in_resize_area(event.pos()):
+            # 리사이즈 영역에 있을 때 커서 변경
+            self.setCursor(Qt.SizeFDiagCursor)
+        else:
+            # 일반 영역
+            self.setCursor(Qt.ArrowCursor)
+            super().mouseMoveEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        """마우스 릴리즈 이벤트"""
+        if self.resizing:
+            self.resizing = False
+            self.save_widget_size()  # 크기 저장
+            self.setCursor(Qt.ArrowCursor)
+        else:
+            super().mouseReleaseEvent(event)
+    
+    def is_in_resize_area(self, pos):
+        """리사이즈 영역인지 확인"""
+        # 오른쪽 아래 모서리 근처
+        return (self.width() - pos.x() < self.resize_margin and 
+                self.height() - pos.y() < self.resize_margin)
+    
+    def paintEvent(self, event):
+        """위젯 그리기 이벤트 - 리사이즈 핸들 표시"""
+        super().paintEvent(event)
+        
+        # 리사이즈 핸들 그리기
+        painter = QPainter(self)
+        painter.setPen(QPen(QColor(150, 150, 150), 1))
+        
+        # 오른쪽 아래 모서리에 작은 삼각형 그리기
+        size = 8
+        painter.drawLine(self.width() - size, self.height(), self.width(), self.height() - size)
+        painter.drawLine(self.width() - size * 2, self.height(), self.width(), self.height() - size * 2)
+        painter.drawLine(self.width() - size * 3, self.height(), self.width(), self.height() - size * 3)
