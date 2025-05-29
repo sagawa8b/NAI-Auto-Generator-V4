@@ -15,6 +15,8 @@ from PyQt5.QtGui import QFont, QColor, QPalette
 
 from consts import DEFAULT_PATH
 
+from i18n_manager import tr
+
 from logger import get_logger
 logger = get_logger()
 
@@ -24,11 +26,11 @@ class LoginDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent = parent
+        self.auto_login = False
         self.setup_ui()
-        self.exec_()
-
+        
     def setup_ui(self):
-        self.setWindowTitle('NAI API 로그인')
+        self.setWindowTitle(tr('dialogs.login_title'))
         self.setFixedWidth(480)
 
         main_layout = QVBoxLayout()
@@ -38,8 +40,11 @@ class LoginDialog(QDialog):
 
         if is_logged_in:
             # 로그인 상태일 때 UI
-            login_label = QLabel("현재 Novel AI 계정으로 로그인되어 있습니다.")
+            login_label = QLabel(tr('dialogs.logged_in'))
             login_label.setAlignment(Qt.AlignCenter)
+            
+            username_label = QLabel(tr('dialogs.user') + f" {self.parent.nai.username if hasattr(self.parent.nai, 'username') else tr('misc.unknown')}")
+            username_label.setAlignment(Qt.AlignCenter)
             
             username_label = QLabel(f"사용자: {self.parent.nai.username if hasattr(self.parent.nai, 'username') else '알 수 없음'}")
             username_label.setAlignment(Qt.AlignCenter)
@@ -59,12 +64,12 @@ class LoginDialog(QDialog):
             
             main_layout.addLayout(buttons_layout)
         else:
-            # 로그인되지 않은 상태일 때 UI (기존 UI)
-            login_label = QLabel("안녕하세요!\nNovel AI 계정으로 로그인해 주세요.")
+            # 로그인되지 않은 상태일 때 UI
+            login_label = QLabel(tr('dialogs.login_welcome'))
             login_label.setAlignment(Qt.AlignCenter)
 
-            username_label = QLabel("아이디:")
-            password_label = QLabel("암호:")
+            username_label = QLabel(tr('dialogs.username'))
+            password_label = QLabel(tr('dialogs.password'))
 
             self.username_field = QLineEdit()
             self.password_field = QLineEdit()

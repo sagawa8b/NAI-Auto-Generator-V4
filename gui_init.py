@@ -11,15 +11,18 @@ from character_prompts_ui import CharacterPromptsContainer
 import random
 import os
 from logger import get_logger
+
+from i18n_manager import tr
+
 logger = get_logger()
 
 def init_advanced_prompt_group(parent):
-    """고급 반응형 프롬프트 그룹 초기화 - 스플리터 사용"""
-    prompt_group = QGroupBox("Prompt")
+    """고급 반응형 프롬프트 그룹 초기화"""
+    prompt_group = QGroupBox(tr('ui.prompt_group', 'Prompt'))
     prompt_layout = QVBoxLayout()
     prompt_group.setLayout(prompt_layout)
 
-    # 스플리터 추가 - 프롬프트와 네거티브 프롬프트 사이 크기 조절 가능
+    # 스플리터 추가
     splitter = QSplitter(Qt.Vertical)
     
     # 프롬프트 위젯
@@ -27,9 +30,9 @@ def init_advanced_prompt_group(parent):
     prompt_widget_layout = QVBoxLayout(prompt_widget)
     prompt_widget_layout.setContentsMargins(0, 0, 0, 0)
     
-    prompt_label = QLabel("프롬프트(Prompt):")
+    prompt_label = QLabel(tr('ui.prompt'))
     parent.dict_ui_settings["prompt"] = CompletionTextEdit()
-    parent.dict_ui_settings["prompt"].setPlaceholderText("이미지에 포함할 내용을 입력하세요...")
+    parent.dict_ui_settings["prompt"].setPlaceholderText(tr('ui.prompt_placeholder'))
     
     prompt_widget_layout.addWidget(prompt_label)
     prompt_widget_layout.addWidget(parent.dict_ui_settings["prompt"])
@@ -39,7 +42,7 @@ def init_advanced_prompt_group(parent):
     neg_prompt_widget_layout = QVBoxLayout(neg_prompt_widget)
     neg_prompt_widget_layout.setContentsMargins(0, 0, 0, 0)
     
-    neg_prompt_label = QLabel("네거티브 프롬프트(Negative Prompt):")
+    neg_prompt_label = QLabel(tr('ui.negative_prompt'))
     parent.dict_ui_settings["negative_prompt"] = CompletionTextEdit()
     parent.dict_ui_settings["negative_prompt"].setPlaceholderText("이미지에서 제외할 내용을 입력하세요...")
     
@@ -206,7 +209,7 @@ def init_main_widget(parent):
     hbox_custom_size.addWidget(parent.dict_ui_settings["height"])
 
     # 체크박스 설정 불러오는 부분
-    checkbox_random_resolution = QCheckBox("랜덤 (Random)")
+    checkbox_random_resolution = QCheckBox("Random")
     checkbox_random_resolution.stateChanged.connect(
         parent.on_random_resolution_checked)
 
@@ -269,9 +272,9 @@ def init_main_widget(parent):
     parent.dict_ui_settings["seed"] = QLineEdit()
     parent.dict_ui_settings["seed"].setAlignment(Qt.AlignRight)
     hbox_seed.addWidget(parent.dict_ui_settings["seed"])
-    parent.dict_ui_settings["seed_fix_checkbox"] = QCheckBox("고정 (Fix)")
+    parent.dict_ui_settings["seed_fix_checkbox"] = QCheckBox("Fix")
     hbox_seed.addWidget(parent.dict_ui_settings["seed_fix_checkbox"])
-    seed_random_button = QPushButton("랜덤 (Random)")
+    seed_random_button = QPushButton("Random")
     seed_random_button.clicked.connect(
         lambda: parent.dict_ui_settings["seed"].setText(str(random.randint(0, 2**32-1))))
     hbox_seed.addWidget(seed_random_button)
@@ -332,8 +335,8 @@ def init_main_widget(parent):
     generate_layout.addWidget(parent.button_expand)
 
     # 이미지 크기 리셋 버튼 추가
-    parent.button_reset_size = QPushButton("이미지 크기 초기화")
-    parent.button_reset_size.setToolTip("결과 이미지 창을 기본 크기로 복원합니다")
+    parent.button_reset_size = QPushButton(tr('ui.reset_image_size'))
+    parent.button_reset_size.setToolTip(tr('ui.reset_image_size_tooltip'))
     parent.button_reset_size.clicked.connect(lambda: parent.image_result.reset_to_default_size())
     parent.button_reset_size.setStyleSheet("""
         QPushButton {
@@ -371,17 +374,17 @@ def init_main_widget(parent):
     folder_layout.setSpacing(3)
 
     # 결과 폴더 버튼
-    results_folder_btn = QPushButton("생성 결과 폴더")
+    results_folder_btn = QPushButton(tr('folders.results'))
     results_folder_btn.clicked.connect(lambda: parent.on_click_open_folder("path_results"))
     folder_layout.addWidget(results_folder_btn)
 
     # 와일드카드 폴더 버튼
-    wildcards_folder_btn = QPushButton("와일드카드 폴더")
+    wildcards_folder_btn = QPushButton(tr('folders.wildcards'))
     wildcards_folder_btn.clicked.connect(lambda: parent.on_click_open_folder("path_wildcards"))
     folder_layout.addWidget(wildcards_folder_btn)
 
     # 세팅 파일 폴더 버튼
-    settings_folder_btn = QPushButton("세팅 파일 폴더")
+    settings_folder_btn = QPushButton(tr('folders.settings'))
     settings_folder_btn.clicked.connect(lambda: parent.on_click_open_folder("path_settings"))
     folder_layout.addWidget(settings_folder_btn)
 

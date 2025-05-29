@@ -125,46 +125,6 @@ def prettify_dict(d):
     return json.dumps(d, sort_keys=True, indent=4)
 
 
-class S:
-    LIST_STATSUBAR_STATE = {
-        "BEFORE_LOGIN": "로그인이 필요합니다.",
-        "LOGINED": "로그인 완료. 이제 생성이 가능합니다.",
-        "LOGGINGIN": "로그인 중...",
-        "GENERATING": "이미지를 생성하는 중...",
-        "IDLE": "대기 중",
-        "LOAD_COMPLETE": "파일 로드 완료",
-        "LOADING": "로드 중...",
-        "AUTO_GENERATING_COUNT": "연속 생성 중 ({}/{})",
-        "AUTO_GENERATING_INF": "연속 생성 중",
-        "AUTO_WAIT": "다음 생성 대기 중... ({}초)",
-        "AUTO_ERROR_WAIT": "에러 발생. {}초 후 재시도...",
-    }
-
-    ABOUT = """NAI Auto Generator v4
-    version 1.5.5.12a
-
-본진 : 
-  아카라이브 AI그림 채널 https://arca.live/b/aiart
-  
-원 제작자 : 
-  https://arca.live/b/aiart @DCP
-
-v4 업데이트 :
- sagawa
-  
-크레딧 :
-  https://huggingface.co/baqu2213
-  https://github.com/neggles/sd-webui-stealth-pnginfo/  
-  https://github.com/DCP-arca/NAI-Auto-Generator
-
-Notice : "본 앱은 제3자가 개발한 앱으로 Novel AI 또는 Stability AI에서 개발하거나 관리하지 않으며, 이들 회사와는 무관합니다."
-
-="This app is a third-party app that is not developed or managed by Novel AI or Stability AI and is unaffiliated with those companies."
-
-
-"""
-
-
 # 기본 파라미터 수정
 DEFAULT_PARAMS = {
     "prompt": "",

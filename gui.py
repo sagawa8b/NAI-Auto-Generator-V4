@@ -13,10 +13,13 @@ from io import BytesIO
 from PIL import Image
 from urllib import request
 
+from i18n_manager import i18n, tr
+
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
                             QPushButton, QPlainTextEdit, QScrollArea, QFrame, 
                             QGridLayout, QDialog, QCheckBox, QButtonGroup, QSizePolicy,
-                            QMainWindow, QAction, QFileDialog, QMessageBox, QApplication)
+                            QMainWindow, QAction, QFileDialog, QMessageBox, QApplication,
+                            QActionGroup)
 from PyQt5.QtCore import (Qt, pyqtSignal, QObject, QTimer, QSettings, QPoint, QSize, 
                           QCoreApplication, QThread)
 from PyQt5.QtGui import QColor, QPalette, QFont
@@ -24,7 +27,7 @@ from PyQt5.QtGui import QColor, QPalette, QFont
 from gui_init import init_main_widget
 from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, MiniUtilDialog, FileIODialog
 
-from consts import COLOR, S, DEFAULT_PARAMS, DEFAULT_PATH, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict, DEFAULT_TAGCOMPLETION_PATH
+from consts import COLOR, DEFAULT_PARAMS, DEFAULT_PATH, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict, DEFAULT_TAGCOMPLETION_PATH
 
 import naiinfo_getter
 from nai_generator import NAIGenerator, NAIAction, NAISessionManager
@@ -288,13 +291,20 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.app = app
         self.palette = self.palette()
         self.is_initializing = True
-        self.is_expand = True  # Default to expanded view
-        
-        # 변수 및 창 초기화
+        self.is_expand = True
+
+        # 변수 및 창 초기화 (settings 초기화)
         self.init_variable()
-        self.init_window()
+        self.init_window()  # 여기서 self.settings가 초기화됨
+        
+        # 언어 초기화를 가장 먼저 실행
+        saved_language = self.settings.value("language", "ko")
+        i18n.set_language(saved_language)
+        i18n.language_changed.connect(self.on_language_changed)
+        
+        # 나머지 초기화
         self.init_statusbar()
-        self.init_menubar()
+        self.init_menubar()        
         self.init_content()
         self.load_data()
         self.check_folders()
@@ -302,6 +312,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # 기존 초기화 코드 후에 추가
         self.last_connected = True
         self.session_timer = None
+
+        # 언어 초기화 (기존 코드의 적절한 위치에 추가)
+        saved_language = self.settings.value("language", "ko")
+        i18n.set_language(saved_language)
+        
+        # 언어 변경 시그널 연결
+        i18n.language_changed.connect(self.on_language_changed)
         
         
         # 테마 적용
@@ -331,6 +348,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.init_wc()
         self.init_tagger()
         self.init_completion()
+    
     
     def start_session_monitoring(self, interval=1800000):
         """주기적 세션 유효성 검사 및 갱신 - 향상된 모니터링"""
@@ -365,12 +383,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         success = self.session_manager.force_refresh()
                         
                         if success:
-                            self.set_statusbar_text("LOGINED")
+                            self.set_statusbar_text("logged_in")
                             self.refresh_anlas()
                             logging.info("세션 강제 갱신 성공")
                         else:
                             # 실패 시 로그인 대화상자 표시 고려
-                            self.set_statusbar_text("BEFORE_LOGIN")
+                            self.set_statusbar_text("before_login")
                             logging.warning("세션 강제 갱신 실패, 사용자 개입 필요")
                             
                             # 자동 로그인 옵션이 켜져 있으면 자동 재로그인 시도
@@ -381,10 +399,10 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     if not self.nai.check_logged_in():
                         success = self.nai.refresh_token()
                         if success:
-                            self.set_statusbar_text("LOGINED")
+                            self.set_statusbar_text("logged_in")
                             self.refresh_anlas()
                         else:
-                            self.set_statusbar_text("BEFORE_LOGIN")
+                            self.set_statusbar_text("before_login")
             except Exception as e:
                 logging.error(f"세션 체크 오류: {e}")
 
@@ -901,12 +919,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.set_statusbar_text("BEFORE_LOGIN")
 
     def init_menubar(self):
-        openAction = QAction('파일 열기(Open file)', self)
+        # 기존 액션들을 번역된 텍스트로 변경
+        openAction = QAction(tr('menu.open_file'), self)
         openAction.setShortcut('Ctrl+O')
         openAction.triggered.connect(lambda: self.show_file_dialog("file"))
 
-        # 설정 저장 액션 추가
-        saveSettingsAction = QAction('설정 저장(Save Settings)', self)
+        saveSettingsAction = QAction(tr('menu.save_settings'), self)
         saveSettingsAction.setShortcut('Ctrl+S')
         saveSettingsAction.triggered.connect(self.on_click_save_settings)
         
@@ -943,12 +961,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
         togglePanelAction.setShortcut('F11')
         togglePanelAction.triggered.connect(self.on_click_expand)
         
-        # 먼저 menubar를 정의
+        # 메뉴 생성
         menubar = self.menuBar()
         menubar.setNativeMenuBar(False)
         
+        
         # 기존 메뉴 추가
-        filemenu_file = menubar.addMenu('&파일(Files)')
+        filemenu_file = menubar.addMenu(tr('menu.file')) 
         filemenu_file.addAction(openAction)
         filemenu_file.addAction(saveSettingsAction)
         filemenu_file.addAction(loadSettingsAction)
@@ -957,16 +976,150 @@ class NAIAutoGeneratorWindow(QMainWindow):
         filemenu_file.addAction(optionAction)
         filemenu_file.addAction(exitAction)
         
-        #filemenu_tool = menubar.addMenu('&도구(Tools)')
+        #filemenu_tool = menubar.addMenu(tr('menu.tools'))
         #filemenu_tool.addAction(getterAction)
         #filemenu_tool.addAction(taggerAction)
         
         # 보기 메뉴 추가
-        viewMenu = menubar.addMenu('&보기')
+        viewMenu = menubar.addMenu(tr('menu.view'))
         viewMenu.addAction(togglePanelAction)
         
-        filemenu_etc = menubar.addMenu('&기타(Etc)')
+        filemenu_etc = menubar.addMenu(tr('menu.etc'))
         filemenu_etc.addAction(aboutAction)
+        
+        # 언어 메뉴 추가
+        self.lang_menu = menubar.addMenu(tr('menu.languages', 'Languages'))
+        self.setup_language_menu()
+
+    def setup_language_menu(self):
+        """언어 선택 메뉴 설정"""
+        self.lang_menu.clear()
+        
+        # 언어 액션 그룹
+        lang_group = QActionGroup(self)
+        
+        for lang_code, lang_name in i18n.get_available_languages().items():
+            action = QAction(lang_name, self)
+            action.setCheckable(True)
+            action.setData(lang_code)
+            
+            # 현재 언어 체크
+            if lang_code == i18n.current_language:
+                action.setChecked(True)
+            
+            # 언어 변경 연결
+            action.triggered.connect(lambda checked, code=lang_code: self.change_language(code))
+            
+            lang_group.addAction(action)
+            self.lang_menu.addAction(action)
+        
+    
+    def change_language(self, language_code):
+        """언어 변경 처리"""
+        if i18n.set_language(language_code):
+            # 설정 저장
+            self.settings.setValue("language", language_code)
+            
+            # 메뉴만 업데이트
+            self.update_menu_texts()
+            
+            # 재시작 안내 메시지
+            QMessageBox.information(self, "Language Changed", 
+                                   "Language has been changed. Please restart the application to apply all changes.\n\n"
+                                   "언어가 변경되었습니다. 모든 변경사항을 적용하려면 애플리케이션을 재시작해주세요.")
+    
+    def on_language_changed(self, language_code):
+        """언어 변경 시그널 처리"""
+        self.update_all_texts()
+
+    def update_all_texts(self):
+        """모든 UI 텍스트 업데이트"""
+        # 윈도우 타이틀 (하드코딩 사용)
+        self.setWindowTitle(TITLE_NAME) 
+        
+        # 메뉴 업데이트
+        self.update_menu_texts()
+        
+        # 버튼 텍스트 업데이트
+        self.button_generate_once.setText(tr('generate.once'))
+        self.button_generate_sett.setText(tr('generate.by_settings'))
+        self.button_generate_auto.setText(tr('generate.auto'))
+        
+        # 그룹 박스 타이틀 업데이트
+        if hasattr(self, 'prompt_group'):
+            self.prompt_group.setTitle(tr('ui.prompt_group', 'Prompt'))
+        
+        # 라벨 업데이트
+        self.label_anlas.setText(tr('misc.anlas') + " ?")
+        
+        # 상태바 업데이트
+        self.set_statusbar_text()
+
+        # 라벨 업데이트 (프롬프트 영역의 라벨들 찾아서 업데이트)
+        if hasattr(self, 'prompt_splitter'):
+            # 스플리터 내 라벨들 업데이트 로직 추가
+            pass
+
+    
+    def update_menu_texts(self):
+        """메뉴 텍스트 업데이트"""
+        for action in self.menuBar().actions():
+            menu = action.menu()
+            if menu:
+                # 메뉴 제목 업데이트
+                if 'file' in action.text().lower() or '파일' in action.text():
+                    menu.setTitle(tr('menu.file'))
+                elif 'view' in action.text().lower() or '보기' in action.text():
+                    menu.setTitle(tr('menu.view'))
+                elif 'etc' in action.text().lower() or '기타' in action.text():
+                    menu.setTitle(tr('menu.etc'))
+                elif 'language' in action.text().lower():
+                    menu.setTitle(tr('menu.languages', 'Languages'))
+                
+                # 메뉴 내 액션들 업데이트
+                for sub_action in menu.actions():
+                    if not sub_action.isSeparator():
+                        text = sub_action.text()
+                        if 'open' in text.lower() or '열기' in text:
+                            sub_action.setText(tr('menu.open_file'))
+                        elif 'save' in text.lower() and 'settings' in text.lower():
+                            sub_action.setText(tr('menu.save_settings'))
+                        elif 'load' in text.lower() or '불러오기' in text:
+                            sub_action.setText(tr('menu.load_settings'))
+                        elif 'login' in text.lower() or '로그인' in text:
+                            sub_action.setText(tr('menu.login'))
+                        elif 'option' in text.lower() or '옵션' in text:
+                            sub_action.setText(tr('menu.option'))
+                        elif 'exit' in text.lower() or '종료' in text:
+                            sub_action.setText(tr('menu.exit'))
+                        elif 'about' in text.lower() or '만든' in text:
+                            sub_action.setText(tr('menu.about'))
+                        elif 'toggle' in text.lower() or '토글' in text:
+                            sub_action.setText(tr('menu.toggle_panel'))
+
+    
+    def set_statusbar_text(self, status_key="", list_format=[]):
+        statusbar = self.statusBar()
+        
+        if status_key:
+            self.status_state = status_key
+            self.status_list_format = list_format
+        else:
+            status_key = self.status_state
+            list_format = self.status_list_format
+        
+        # 번역된 텍스트 사용
+        status_text = tr(f'statusbar.{status_key.lower()}', *list_format)
+        statusbar.showMessage(status_text)
+
+    
+    def refresh_languages(self):
+        """언어 파일 새로고침"""
+        i18n.reload_languages()
+        self.setup_language_menu()
+        QMessageBox.information(self, tr('dialogs.info'), 
+                               tr('dialogs.languages_refreshed', 'Languages refreshed successfully'))
+
 
     def init_content(self):
         widget = init_main_widget(self)
@@ -1759,7 +1912,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 import datetime
                 data["metadata"] = {
                     "saved_at": datetime.datetime.now().isoformat(),
-                    "app_version": "1.5.4"  # 앱 버전 상수화 필요
+                    "app_version": "2.5.29"  # 앱 버전 상수화 필요
                 }
                 
                 # 캐릭터 프롬프트 데이터 추가
@@ -2076,18 +2229,39 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.image_result.set_custom_pixmap(img_obj)
             self.set_statusbar_text("LOAD_COMPLETE")
 
+
+    def show_option_dialog(self):
+        """옵션 대화상자를 표시합니다."""
+        dialog = OptionDialog(self)
+        dialog.exec_()
+
     def show_login_dialog(self):
         dialog = LoginDialog(self)
+        dialog.exec_() 
         # 여기서 dialog가 모달로 실행되고 완료됩니다
         # 로그인 성공/실패 처리는 dialog에서 이루어집니다
 
-    def show_option_dialog(self):
-        self.option_dialog = OptionDialog(self)
+    def show_about_dialog(self):
+        about_text = """NAI Auto Generator v4.5    
+
+        Community : https://arca.live/b/aiart
+          
+        Original :  https://github.com/DCP-arca/NAI-Auto-Generator
+
+        v4/v4.5 update : sagawa8b
+          
+        크레딧 : https://huggingface.co/baqu2213
+                https://github.com/neggles/sd-webui-stealth-pnginfo/  
+                https://github.com/DCP-arca/NAI-Auto-Generator
+
+        Notice : "본 앱은 제3자가 개발한 앱으로 Novel AI 에서 개발하거나 관리하지 않으며, 이들 회사와는 무관합니다."
+
+        ="This app is a third-party app that is not developed or managed by Novel AI is unaffiliated with those companies."
+        """
+        QMessageBox.about(self, 'About', about_text)
 
         self.option_dialog.exec_()
-
-    def show_about_dialog(self):
-        QMessageBox.about(self, 'About', S.ABOUT)
+    
 
     def set_disable_button(self, will_disable):
         self.button_generate_once.setDisabled(will_disable)
@@ -2347,8 +2521,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
             status_key = self.status_state
             list_format = self.status_list_format
 
-        statusbar.showMessage(
-            S.LIST_STATSUBAR_STATE[status_key].format(*list_format))
+        # 번역된 텍스트 사용
+        status_text = tr(f'statusbar.{status_key.lower()}', *list_format)
+        statusbar.showMessage(status_text)
 
     def on_statusbar_message_changed(self, t):
         if not t:

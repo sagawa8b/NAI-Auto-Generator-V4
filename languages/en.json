@@ -1,0 +1,142 @@
+{
+  "language_name": "English",
+  "language_code": "en",
+  "translations": {
+    "menu": {
+	  "languages": "Languages",
+      "file": "Files",
+      "open_file": "Open file",
+      "save_settings": "Save Settings",
+      "load_settings": "Load Settings",
+      "login": "Log in",
+      "option": "Option",
+      "exit": "Exit",
+      "view": "View",
+      "toggle_panel": "Toggle Result Panel",
+      "etc": "Etc",
+      "about": "About"
+    },
+    "statusbar": {
+      "before_login": "Login required.",
+      "logged_in": "Login complete. You can now generate images.",
+      "logging_in": "Logging in...",
+      "generating": "Generating image...",
+      "idle": "Idle",
+      "load_complete": "File load complete",
+      "loading": "Loading...",
+      "auto_generating_count": "Auto generating ({}/{})",
+      "auto_generating_inf": "Auto generating",
+      "auto_wait": "Waiting for next generation... ({} seconds)",
+      "auto_error_wait": "Error occurred. Retrying in {} seconds..."
+    },
+    "ui": {
+	  "languages": "Languages",
+      "prompt_group": "Prompt", 
+	  "prompt": "Prompt:",
+      "negative_prompt": "Negative Prompt:",
+      "prompt_placeholder": "Enter what to include in the image...",
+      "negative_prompt_placeholder": "Enter what to exclude from the image...",
+      "character_prompts": "Character Prompts (V4)",
+      "character_prompt_info": "Character Prompts: In V4 model, you can specify multiple characters individually.",
+      "ai_position": "AI Position Selection",
+      "add_character": "+ Add Character",
+      "clear_all": "Clear All",
+      "character_n": "Character {}",
+      "position": "Position",
+      "negative_prompt_add": "Add Negative Prompt",
+	  "character_prompt_info": "Character prompt: V4 models allow you to specify multiple characters individually in an image.",
+	  "ai_position": "Select AI position",
+	  "add_character": "+ Add character",
+	  "clear_all": "Clear all",
+	  "sync_width": "Sync width",
+	  "character_n": "Character {}",
+	  "character_prompt": "Character prompt:",
+	  "position": "Position",
+	  "reset_image_size": "Reset image size",
+	  "reset_image_size_tooltip": "Restores the resulting image window to its default size"
+    },
+    "image_options": {
+      "title": "Image Options",
+      "size": "Size:",
+      "width": "W:",
+      "height": "H:",
+      "random": "Random",
+      "sampler": "Sampler:",
+      "steps": "Steps:",
+      "seed": "Seed:",
+      "fix": "Fix",
+      "random_button": "Random"
+    },
+    "advanced": {
+      "title": "Advanced Settings",
+      "prompt_guidance": "Prompt Guidance:",
+      "prompt_guidance_rescale": "Prompt Guidance Rescale:",
+      "variety_plus": "Variety+",
+      "variety_plus_tooltip": "Skip CFG in early generation stages for more diverse results",
+      "noise_schedule": "Noise Schedule:",
+      "legacy_mode": "Legacy Prompt Conditioning Mode"
+    },
+    "generate": {
+      "title": "Generate",
+      "once": "Generate Once",
+      "by_settings": "Generate by Settings",
+      "auto": "Auto Generate",
+      "stop": "Stop Generation"
+    },
+    "folders": {
+      "title": "Open Folder",
+      "results": "Results Folder",
+      "wildcards": "Wildcards Folder",
+      "settings": "Settings Folder"
+    },
+    "result": {
+      "image_title": "Result Image",
+      "no_image": "No result image",
+      "save_image": "Save Image",
+      "prompt_title": "Result Prompt"
+    },
+    "dialogs": {
+      "login_title": "NAI API Login",
+      "login_welcome": "Hello!\\nPlease log in with your Novel AI account.",
+      "logged_in": "You are currently logged in to your Novel AI account.",
+      "user": "User:",
+      "username": "Username:",
+      "password": "Password:",
+      "auto_login": "Auto login next time",
+      "login_button": "Login",
+      "logout_button": "Logout",
+      "login_info": "※ Your username and password are sent only to Novel AI servers,\\nnot to this app's servers.",
+      "logout_confirm": "Are you sure you want to logout?",
+      "logout_complete": "Logout complete.",
+      "login_success": "Login successful.",
+      "login_failed": "Login failed.\\nPlease check your username and password."
+    },
+    "errors": {
+      "title": "Error",
+      "warning": "Warning",
+      "info": "Information",
+      "network_error": "Internet connection problem: Cannot connect to server. Please check your network status.",
+      "auth_error": "Authentication error: Login required.",
+      "payment_required": "Payment required: Insufficient Anlas.",
+      "api_error": "API request error",
+      "generation_error": "Error during image generation",
+      "file_save_error": "Error saving file",
+      "file_load_error": "Error loading file"
+    },
+    "connection": {
+      "server": "Server:",
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "checking": "Checking...",
+      "network_disconnected": "No network connection",
+      "network_restored": "Internet connection restored."
+    },
+    "misc": {
+      "login_state": "Login State",
+      "logged_in": "Logged In",
+      "not_logged_in": "Login Required",
+      "anlas": "Anlas:",
+      "unknown": "Unknown"
+    }
+  }
+}

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdi
 from PyQt5.QtCore import Qt, pyqtSignal, QSize, QPoint, QRect, QEvent, QSettings
 from PyQt5.QtGui import QColor, QPalette, QBrush, QCursor, QResizeEvent
 from completer import CompletionTextEdit
-
+from i18n_manager import tr
 from logger import get_logger
 logger = get_logger()
 
@@ -186,7 +186,7 @@ class CharacterPromptWidget(QFrame):
             if header_layout:
                 title_label = header_layout.itemAt(0).widget()
                 if title_label:
-                    title_label.setText(f"캐릭터 {self.index + 1}")
+                    title_label.setText(tr('ui.character_n', self.index + 1))
         except Exception as e:
             logger.error(f"타이틀 업데이트 중 오류: {e}")
     
@@ -201,7 +201,7 @@ class CharacterPromptWidget(QFrame):
         header_layout.setContentsMargins(0, 0, 0, 0)  # 여백 제거
         header_layout.setSpacing(2)  # 간격 축소
         
-        title_label = QLabel(f"캐릭터 {self.index + 1}")
+        title_label = QLabel(tr('ui.character_n', self.index + 1))
         title_label.setStyleSheet("font-weight: bold; color: black;")
         header_layout.addWidget(title_label)
         
@@ -219,7 +219,7 @@ class CharacterPromptWidget(QFrame):
         move_down_btn.clicked.connect(lambda: self.moved.emit(self, 1))
         
         # 위치 설정 버튼 - 크기 축소
-        self.position_btn = QPushButton("위치")
+        self.position_btn = QPushButton(tr('ui.position'))
         self.position_btn.setFixedWidth(40)  # 크기 축소
         self.position_btn.setStyleSheet("background-color: #f0f0f0; color: black; padding: 2px;")
         self.position_btn.clicked.connect(self.show_position_dialog)
@@ -238,7 +238,7 @@ class CharacterPromptWidget(QFrame):
         self.layout.addLayout(header_layout)
         
         # 캐릭터 프롬프트 입력
-        prompt_label = QLabel("캐릭터 프롬프트:")
+        prompt_label = QLabel(tr('ui.character_prompt'))
         prompt_label.setStyleSheet("color: black; font-weight: bold;")
         self.layout.addWidget(prompt_label)
         
@@ -364,7 +364,7 @@ class CharacterPromptsContainer(QWidget):
         # 캐릭터 프롬프트 설명
         info_layout = QHBoxLayout()
         info_layout.setContentsMargins(0, 0, 0, 0)  # 여백 제거
-        info_label = QLabel("캐릭터 프롬프트: V4 모델에서는 이미지 내 여러 캐릭터를 개별적으로 지정할 수 있습니다.")
+        info_label = QLabel(tr('ui.character_prompt_info'))
         info_label.setWordWrap(True)
         info_layout.addWidget(info_label)
         self.main_layout.addLayout(info_layout)
@@ -372,23 +372,23 @@ class CharacterPromptsContainer(QWidget):
         # AI 위치 선택 여부 체크박스
         controls_layout = QHBoxLayout()
         controls_layout.setContentsMargins(0, 0, 0, 0)  # 여백 제거
-        self.ai_position_checkbox = QCheckBox("AI 위치 선택")
+        self.ai_position_checkbox = QCheckBox(tr('ui.ai_position'))
         self.ai_position_checkbox.setChecked(True)
         self.ai_position_checkbox.stateChanged.connect(self.toggle_ai_positions)
         controls_layout.addWidget(self.ai_position_checkbox)
         
         # 캐릭터 추가 버튼
-        self.add_button = QPushButton("+ 캐릭터 추가")
+        self.add_button = QPushButton(tr('ui.add_character'))
         self.add_button.clicked.connect(self.add_character)
         controls_layout.addWidget(self.add_button)
         
         # 모두 삭제 버튼
-        self.clear_button = QPushButton("모두 삭제")
+        self.clear_button = QPushButton(tr('ui.clear_all'))
         self.clear_button.clicked.connect(self.clear_characters)
         controls_layout.addWidget(self.clear_button)
         
         # 동일 너비 설정 버튼 추가
-        self.apply_width_button = QPushButton("너비 동기화")
+        self.apply_width_button = QPushButton(tr('ui.sync_width'))
         self.apply_width_button.setToolTip("모든 캐릭터 프롬프트 위젯의 너비를 동일하게 설정")
         self.apply_width_button.clicked.connect(self.apply_same_width_to_all)
         controls_layout.addWidget(self.apply_width_button)

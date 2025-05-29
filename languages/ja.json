@@ -1,0 +1,136 @@
+{
+  "language_name": "日本語",
+  "language_code": "ja",
+  "translations": {
+    "menu": {
+      "languages": "言語",
+      "file": "ファイル(Files)",
+      "open_file": "ファイルを開く(Open file)",
+      "save_settings": "設定を保存(Save Settings)",
+      "load_settings": "設定を読み込み(Load Settings)",
+      "login": "ログイン(Login)",
+      "option": "オプション(Option)",
+      "exit": "終了(Exit)",
+      "view": "表示",
+      "toggle_panel": "結果パネル切替",
+      "etc": "その他(Etc)",
+      "about": "作成者について(About)"
+    },
+    "statusbar": {
+      "before_login": "ログインが必要です。",
+      "logged_in": "ログイン完了。生成が可能です。",
+      "logging_in": "ログイン中...",
+      "generating": "画像を生成中...",
+      "idle": "待機中",
+      "load_complete": "ファイル読み込み完了",
+      "loading": "読み込み中...",
+      "auto_generating_count": "連続生成中 ({}/{})",
+      "auto_generating_inf": "連続生成中",
+      "auto_wait": "次の生成まで待機中... ({}秒)",
+      "auto_error_wait": "エラーが発生しました。{}秒後に再試行..."
+    },
+    "ui": {
+      "languages": "言語",
+      "prompt_group": "プロンプト",
+      "prompt": "プロンプト(Prompt):",
+      "negative_prompt": "ネガティブプロンプト(Negative Prompt):",
+      "prompt_placeholder": "画像に含める内容を入力してください...",
+      "negative_prompt_placeholder": "画像から除外する内容を入力してください...",
+      "character_prompts": "キャラクタープロンプト (V4)",
+      "character_prompt_info": "キャラクタープロンプト: V4モデルでは画像内の複数のキャラクターを個別に指定できます。",
+      "ai_position": "AI位置選択",
+      "add_character": "+ キャラクター追加",
+      "clear_all": "すべて削除",
+      "character_n": "キャラクター {}",
+      "position": "位置",
+      "negative_prompt_add": "ネガティブプロンプト追加",
+      "sync_width": "幅を同期",
+      "character_prompt": "キャラクタープロンプト:",
+      "reset_image_size": "画像サイズ初期化",
+      "reset_image_size_tooltip": "結果画像ウィンドウをデフォルトサイズに復元します"
+    },
+    "image_options": {
+      "title": "画像オプション",
+      "size": "サイズ:",
+      "width": "幅:",
+      "height": "高さ:",
+      "random": "ランダム (Random)",
+      "sampler": "サンプラー:",
+      "steps": "ステップ:",
+      "seed": "シード:",
+      "fix": "固定 (Fix)",
+      "random_button": "ランダム (Random)"
+    },
+    "advanced": {
+      "title": "高度な設定",
+      "prompt_guidance": "プロンプトガイダンス:",
+      "prompt_guidance_rescale": "プロンプトガイダンスリスケール:",
+      "variety_plus": "バラエティ+",
+      "variety_plus_tooltip": "画像生成初期段階でCFGをスキップしてより多様な結果を生成",
+      "noise_schedule": "ノイズスケジュール:",
+      "legacy_mode": "レガシープロンプト条件付けモード"
+    },
+    "generate": {
+      "title": "生成",
+      "once": "1回生成",
+      "by_settings": "設定別連続生成",
+      "auto": "連続生成 (Auto)",
+      "stop": "生成停止"
+    },
+    "folders": {
+      "title": "フォルダを開く",
+      "results": "生成結果フォルダ",
+      "wildcards": "ワイルドカードフォルダ",
+      "settings": "設定ファイルフォルダ"
+    },
+    "result": {
+      "image_title": "結果画像 (Result Image)",
+      "no_image": "結果画像がありません",
+      "save_image": "画像を保存 (Save Image)",
+      "prompt_title": "結果プロンプト (Result Prompt)"
+    },
+    "dialogs": {
+      "login_title": "NAI API ログイン",
+      "login_welcome": "こんにちは！\\nNovel AIアカウントでログインしてください。",
+      "logged_in": "現在Novel AIアカウントでログインしています。",
+      "user": "ユーザー:",
+      "username": "ユーザー名:",
+      "password": "パスワード:",
+      "auto_login": "次回も自動ログイン",
+      "login_button": "ログイン",
+      "logout_button": "ログアウト",
+      "login_info": "※ 入力されたユーザー名とパスワードはNovel AIサーバーにのみ送信され、\\nこのアプリのサーバーには送信されません。",
+      "logout_confirm": "本当にログアウトしますか？",
+      "logout_complete": "ログアウトしました。",
+      "login_success": "ログインに成功しました。",
+      "login_failed": "ログインに失敗しました。\\nユーザー名とパスワードを確認してください。"
+    },
+    "errors": {
+      "title": "エラー",
+      "warning": "警告",
+      "info": "通知",
+      "network_error": "インターネット接続の問題: サーバーに接続できません。ネットワーク状態を確認してください。",
+      "auth_error": "認証エラー: ログインが必要です。",
+      "payment_required": "支払いが必要: Anlasが不足しています。",
+      "api_error": "API リクエストエラー",
+      "generation_error": "画像生成中にエラーが発生",
+      "file_save_error": "ファイル保存中にエラーが発生",
+      "file_load_error": "ファイル読み込み中にエラーが発生"
+    },
+    "connection": {
+      "server": "サーバー:",
+      "connected": "接続済み",
+      "disconnected": "接続切断",
+      "checking": "確認中...",
+      "network_disconnected": "ネットワーク接続なし",
+      "network_restored": "インターネット接続が復旧しました。"
+    },
+    "misc": {
+      "login_state": "ログイン状態",
+      "logged_in": "ログイン済み",
+      "not_logged_in": "ログイン必要",
+      "anlas": "Anlas:",
+      "unknown": "不明"
+    }
+  }
+}
