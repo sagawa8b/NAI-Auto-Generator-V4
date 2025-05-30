@@ -113,11 +113,12 @@ def prettify_naidict(d, additional_dict=None):
 # 모델 목록 정의 추가
 NAI_MODELS = {
     "nai-diffusion-4-full": "NAI Diffusion V4 Full",
-    "nai-diffusion-4-5-curated": "NAI Diffusion V4.5 Curated"
+    "nai-diffusion-4-5-curated": "NAI Diffusion V4.5 Curated",
+    "nai-diffusion-4-5-full": "NAI Diffusion V4.5 Full"
 }
 
 # 기본 모델 설정
-DEFAULT_MODEL = "nai-diffusion-4-5-curated"  # V4.5 Curated를 기본값으로 설정
+DEFAULT_MODEL = "nai-diffusion-4-5-full"  # V4.5 Full을 기본값으로 설정
 
 
 
@@ -148,6 +149,8 @@ DEFAULT_PARAMS = {
     "anti_artifacts": "0.0",
     "skip_cfg_above_sigma": "null",
     "variety_plus": "False",  # 기본값 False로 설정
+    "model": "nai-diffusion-4-5-full",  # 추가
+    "v4_model_preset": "Artistic",
 }
 
 DEFAULT_PATH = {

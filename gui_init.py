@@ -706,12 +706,12 @@ def init_advanced_group(parent):
     hbox_model.addWidget(QLabel("Model:"))
     parent.dict_ui_settings["model"] = QComboBox()
     
-    # 모델 목록 추가
+    # 업데이트된 모델 목록 추가
     from consts import NAI_MODELS, DEFAULT_MODEL
     for model_id, model_name in NAI_MODELS.items():
         parent.dict_ui_settings["model"].addItem(model_name, model_id)
     
-    # 기본 모델 선택
+    # 기본 모델을 4.5 full로 선택
     for i in range(parent.dict_ui_settings["model"].count()):
         if parent.dict_ui_settings["model"].itemData(i) == DEFAULT_MODEL:
             parent.dict_ui_settings["model"].setCurrentIndex(i)

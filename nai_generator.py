@@ -423,13 +423,19 @@ class NAIGenerator():
             "v4_model_preset": "Artistic",  # Normal, Artistic, Anime 중 선택
             "anti_artifacts": 0.0,  # 아티팩트 제거 강도
             
-            # V4 시스템 설정
+            # V4.5에서 개선된 설정들
             "params_version": 3,
             "add_original_image": True,
             "legacy": False,
             "prefer_brownian": True,
+            "noise_schedule": "karras",
             "ucPreset": 0,
             
+       
+            # V4.5 최적화 설정
+            "v4_model_preset": "Artistic",  # Normal, Artistic, Anime 중 선택
+            "model": "nai-diffusion-4-5-full",  # 기본 모델을 4.5로 설정
+                   
             # 이미지 변환 설정 (img2img, inpainting)
             "image": None,
             "mask": None,
@@ -443,9 +449,7 @@ class NAIGenerator():
             
             # 캐릭터 프롬프트
             "characterPrompts": [],
-            
-            # 기타 설정
-            "noise_schedule": "karras",
+                        
         }
     
     def refresh_token(self):
