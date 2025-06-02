@@ -11,7 +11,9 @@ class WildcardApplier():
         self._wildcards_dict = {}
         # 루프카드 인덱스 관리 딕셔너리 추가
         self._loopcard_indices = {}
-
+        self._current_snapshot = {}
+        self._used_keys = set()
+        
     def set_src(self, src):
         # Windows에서는 백슬래시 사용하도록 정규화
         if os.name == 'nt':
@@ -64,6 +66,90 @@ class WildcardApplier():
             
         except Exception as e:
             print(f"Error loading wildcards: {e}")
+
+    def create_index_snapshot(self):
+        """현재 루프카드 인덱스의 스냅샷 생성"""
+        self._current_snapshot = self._loopcard_indices.copy()
+        self._used_keys = set()
+
+    def apply_wildcards_with_snapshot(self, target_str):
+        """스냅샷된 인덱스를 사용하여 와일드카드 적용 (인덱스 증가 안함)"""
+        self.load_wildcards()
+        result = target_str
+        
+        # 루프카드 적용 (스냅샷 사용)
+        index = 0
+        except_list = []
+        while True:
+            result, applied_list = self._apply_loopcard_once_with_snapshot(result, except_list)
+            except_list.extend(applied_list)
+            if len(applied_list) == 0 or index > MAX_TRY_AMOUNT:
+                break
+            index += 1
+        
+        # 일반 와일드카드 적용
+        index = 0
+        except_list = []
+        while True:
+            result, applied_list = self._apply_wildcard_once(result, except_list)
+            except_list.extend(applied_list)
+            if len(applied_list) == 0 or index > MAX_TRY_AMOUNT:
+                break
+            index += 1
+        
+        return result
+
+    def _apply_loopcard_once_with_snapshot(self, target_str, except_list=[]):
+        """스냅샷된 인덱스를 사용한 루프카드 처리"""
+        result = target_str
+        applied_loopcard_list = []
+        prev_point = 0
+        
+        while "##" in result:
+            p_left = result.find("##", prev_point)
+            if p_left == -1:
+                break
+            p_right = result.find("##", p_left + 2)
+            if p_right == -1:
+                break
+
+            str_left = result[0:p_left]
+            str_center = result[p_left + 2:p_right].lower().strip()
+            str_right = result[p_right + 2:len(result)]
+
+            if str_center in self._wildcards_dict and not (str_center in except_list):
+                wc_list = self._wildcards_dict[str_center]
+                if wc_list:
+                    # 키 사용 기록
+                    self._used_keys.add(str_center)
+                    
+                    # 스냅샷에서 인덱스 가져오기
+                    idx = self._current_snapshot.get(str_center, 0)
+                    str_center = wc_list[idx].strip()
+                    applied_loopcard_list.append(str_center)
+                else:
+                    str_center = "##" + str_center + "##"
+            else:
+                str_center = "##" + str_center + "##"
+
+            result_left = str_left + str_center
+            prev_point = len(result_left)
+            result = result_left + str_right
+
+        return result, applied_loopcard_list
+
+    def advance_loopcard_indices(self):
+        """사용된 루프카드 인덱스만 다음으로 진행"""
+        for key in self._used_keys:  # 실제 사용된 키만
+            if key in self._wildcards_dict:
+                wc_list = self._wildcards_dict[key]
+                if wc_list:
+                    if key not in self._loopcard_indices:
+                        self._loopcard_indices[key] = 0
+                    self._loopcard_indices[key] = (self._loopcard_indices[key] + 1) % len(wc_list)
+        
+        # 사용된 키 리셋
+        self._used_keys.clear()
 
     def _apply_wildcard_once(self, target_str, except_list=[]):
         result = target_str

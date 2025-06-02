@@ -589,11 +589,6 @@ class CharacterPromptsContainer(QWidget):
         characters_data = []
         for widget in self.character_widgets:
             char_data = widget.get_data()
-            # 와일드카드 처리 적용
-            if apply_wildcards_func:
-                char_data["prompt"] = apply_wildcards_func(char_data["prompt"])
-                if char_data["negative_prompt"]:
-                    char_data["negative_prompt"] = apply_wildcards_func(char_data["negative_prompt"])
             characters_data.append(char_data)
             
         return {

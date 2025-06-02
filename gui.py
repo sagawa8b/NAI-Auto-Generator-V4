@@ -1517,6 +1517,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
             
             # 캐릭터 프롬프트 데이터 가져오기
             if hasattr(self, 'character_prompts_container'):
+                # 🔧 스냅샷 생성 추가
+                if hasattr(self, 'wcapplier'):
+                    self.wcapplier.create_index_snapshot()
                 try:
                     char_data = self.character_prompts_container.get_data()
                     logger.debug(f"캐릭터 프롬프트 가져오기: {len(char_data.get('characters', []))}개")
@@ -1529,8 +1532,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     if "characters" in char_data:
                         for char in char_data["characters"]:
                             # 와일드카드 처리 적용
-                            prompt = self.apply_wildcards(char.get("prompt", ""))
-                            negative_prompt = self.apply_wildcards(char.get("negative_prompt", "")) if char.get("negative_prompt") else ""
+                            prompt = self.apply_wildcards_with_snapshot(char.get("prompt", ""))
+                            negative_prompt = self.apply_wildcards_with_snapshot(char.get("negative_prompt", "")) if char.get("negative_prompt") else ""
                             
                             char_prompt = {
                                 "prompt": prompt,
@@ -1543,8 +1546,11 @@ class NAIAutoGeneratorWindow(QMainWindow):
                                 
                             data["characterPrompts"].append(char_prompt)
                             
-                    logger.debug(f"생성 요청에 포함된 캐릭터 수: {len(data['characterPrompts'])}")
-                except Exception as e:
+                    logger.debug(f"생성 요청에 포함된 캐릭터 수: {len(data['characterPrompts'])}")\
+                    # 🔧 인덱스 진행 추가
+                    if hasattr(self, 'wcapplier'):
+                        self.wcapplier.advance_loopcard_indices()
+                except Exception as e:                
                     logger.error(f"캐릭터 프롬프트 처리 중 오류: {e}")
                     
             # 모든 필수 필드가 있는지 확인
@@ -1862,29 +1868,48 @@ class NAIAutoGeneratorWindow(QMainWindow):
             
         return self.wcapplier.apply_wildcards(prompt)
 
+    def apply_wildcards_with_snapshot(self, prompt):
+        """스냅샷을 사용한 와일드카드 적용"""
+        if not prompt or ("__" not in prompt and "##" not in prompt):
+            return prompt
+        if not hasattr(self, 'wcapplier') or not self.wcapplier:
+            self.init_wc()
+        return self.wcapplier.apply_wildcards_with_snapshot(prompt)
+
+    # gui.py의 debug_wildcards() 메서드를 이렇게 수정:
     def debug_wildcards(self):
-        """와일드카드 시스템 디버깅"""
+        """와일드카드 시스템 디버깅 - 개선된 버전"""
         if not hasattr(self, 'wcapplier'):
             self.init_wc()
             
-        self.wcapplier.load_wildcards()
+        print("=== 루프카드 디버깅 시작 ===")
         
+        # 1. 와일드카드 로딩 확인
+        self.wcapplier.load_wildcards()
         wildcards = self.wcapplier._wildcards_dict
-        if not wildcards:
-            print("와일드카드가 로드되지 않았습니다.")
-            logger.error(f"와일드카드 폴더 경로: {self.wcapplier.src_wildcards_folder}")
-            logger.error(f"폴더 존재 여부: {os.path.exists(self.wcapplier.src_wildcards_folder)}")
-            return
-            
-        logger.error(f"로드된 와일드카드 수: {len(wildcards)}")
-        print("와일드카드 목록:")
-        for i, (key, values) in enumerate(wildcards.items()):
-            logger.error(f"{i+1}. {key}: {len(values)}개 옵션")
-            if i < 5:  # 처음 5개만 상세 출력
-                for j, value in enumerate(values[:3]):
-                    logger.error(f"   {j+1}. {value.strip()}")
-                if len(values) > 3:
-                    logger.error(f"   ... 외 {len(values)-3}개")
+        
+        print(f"로드된 와일드카드 수: {len(wildcards)}")
+        print("사용 가능한 키들:")
+        for key in wildcards.keys():
+            print(f"  - '{key}': {len(wildcards[key])}개 라인")
+        
+        # 2. 특정 키 확인
+        test_key = "1_chara"
+        print(f"\n키 '{test_key}' 확인:")
+        if test_key in wildcards:
+            print(f"✅ 발견! 내용: {wildcards[test_key]}")
+        else:
+            print(f"❌ 없음")
+        
+        # 3. 루프카드 테스트
+        test_prompt = "##1_chara##"
+        print(f"\n루프카드 테스트: {test_prompt}")
+        
+        for i in range(3):
+            result = self.wcapplier.apply_wildcards(test_prompt)
+            print(f"시도 {i+1}: {result}")
+        
+        print("=== 루프카드 디버깅 완료 ===")
                 
                 
     def on_click_open_folder(self, target_pathcode):
