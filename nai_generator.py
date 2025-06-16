@@ -13,7 +13,7 @@ from PIL import Image
 import base64
 
 from logger import get_logger
-logger = get_logger()
+logger = get_logger()  # 기존 setup_logger() 대신 통일된 로거 사용
 
 BASE_URL_DEPRE = "https://api.novelai.net"
 BASE_URL = "https://image.novelai.net"
@@ -340,28 +340,6 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.skip_cfg_above_sigma: (int, type(None))  # int 또는 None 타입 허용
 }
 
-def setup_logger():
-    logger = logging.getLogger('nai_generator')
-    logger.setLevel(logging.INFO)
-    
-    # 콘솔 핸들러
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_format = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(console_format)
-    
-    # 파일 핸들러 부분 제거
-    # file_handler = logging.FileHandler('nai_api_log.txt')
-    # file_handler.setLevel(logging.DEBUG)
-    # file_format = logging.Formatter('%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
-    # file_handler.setFormatter(file_format)
-    
-    logger.addHandler(console_handler)
-    # logger.addHandler(file_handler)
-    return logger
-
-logger = setup_logger()
-
 
 def argon_hash(email: str, password: str, size: int, domain: str) -> str:
     pre_salt = f"{password[:6]}{email}{domain}"
@@ -551,15 +529,17 @@ class NAIGenerator():
     def set_param_dict(self, param_dict):
         # V4 API에서만 사용하는 특별한 파라미터들
         special_params = ["legacy_v3_extend", "noise_schedule", "params_version", 
-                          "characterPrompts", "v4_prompt", "v4_negative_prompt",
-                          "use_character_coords", "model"]  # model 추가
+                          "characterPrompts", "v4_prompt", "v4_negative_prompt", "model"]  # model 추가
         
         for k, v in param_dict.items():
             if k:
                 if k in special_params:
-                    # 특별 파라미터는 직접 설정 (model 포함)
-                    if k != "use_character_coords":  # use_character_coords는 내부에서만 사용
-                        self.parameters[k] = v
+                    # 특별 파라미터는 직접 설정
+                    self.parameters[k] = v
+                    continue
+                elif k == "use_character_coords":
+                    # use_character_coords는 별도 처리
+                    self.parameters[k] = v
                     continue
                     
                 try:
@@ -587,6 +567,9 @@ class NAIGenerator():
     def generate_image(self, action: NAIAction):
         assert(isinstance(action, NAIAction))
         
+        logger.debug("=== generate_image 메서드 시작 ===")
+        
+        
         # 요청 추적을 위한 ID 생성
         import uuid
         request_id = str(uuid.uuid4())[:8]
@@ -603,14 +586,19 @@ class NAIGenerator():
             else:
                 model = "nai-diffusion-4-full-inpainting"
         
+        logger.info(f"📍 [{request_id}] generate_image 메서드 시작")
+        
         # 시드 설정
         if self.parameters["extra_noise_seed"] == -1:
             self.parameters["extra_noise_seed"] = self.parameters["seed"]
 
-        # V4 구조에 맞게 파라미터 변환
+        # *** V4 구조에 맞게 파라미터 변환 ***
+        logger.info(f"📍 [{request_id}] V4 파라미터 변환 호출 직전")
         self._prepare_v4_parameters()
+        logger.info(f"📍 [{request_id}] V4 파라미터 변환 호출 완료")
 
         url = BASE_URL + f"/ai/generate-image"
+
         data = {
             "input": self.parameters["prompt"],
             "model": model,
@@ -619,17 +607,25 @@ class NAIGenerator():
         }
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
-        # 로깅
-        log_params = {
-            "action": action.name,
-            "model": model,
-            "width": self.parameters.get("width"),
-            "height": self.parameters.get("height"),
-            "steps": self.parameters.get("steps"),
-            "sampler": self.parameters.get("sampler")
-        }
+        # API 전송 직전 최종 데이터 로깅 강화
+        logger.info(f"📍 [{request_id}] API 전송 직전 최종 데이터 검증:")
+        logger.info(f"  - 모델: {model}")
+        logger.info(f"  - 액션: {action.name}")
         
-        logger.debug(f"Request parameters [ID: {request_id}]: {log_params}")
+        if "v4_prompt" in self.parameters:
+            v4_prompt = self.parameters["v4_prompt"]
+            logger.info(f"  - v4_prompt use_coords: {v4_prompt.get('use_coords', False)}")
+            char_captions = v4_prompt["caption"].get("char_captions", [])
+            logger.info(f"  - 캐릭터 수: {len(char_captions)}")
+            
+            for i, char_caption in enumerate(char_captions):
+                centers = char_caption.get('centers', [])
+                prompt_preview = char_caption.get('char_caption', '')[:30] + '...'
+                logger.info(f"  - 캐릭터 {i+1}: '{prompt_preview}' -> {centers}")
+        
+        # 캐릭터 프롬프트 로깅 (기존 코드 개선)
+        if "characterPrompts" in self.parameters:
+            logger.debug(f"[{request_id}] 원본 characterPrompts: {len(self.parameters['characterPrompts'])}개")
         
         # 네트워크 상태 확인 추가
         if hasattr(self, 'session_manager') and not self.session_manager.network_available:
@@ -722,18 +718,18 @@ class NAIGenerator():
     
     def _prepare_v4_parameters(self):
         """V4 API에 필요한 파라미터 구조로 변환"""
-        # 내부 파라미터 처리 - use_character_coords 값 저장 후 제거
-        use_coords = self.parameters.get("use_character_coords", False)  # 기본값 False
-        if "use_character_coords" in self.parameters:
-            del self.parameters["use_character_coords"]  # API 요청에서 제거
-
-        # 캐릭터 프롬프트 확인 로깅
-        if "characterPrompts" in self.parameters:
-            logger.debug(f"캐릭터 프롬프트 API 처리: {len(self.parameters['characterPrompts'])}개")
-            logger.debug(f"use_character_coords: {use_coords}")  # 디버깅용 로그 추가
+        print("=== _prepare_v4_parameters 메서드 호출됨 ===")  # 강제 출력
+        logger.info("📍 _prepare_v4_parameters 메서드 시작")
         
+        # 내부 파라미터 처리 - use_character_coords 값 저장 후 제거
+        use_coords = self.parameters.get("use_character_coords", False)
+        logger.info(f"📍 원본 use_character_coords: {use_coords}")
+        if "use_character_coords" in self.parameters:
+            del self.parameters["use_character_coords"]
+
         # Legacy 모드 확인
         legacy_mode = bool(self.parameters.get("legacy", False))
+        logger.debug(f"📍 Legacy 모드: {legacy_mode}")
         
         # V4 프롬프트 형식 설정
         self.parameters["v4_prompt"] = {
@@ -743,7 +739,7 @@ class NAIGenerator():
             },
             "use_coords": use_coords,
             "use_order": True,
-            "legacy_format": legacy_mode  # Legacy 모드 적용
+            "legacy_format": legacy_mode
         }
         
         # V4 네거티브 프롬프트 형식 설정
@@ -752,49 +748,68 @@ class NAIGenerator():
                 "base_caption": self.parameters["negative_prompt"],
                 "char_captions": []
             },
-            "use_coords": use_coords,
-            "use_order": True,
-            "legacy_uc": legacy_mode  # Legacy 모드 적용
+            "use_coords": False,
+            "use_order": False,
+            "legacy_uc": legacy_mode
         }
         
-         # 캐릭터 프롬프트 처리
+        logger.debug(f"📍 v4_prompt 초기 구조 생성 완료 - use_coords: {use_coords}")
+        
+        # 캐릭터 프롬프트 처리
         if self.parameters.get("characterPrompts") and len(self.parameters["characterPrompts"]) > 0:
             char_prompts = self.parameters["characterPrompts"]
-            logger.debug(f"캐릭터 프롬프트 처리 중: {len(char_prompts)}개")
+            logger.info(f"📍 캐릭터 프롬프트 처리 시작: {len(char_prompts)}개")
             
             for i, char in enumerate(char_prompts):
-                # 캐릭터 프롬프트 구조 설정
                 if isinstance(char, dict) and "prompt" in char:
                     char_caption = {
                         "char_caption": char["prompt"],
-                        "centers": [{"x": 0.5, "y": 0.5}]  # 기본 중앙 위치 설정
+                        "centers": [{"x": 0.5, "y": 0.5}]  # 기본 중앙 위치
                     }
                     
-                    # 위치 정보가 있으면 덮어쓰기 (use_coords 값에 관계없이 처리)
-                    if "position" in char and char["position"] and len(char["position"]) == 2:
-                        char_caption["centers"] = [{
-                            "x": float(char["position"][0]),
-                            "y": float(char["position"][1])
-                        }]
-                        logger.debug(f"캐릭터 {i+1} 위치 설정: {char_caption['centers']}")
+                    logger.debug(f"📍 캐릭터 {i+1} 프롬프트: '{char['prompt'][:50]}...'")
+                    
+                    # 위치 정보 처리
+                    if use_coords and "position" in char and char["position"]:
+                        position = char["position"]
+                        logger.debug(f"📍 캐릭터 {i+1} 원본 위치 데이터: {position}, 타입: {type(position)}")
+                        
+                        if isinstance(position, (tuple, list)) and len(position) >= 2:
+                            try:
+                                position_x = float(position[0])
+                                position_y = float(position[1])
+                                char_caption["centers"] = [{"x": position_x, "y": position_y}]
+                                logger.info(f"📍 캐릭터 {i+1} 커스텀 위치 적용: x={position_x}, y={position_y}")
+                            except Exception as e:
+                                logger.error(f"📍 캐릭터 {i+1} 위치 변환 실패: {e}")
+                                logger.debug(f"📍 원본 위치 데이터 상세: {position}")
                     else:
-                        logger.debug(f"캐릭터 {i+1} 기본 위치 사용: {char_caption['centers']}")
+                        logger.debug(f"📍 캐릭터 {i+1} 기본 중앙 위치 사용 (use_coords={use_coords})")
                     
                     # 캐릭터 프롬프트 추가
                     self.parameters["v4_prompt"]["caption"]["char_captions"].append(char_caption)
+                    logger.debug(f"📍 캐릭터 {i+1} v4_prompt에 추가됨: {char_caption}")
                     
-                    # 캐릭터 네거티브 프롬프트 (있을 경우)
+                    # 네거티브 프롬프트
                     neg_caption = {
                         "char_caption": char.get("negative_prompt", ""),
-                        "centers": char_caption["centers"]  # 같은 위치 사용
+                        "centers": char_caption["centers"]
                     }
                     self.parameters["v4_negative_prompt"]["caption"]["char_captions"].append(neg_caption)
             
-            # 디버깅을 위한 로깅
-            logger.debug(f"최종 v4_prompt 캐릭터 수: {len(self.parameters['v4_prompt']['caption']['char_captions'])}")
-            logger.debug(f"최종 v4_negative_prompt 캐릭터 수: {len(self.parameters['v4_negative_prompt']['caption']['char_captions'])}")
+            logger.info(f"📍 캐릭터 프롬프트 처리 완료 - 총 {len(self.parameters['v4_prompt']['caption']['char_captions'])}개 변환됨")
             
-            
+            # 최종 v4_prompt 구조 로깅
+            logger.debug(f"📍 최종 v4_prompt 구조:")
+            logger.debug(f"  - use_coords: {self.parameters['v4_prompt']['use_coords']}")
+            logger.debug(f"  - 캐릭터 수: {len(self.parameters['v4_prompt']['caption']['char_captions'])}")
+            for i, char_cap in enumerate(self.parameters['v4_prompt']['caption']['char_captions']):
+                logger.debug(f"  - 캐릭터 {i+1}: centers={char_cap['centers']}")
+        else:
+            logger.debug("📍 캐릭터 프롬프트 없음 - 기본 프롬프트만 사용")
+        
+        logger.debug("*** _prepare_v4_parameters 메서드 완료 ***")
+                        
     def check_logged_in(self):
         """더 나은 오류 처리를 포함한 로그인 확인"""
         if not self.access_token:

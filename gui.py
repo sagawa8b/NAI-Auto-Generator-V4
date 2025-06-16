@@ -1105,11 +1105,36 @@ class NAIAutoGeneratorWindow(QMainWindow):
             self.status_state = status_key
             self.status_list_format = list_format
         else:
-            status_key = self.status_state
-            list_format = self.status_list_format
+            status_key = getattr(self, 'status_state', 'IDLE')
+            list_format = getattr(self, 'status_list_format', [])
         
-        # 번역된 텍스트 사용
-        status_text = tr(f'statusbar.{status_key.lower()}', *list_format)
+        # 번역된 텍스트 사용 - 키 매핑 개선
+        status_mapping = {
+            'BEFORE_LOGIN': 'statusbar.before_login',
+            'LOGINED': 'statusbar.logged_in', 
+            'LOGGED_IN': 'statusbar.logged_in',  # 추가 매핑
+            'LOGGINGIN': 'statusbar.logging_in',
+            'GENERATING': 'statusbar.generating',
+            'IDLE': 'statusbar.idle',
+            'LOAD_COMPLETE': 'statusbar.load_complete',
+            'LOADING': 'statusbar.loading',
+            'AUTO_GENERATING_COUNT': 'statusbar.auto_generating_count',
+            'AUTO_GENERATING_INF': 'statusbar.auto_generating_inf',
+            'AUTO_WAIT': 'statusbar.auto_wait',
+            'AUTO_ERROR_WAIT': 'statusbar.auto_error_wait'
+        }
+        
+        # 상태 키를 번역 키로 변환
+        translation_key = status_mapping.get(status_key.upper(), f'statusbar.{status_key.lower()}')
+        
+        try:
+            status_text = tr(translation_key, *list_format)
+            # 번역이 키 그대로 반환되면 기본 텍스트 사용
+            if status_text == translation_key:
+                status_text = status_key.replace('_', ' ').title()
+        except:
+            status_text = status_key.replace('_', ' ').title()
+        
         statusbar.showMessage(status_text)
 
     
@@ -1514,58 +1539,53 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 data['autoSmea'] = False
             elif "autoSmea" not in data and hasattr(self, 'dict_ui_settings') and 'autoSmea' in self.dict_ui_settings:
                 data['autoSmea'] = bool(self.dict_ui_settings["autoSmea"].isChecked())
-            
+                        
             # 캐릭터 프롬프트 데이터 가져오기
             if hasattr(self, 'character_prompts_container'):
-                # 🔧 스냅샷 생성 추가
                 if hasattr(self, 'wcapplier'):
                     self.wcapplier.create_index_snapshot()
                 try:
                     char_data = self.character_prompts_container.get_data()
-                    logger.debug(f"캐릭터 프롬프트 가져오기: {len(char_data.get('characters', []))}개")
+                    logger.debug(f"🔍 캐릭터 컨테이너 원본 데이터: {char_data}")
                     
                     data["characterPrompts"] = []
                     
-                    # use_character_coords 설정 (AI 위치 선택이 비활성화되면 좌표 사용)
-                    if "use_ai_positions" in char_data:
-                        data["use_character_coords"] = not char_data["use_ai_positions"]
-                        logger.debug(f"use_character_coords 설정: {data['use_character_coords']}")
+                    # use_character_coords 설정
+                    use_ai_positions = char_data.get("use_ai_positions", True)
+                    data["use_character_coords"] = not use_ai_positions
+                    
+                    logger.debug(f"🔍 use_ai_positions: {use_ai_positions}")
+                    logger.debug(f"🔍 use_character_coords: {data['use_character_coords']}")
                     
                     if "characters" in char_data:
                         for i, char in enumerate(char_data["characters"]):
-                            # 원본 프롬프트 텍스트 가져오기
+                            # 프롬프트 전처리
                             raw_prompt = char.get("prompt", "")
                             raw_negative_prompt = char.get("negative_prompt", "") if char.get("negative_prompt") else ""
                             
-                            # 전처리 함수 사용 (일반 프롬프트와 동일한 처리)
                             prompt = self._preprocess_character_prompt(raw_prompt)
                             negative_prompt = self._preprocess_character_prompt(raw_negative_prompt)
-                            
-                            logger.debug(f"캐릭터 {i+1} 프롬프트 전처리:")
-                            logger.debug(f"  원본: {repr(raw_prompt[:50])}...")
-                            logger.debug(f"  처리후: {repr(prompt[:50])}...")
                             
                             char_prompt = {
                                 "prompt": prompt,
                                 "negative_prompt": negative_prompt
                             }
                             
-                            # 위치 정보 처리 개선
-                            if char.get("position") and isinstance(char["position"], (list, tuple)) and len(char["position"]) == 2:
+                            # 위치 정보 처리 (한 번만)
+                            if not use_ai_positions and char.get("position") and isinstance(char["position"], (list, tuple)) and len(char["position"]) == 2:
                                 char_prompt["position"] = [float(char["position"][0]), float(char["position"][1])]
-                                logger.debug(f"캐릭터 {i+1} 위치 정보: {char_prompt['position']}")
+                                logger.debug(f"캐릭터 {i+1} 커스텀 위치: {char_prompt['position']}")
                             else:
-                                logger.debug(f"캐릭터 {i+1} 위치 정보 없음")
-                                
-                            data["characterPrompts"].append(char_prompt)
+                                logger.debug(f"캐릭터 {i+1}: AI's choice 모드 - 위치 정보 미포함")
                             
-                    logger.debug(f"생성 요청에 포함된 캐릭터 수: {len(data['characterPrompts'])}")
+                            data["characterPrompts"].append(char_prompt)
                     
-                    # 🔧 인덱스 진행 추가
+                    # 인덱스 진행
                     if hasattr(self, 'wcapplier'):
                         self.wcapplier.advance_loopcard_indices()
                 except Exception as e:                
                     logger.error(f"캐릭터 프롬프트 처리 중 오류: {e}")
+
                     
             # 모든 필수 필드가 있는지 확인
             required_fields = ["prompt", "negative_prompt", "width", "height", "steps", "scale"]
@@ -2246,6 +2266,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 
                 # characterPrompts 배열 생성
                 character_prompts = []
+                has_custom_positions = False  # 커스텀 위치 여부 확인용
+                
                 for i, char in enumerate(char_captions):
                     char_prompt = {
                         "prompt": char.get("char_caption", ""),
@@ -2256,7 +2278,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     # 위치 정보 추가 (있을 경우)
                     if "centers" in char and len(char["centers"]) > 0:
                         center = char["centers"][0]
-                        char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
+                        position = [center.get("x", 0.5), center.get("y", 0.5)]
+                        char_prompt["position"] = position
+                        
+                        # 중앙(0.5, 0.5)이 아닌 위치가 있으면 커스텀 위치로 판단
+                        if position[0] != 0.5 or position[1] != 0.5:
+                            has_custom_positions = True
                     
                     # 네거티브 프롬프트 추가 (존재하는 경우)
                     if i < len(neg_char_captions):
@@ -2266,6 +2293,28 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 
                 if character_prompts:
                     new_dict["characterPrompts"] = character_prompts
+                    
+                    # use_character_coords 복원 로직 개선
+                    use_character_coords = new_dict.get("use_character_coords", None)
+                    
+                    if use_character_coords is not None:
+                        # 메타데이터에 use_character_coords가 있으면 그 값 사용
+                        use_ai_positions = not use_character_coords
+                        logger.debug(f"메타데이터에서 use_character_coords 복원: {use_character_coords}")
+                    else:
+                        # 메타데이터에 없으면 위치 정보로 추론
+                        use_ai_positions = not has_custom_positions
+                        logger.debug(f"위치 정보로 AI 위치 설정 추론: has_custom_positions={has_custom_positions}, use_ai_positions={use_ai_positions}")
+                    
+                    # v4_prompt의 use_coords 값도 확인 (추가 검증)
+                    if "v4_prompt" in nai_dict["etc"]:
+                        v4_use_coords = nai_dict["etc"]["v4_prompt"].get("use_coords", None)
+                        if v4_use_coords is False:
+                            # API에서 use_coords가 false면 AI Choice 모드였음
+                            use_ai_positions = True
+                        else:
+                            # use_coords가 true면 수동 위치 모드였음
+                            use_ai_positions = False
 
             self.set_data(new_dict)
             
@@ -2281,11 +2330,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     characters.append(character)
                 
                 character_data = {
-                    "use_ai_positions": not new_dict.get("use_character_coords", True),
+                    "use_ai_positions": use_ai_positions,  # 개선된 로직으로 설정
                     "characters": characters
                 }
                 
-                self.character_prompts_container.set_data(character_data)
+                self.character_prompts_container.set_data(character_data)                
+                logger.debug(f"캐릭터 프롬프트 UI 적용: use_ai_positions={use_ai_positions}")
+                
             
             # 메타데이터 표시
             params_copy = self.nai.parameters.copy()
@@ -2577,20 +2628,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.set_statusbar_text("IDLE")
                 QMessageBox.information(self, '경고', "이미지 파일 다운로드에 실패했습니다.")
                 return
-
-    def set_statusbar_text(self, status_key="", list_format=[]):
-        statusbar = self.statusBar()
-
-        if status_key:
-            self.status_state = status_key
-            self.status_list_format = list_format
-        else:
-            status_key = self.status_state
-            list_format = self.status_list_format
-
-        # 번역된 텍스트 사용
-        status_text = tr(f'statusbar.{status_key.lower()}', *list_format)
-        statusbar.showMessage(status_text)
 
     def on_statusbar_message_changed(self, t):
         if not t:

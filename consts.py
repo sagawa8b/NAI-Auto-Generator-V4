@@ -85,8 +85,13 @@ def prettify_naidict(d, additional_dict=None):
                     result += f"Character {i+1}: {char.get('prompt', 'No information')}\n"
                     if 'negative_prompt' in char and char['negative_prompt'].strip():
                         result += f"  Negative: {char['negative_prompt']}\n"
-                    if 'position' in char:
-                        result += f"  Position: ({char['position'][0]:.2f}, {char['position'][1]:.2f})\n"
+                    
+                    # v4_prompt에서 실제 사용된 위치 정보 가져오기
+                    if 'v4_prompt' in d and 'caption' in d['v4_prompt']:
+                        char_captions = d['v4_prompt']['caption'].get('char_captions', [])
+                        if i < len(char_captions) and 'centers' in char_captions[i]:
+                            centers = char_captions[i]['centers'][0]
+                            result += f"  Position: ({centers['x']:.2f}, {centers['y']:.2f})\n"
         
         # 이미지/레퍼런스 이미지가 있는 경우 추가 정보
         if 'image' in d and d['image']:

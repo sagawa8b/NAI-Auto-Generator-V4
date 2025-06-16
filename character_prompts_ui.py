@@ -597,10 +597,18 @@ class CharacterPromptsContainer(QWidget):
             char_data = widget.get_data()
             characters_data.append(char_data)
             
-        return {
+        result = {
             "use_ai_positions": self.use_ai_positions,
             "characters": characters_data
         }
+        
+        logger.debug(f"캐릭터 프롬프트 컨테이너 데이터:")
+        logger.debug(f"  AI 위치 선택: {self.use_ai_positions}")
+        logger.debug(f"  캐릭터 수: {len(characters_data)}")
+        for i, char in enumerate(characters_data):
+            logger.debug(f"  캐릭터 {i+1} 위치: {char.get('position', 'None')}")
+        
+        return result
     
     def set_data(self, data):
         """캐릭터 프롬프트 데이터 설정"""
