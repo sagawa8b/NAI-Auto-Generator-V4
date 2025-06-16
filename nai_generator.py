@@ -723,14 +723,14 @@ class NAIGenerator():
     def _prepare_v4_parameters(self):
         """V4 API에 필요한 파라미터 구조로 변환"""
         # 내부 파라미터 처리 - use_character_coords 값 저장 후 제거
-        use_coords = False
+        use_coords = self.parameters.get("use_character_coords", False)  # 기본값 False
         if "use_character_coords" in self.parameters:
-            use_coords = self.parameters["use_character_coords"]
             del self.parameters["use_character_coords"]  # API 요청에서 제거
 
         # 캐릭터 프롬프트 확인 로깅
         if "characterPrompts" in self.parameters:
             logger.debug(f"캐릭터 프롬프트 API 처리: {len(self.parameters['characterPrompts'])}개")
+            logger.debug(f"use_character_coords: {use_coords}")  # 디버깅용 로그 추가
         
         # Legacy 모드 확인
         legacy_mode = bool(self.parameters.get("legacy", False))
@@ -770,12 +770,15 @@ class NAIGenerator():
                         "centers": [{"x": 0.5, "y": 0.5}]  # 기본 중앙 위치 설정
                     }
                     
-                    # 위치 정보가 있으면 덮어쓰기
-                    if use_coords and "position" in char and char["position"]:
+                    # 위치 정보가 있으면 덮어쓰기 (use_coords 값에 관계없이 처리)
+                    if "position" in char and char["position"] and len(char["position"]) == 2:
                         char_caption["centers"] = [{
-                            "x": char["position"][0],
-                            "y": char["position"][1]
+                            "x": float(char["position"][0]),
+                            "y": float(char["position"][1])
                         }]
+                        logger.debug(f"캐릭터 {i+1} 위치 설정: {char_caption['centers']}")
+                    else:
+                        logger.debug(f"캐릭터 {i+1} 기본 위치 사용: {char_caption['centers']}")
                     
                     # 캐릭터 프롬프트 추가
                     self.parameters["v4_prompt"]["caption"]["char_captions"].append(char_caption)
@@ -783,7 +786,7 @@ class NAIGenerator():
                     # 캐릭터 네거티브 프롬프트 (있을 경우)
                     neg_caption = {
                         "char_caption": char.get("negative_prompt", ""),
-                        "centers": char_caption["centers"]
+                        "centers": char_caption["centers"]  # 같은 위치 사용
                     }
                     self.parameters["v4_negative_prompt"]["caption"]["char_captions"].append(neg_caption)
             

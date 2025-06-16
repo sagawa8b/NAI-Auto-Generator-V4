@@ -288,27 +288,31 @@ class CharacterPromptWidget(QFrame):
     def show_position_dialog(self):
         """캐릭터 위치 선택 다이얼로그 표시"""
         try:
-            print("위치 선택 다이얼로그 열기 시도")
+            logger.debug("위치 선택 다이얼로그 열기 시도")
             dialog = PositionSelectorDialog(self)
             
             # 기존 위치 선택된 상태로 표시
             if self.position:
-                logger.error(f"기존 위치: {self.position}")
+                logger.debug(f"기존 위치: {self.position}")
                 col = int(self.position[0] * 5)
                 row = int(self.position[1] * 5)
+                # 경계값 처리
+                col = max(0, min(4, col))
+                row = max(0, min(4, row))
                 index = row * 5 + col
-                dialog.buttons[index].setStyleSheet("background-color: #559977;")
-                dialog.selected_position = self.position
+                if 0 <= index < len(dialog.buttons):
+                    dialog.buttons[index].setStyleSheet("background-color: #559977;")
+                    dialog.selected_position = self.position
             
             # 다이얼로그 표시 및 결과 처리
             result = dialog.exec_()
-            logger.error(f"다이얼로그 결과: {result}, 선택된 위치: {dialog.selected_position}")
+            logger.debug(f"다이얼로그 결과: {result}, 선택된 위치: {dialog.selected_position}")
             
             if result == QDialog.Accepted and dialog.selected_position:
                 self.position = dialog.selected_position
                 self.position_btn.setStyleSheet("background-color: #559977; color: black; padding: 2px;")
                 self.position_btn.setToolTip(f"위치: {int(self.position[0]*100)}%, {int(self.position[1]*100)}%")
-                logger.error(f"위치 설정 완료: {self.position}")
+                logger.debug(f"위치 설정 완료: {self.position}")
         except Exception as e:
             logger.error(f"위치 선택 다이얼로그 오류: {e}")
             import traceback
@@ -316,12 +320,14 @@ class CharacterPromptWidget(QFrame):
     
     def get_data(self):
         """캐릭터 프롬프트 데이터 반환"""
-        return {
+        data = {
             "prompt": self.prompt_edit.toPlainText(),
             "negative_prompt": self.neg_prompt_edit.toPlainText() if self.show_negative else "",
             "position": self.position,
             "show_negative": self.show_negative
         }
+        logger.debug(f"캐릭터 {self.index + 1} 데이터: position={data['position']}")
+        return data
     
     def set_data(self, data):
         """캐릭터 프롬프트 데이터 설정"""

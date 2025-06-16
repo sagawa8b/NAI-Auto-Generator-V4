@@ -37,7 +37,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.06.15"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -1526,27 +1526,41 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     
                     data["characterPrompts"] = []
                     
+                    # use_character_coords 설정 (AI 위치 선택이 비활성화되면 좌표 사용)
                     if "use_ai_positions" in char_data:
                         data["use_character_coords"] = not char_data["use_ai_positions"]
+                        logger.debug(f"use_character_coords 설정: {data['use_character_coords']}")
                     
                     if "characters" in char_data:
-                        for char in char_data["characters"]:
-                            # 와일드카드 처리 적용
-                            prompt = self.apply_wildcards_with_snapshot(char.get("prompt", ""))
-                            negative_prompt = self.apply_wildcards_with_snapshot(char.get("negative_prompt", "")) if char.get("negative_prompt") else ""
+                        for i, char in enumerate(char_data["characters"]):
+                            # 원본 프롬프트 텍스트 가져오기
+                            raw_prompt = char.get("prompt", "")
+                            raw_negative_prompt = char.get("negative_prompt", "") if char.get("negative_prompt") else ""
+                            
+                            # 전처리 함수 사용 (일반 프롬프트와 동일한 처리)
+                            prompt = self._preprocess_character_prompt(raw_prompt)
+                            negative_prompt = self._preprocess_character_prompt(raw_negative_prompt)
+                            
+                            logger.debug(f"캐릭터 {i+1} 프롬프트 전처리:")
+                            logger.debug(f"  원본: {repr(raw_prompt[:50])}...")
+                            logger.debug(f"  처리후: {repr(prompt[:50])}...")
                             
                             char_prompt = {
                                 "prompt": prompt,
                                 "negative_prompt": negative_prompt
                             }
                             
-                            # 위치 정보가 있고 AI 위치가 아닌 경우에만 추가
-                            if char.get("position") and not char_data.get("use_ai_positions", True):
-                                char_prompt["position"] = char["position"]
+                            # 위치 정보 처리 개선
+                            if char.get("position") and isinstance(char["position"], (list, tuple)) and len(char["position"]) == 2:
+                                char_prompt["position"] = [float(char["position"][0]), float(char["position"][1])]
+                                logger.debug(f"캐릭터 {i+1} 위치 정보: {char_prompt['position']}")
+                            else:
+                                logger.debug(f"캐릭터 {i+1} 위치 정보 없음")
                                 
                             data["characterPrompts"].append(char_prompt)
                             
-                    logger.debug(f"생성 요청에 포함된 캐릭터 수: {len(data['characterPrompts'])}")\
+                    logger.debug(f"생성 요청에 포함된 캐릭터 수: {len(data['characterPrompts'])}")
+                    
                     # 🔧 인덱스 진행 추가
                     if hasattr(self, 'wcapplier'):
                         self.wcapplier.advance_loopcard_indices()
@@ -1629,7 +1643,35 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 break
 
         return edited_prompt, edited_nprompt
-
+    
+    def _preprocess_character_prompt(self, prompt_text):
+        """캐릭터 프롬프트 전처리 (일반 프롬프트와 동일한 처리)"""
+        if not prompt_text:
+            return ""
+        
+        # 1. 줄바꿈을 공백으로 변환
+        processed = prompt_text.replace("\n", " ")
+        
+        # 2. 연속된 공백을 하나로 통합
+        import re
+        processed = re.sub(r'\s+', ' ', processed).strip()
+        
+        # 3. 와일드카드와 기타 전처리 적용 (기존 _preedit_prompt 로직과 동일)
+        try_count = 0
+        while try_count < MAX_COUNT_FOR_WHILE:
+            try_count += 1
+            before_edit = processed
+            
+            # lessthan pick (<>)
+            processed = pickedit_lessthan_str(processed)
+            # wildcards pick
+            processed = self.apply_wildcards_with_snapshot(processed)
+            
+            if before_edit == processed:
+                break
+        
+        return processed
+        
     def _on_after_create_data_apply_gui(self):
         data = self.nai.parameters
 

@@ -610,65 +610,65 @@ class GenerateDialog(QDialog):
         self.delay = "3"    # 기본값
         self.ignore_error = False  # 기본값
         self.setup_ui()
-        self.setWindowTitle('연속 생성 옵션')
+        self.setWindowTitle(tr('generate_dialog.title'))
 
     def setup_ui(self):
         main_layout = QVBoxLayout()
 
         # 연속생성 매수 영역 (원클릭 생성)
-        preset_group = QGroupBox("연속생성 매수 (클릭 즉시 생성)")
+        preset_group = QGroupBox(tr('generate_dialog.preset_group'))
         preset_layout = QHBoxLayout()
         preset_group.setLayout(preset_layout)
 
         # 프리셋 버튼들
-        self.preset_20_btn = QPushButton("20장")
-        self.preset_30_btn = QPushButton("30장")
-        self.preset_50_btn = QPushButton("50장")
-        self.preset_100_btn = QPushButton("100장")
+        self.preset_5_btn = QPushButton(tr('generate_dialog.count_5'))
+        self.preset_10_btn = QPushButton(tr('generate_dialog.count_10'))
+        self.preset_50_btn = QPushButton(tr('generate_dialog.count_50'))
+        self.preset_100_btn = QPushButton(tr('generate_dialog.count_100'))
 
         # 버튼 이벤트 연결 - 클릭 즉시 생성 시작
-        self.preset_20_btn.clicked.connect(lambda: self.quick_start("20"))
-        self.preset_30_btn.clicked.connect(lambda: self.quick_start("30"))
+        self.preset_5_btn.clicked.connect(lambda: self.quick_start("5"))
+        self.preset_10_btn.clicked.connect(lambda: self.quick_start("10"))
         self.preset_50_btn.clicked.connect(lambda: self.quick_start("50"))
         self.preset_100_btn.clicked.connect(lambda: self.quick_start("100"))
 
-        preset_layout.addWidget(self.preset_20_btn)
-        preset_layout.addWidget(self.preset_30_btn)
+        preset_layout.addWidget(self.preset_5_btn)
+        preset_layout.addWidget(self.preset_10_btn)
         preset_layout.addWidget(self.preset_50_btn)
         preset_layout.addWidget(self.preset_100_btn)
         
         main_layout.addWidget(preset_group)
 
         # 연속생성 수동 입력 영역
-        custom_group = QGroupBox("연속생성 수동 입력")
+        custom_group = QGroupBox(tr('generate_dialog.manual_group'))
         custom_layout = QVBoxLayout()
         custom_group.setLayout(custom_layout)
 
         # 기존의 수동 입력 필드
         count_layout = QHBoxLayout()
-        count_layout.addWidget(QLabel('생성 횟수:'))
+        count_layout.addWidget(QLabel(tr('generate_dialog.count_label')))
         self.count_edit = QLineEdit('100')
         count_layout.addWidget(self.count_edit)
-        count_desc = QLabel('(-1 = 무제한)')
+        count_desc = QLabel(tr('generate_dialog.count_unlimited'))
         count_layout.addWidget(count_desc)
         custom_layout.addLayout(count_layout)
 
         main_layout.addWidget(custom_group)
 
         # 기타 설정 영역
-        settings_group = QGroupBox("기타 설정")
+        settings_group = QGroupBox(tr('generate_dialog.settings_group'))
         settings_layout = QVBoxLayout()
         settings_group.setLayout(settings_layout)
 
         # 생성 간격
         delay_layout = QHBoxLayout()
-        delay_layout.addWidget(QLabel('생성 간격(초):'))
+        delay_layout.addWidget(QLabel(tr('generate_dialog.delay_label')))
         self.delay_edit = QLineEdit('3')
         delay_layout.addWidget(self.delay_edit)
         settings_layout.addLayout(delay_layout)
 
         # 체크박스
-        self.ignore_error_checkbox = QCheckBox('생성 오류 무시하기')
+        self.ignore_error_checkbox = QCheckBox(tr('generate_dialog.ignore_error'))
         settings_layout.addWidget(self.ignore_error_checkbox)
 
         main_layout.addWidget(settings_group)
