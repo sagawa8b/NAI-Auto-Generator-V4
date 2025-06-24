@@ -309,6 +309,55 @@ class OptionDialog(QDialog):
 
         path_group.setLayout(path_layout)
         main_layout.addWidget(path_group)
+
+        # === 연속생성 설정 그룹 추가 ===
+        generation_group = QGroupBox("연속생성 설정 (Generation Settings)")
+        generation_layout = QVBoxLayout()
+        
+        # Quick Generation 매수 설정
+        quick_gen_layout = QHBoxLayout()
+        quick_gen_layout.addWidget(QLabel("Quick Generation 매수:"))
+        
+        self.quick_gen_5_spinbox = QSpinBox()
+        self.quick_gen_5_spinbox.setRange(1, 9999)
+        self.quick_gen_5_spinbox.setValue(int(self.parent.settings.value("quick_gen_count_1", 5)))
+        quick_gen_layout.addWidget(QLabel("1번 버튼:"))
+        quick_gen_layout.addWidget(self.quick_gen_5_spinbox)
+        
+        self.quick_gen_10_spinbox = QSpinBox()
+        self.quick_gen_10_spinbox.setRange(1, 9999)
+        self.quick_gen_10_spinbox.setValue(int(self.parent.settings.value("quick_gen_count_2", 10)))
+        quick_gen_layout.addWidget(QLabel("2번 버튼:"))
+        quick_gen_layout.addWidget(self.quick_gen_10_spinbox)
+        
+        self.quick_gen_50_spinbox = QSpinBox()
+        self.quick_gen_50_spinbox.setRange(1, 9999)
+        self.quick_gen_50_spinbox.setValue(int(self.parent.settings.value("quick_gen_count_3", 50)))
+        quick_gen_layout.addWidget(QLabel("3번 버튼:"))
+        quick_gen_layout.addWidget(self.quick_gen_50_spinbox)
+        
+        self.quick_gen_100_spinbox = QSpinBox()
+        self.quick_gen_100_spinbox.setRange(1, 9999)
+        self.quick_gen_100_spinbox.setValue(int(self.parent.settings.value("quick_gen_count_4", 100)))
+        quick_gen_layout.addWidget(QLabel("4번 버튼:"))
+        quick_gen_layout.addWidget(self.quick_gen_100_spinbox)
+        
+        generation_layout.addLayout(quick_gen_layout)
+        
+        # 기본 생성 간격 설정
+        interval_layout = QHBoxLayout()
+        interval_layout.addWidget(QLabel("기본 생성 간격(초):"))
+        self.default_interval_spinbox = QDoubleSpinBox()
+        self.default_interval_spinbox.setRange(0.1, 3600.0)
+        self.default_interval_spinbox.setDecimals(1)
+        self.default_interval_spinbox.setValue(float(self.parent.settings.value("default_generation_interval", 3.0)))
+        interval_layout.addWidget(self.default_interval_spinbox)
+        interval_layout.addStretch()
+        generation_layout.addLayout(interval_layout)
+        
+        generation_group.setLayout(generation_layout)
+        main_layout.addWidget(generation_group)
+
         
         # === Theme Settings Group ===
         theme_group = QGroupBox("테마 설정 (Theme Settings)")
@@ -596,6 +645,16 @@ class OptionDialog(QDialog):
 
         self.accept()
         
+        # 연속생성 설정 저장
+        self.parent.settings.setValue("quick_gen_count_1", self.quick_gen_5_spinbox.value())
+        self.parent.settings.setValue("quick_gen_count_2", self.quick_gen_10_spinbox.value())
+        self.parent.settings.setValue("quick_gen_count_3", self.quick_gen_50_spinbox.value())
+        self.parent.settings.setValue("quick_gen_count_4", self.quick_gen_100_spinbox.value())
+        self.parent.settings.setValue("default_generation_interval", self.default_interval_spinbox.value())
+        
+        self.accept()
+        
+        
     def on_model_downloaded(self, model_name):
         # 다운로드 완료 후 모델 리스트 업데이트
         self.tagger_combo.addItem(model_name + " (설치됨)")
@@ -615,27 +674,33 @@ class GenerateDialog(QDialog):
     def setup_ui(self):
         main_layout = QVBoxLayout()
 
-        # 연속생성 매수 영역 (원클릭 생성)
+        # 연속생성 매수 영역 (원클릭 생성) - 설정값 반영
         preset_group = QGroupBox(tr('generate_dialog.preset_group'))
         preset_layout = QHBoxLayout()
         preset_group.setLayout(preset_layout)
 
-        # 프리셋 버튼들
-        self.preset_5_btn = QPushButton(tr('generate_dialog.count_5'))
-        self.preset_10_btn = QPushButton(tr('generate_dialog.count_10'))
-        self.preset_50_btn = QPushButton(tr('generate_dialog.count_50'))
-        self.preset_100_btn = QPushButton(tr('generate_dialog.count_100'))
+        # 설정에서 매수값 가져오기
+        count_1 = self.parent.settings.value("quick_gen_count_1", 5, type=int)
+        count_2 = self.parent.settings.value("quick_gen_count_2", 10, type=int)
+        count_3 = self.parent.settings.value("quick_gen_count_3", 50, type=int)
+        count_4 = self.parent.settings.value("quick_gen_count_4", 100, type=int)
 
-        # 버튼 이벤트 연결 - 클릭 즉시 생성 시작
-        self.preset_5_btn.clicked.connect(lambda: self.quick_start("5"))
-        self.preset_10_btn.clicked.connect(lambda: self.quick_start("10"))
-        self.preset_50_btn.clicked.connect(lambda: self.quick_start("50"))
-        self.preset_100_btn.clicked.connect(lambda: self.quick_start("100"))
+        # 프리셋 버튼들 - 동적 텍스트
+        self.preset_1_btn = QPushButton(f"{count_1}장")
+        self.preset_2_btn = QPushButton(f"{count_2}장")
+        self.preset_3_btn = QPushButton(f"{count_3}장")
+        self.preset_4_btn = QPushButton(f"{count_4}장")
 
-        preset_layout.addWidget(self.preset_5_btn)
-        preset_layout.addWidget(self.preset_10_btn)
-        preset_layout.addWidget(self.preset_50_btn)
-        preset_layout.addWidget(self.preset_100_btn)
+        # 버튼 이벤트 연결 - 설정값 사용
+        self.preset_1_btn.clicked.connect(lambda: self.quick_start(str(count_1)))
+        self.preset_2_btn.clicked.connect(lambda: self.quick_start(str(count_2)))
+        self.preset_3_btn.clicked.connect(lambda: self.quick_start(str(count_3)))
+        self.preset_4_btn.clicked.connect(lambda: self.quick_start(str(count_4)))
+
+        preset_layout.addWidget(self.preset_1_btn)
+        preset_layout.addWidget(self.preset_2_btn)
+        preset_layout.addWidget(self.preset_3_btn)
+        preset_layout.addWidget(self.preset_4_btn)
         
         main_layout.addWidget(preset_group)
 
@@ -660,10 +725,11 @@ class GenerateDialog(QDialog):
         settings_layout = QVBoxLayout()
         settings_group.setLayout(settings_layout)
 
-        # 생성 간격
+        # 생성 간격 - 기본값을 설정에서 가져오기
         delay_layout = QHBoxLayout()
         delay_layout.addWidget(QLabel(tr('generate_dialog.delay_label')))
-        self.delay_edit = QLineEdit('3')
+        default_interval = self.parent.settings.value("default_generation_interval", 3.0, type=float)
+        self.delay_edit = QLineEdit(str(default_interval))
         delay_layout.addWidget(self.delay_edit)
         settings_layout.addLayout(delay_layout)
 

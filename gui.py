@@ -37,7 +37,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.06.15"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.06.24"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -860,7 +860,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     def init_variable(self):
         self.trying_auto_login = False
-        self.autogenerate_thread = None
+        self.autogenerate_thread = None        
         self.list_settings_batch_target = []
         self.index_settings_batch_target = -1
         self.dict_img_batch_target = {
@@ -876,10 +876,22 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # UI 요소를 저장할 딕셔너리 초기화
         self.dict_ui_settings = {}
         # is_expand 변수는 여기서 초기화하지 않음
+        
+        # 설정 관련 코드는 모두 제거 (init_window에서 처리)
+                      
 
     def init_window(self):
         self.setWindowTitle(TITLE_NAME)
         self.settings = QSettings(TOP_NAME, APP_NAME)
+        
+        # 연속생성 설정 기본값 초기화 (여기로 이동)
+        if not self.settings.contains("quick_gen_count_1"):
+            self.settings.setValue("quick_gen_count_1", 5)
+            self.settings.setValue("quick_gen_count_2", 10)
+            self.settings.setValue("quick_gen_count_3", 50)
+            self.settings.setValue("quick_gen_count_4", 100)
+            self.settings.setValue("default_generation_interval", 3.0)
+        
         
         # 설정에서 위치 정보 불러오기 (기본값: 화면 중앙)
         if self.settings.contains("pos"):
