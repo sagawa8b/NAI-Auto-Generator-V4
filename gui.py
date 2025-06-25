@@ -37,7 +37,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.06.24"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.06.25"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 

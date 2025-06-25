@@ -5,12 +5,15 @@ from enum import Enum
 MAX_TRY_AMOUNT = 10
 
 
+
 class WildcardApplier():
     def __init__(self, src_wildcards_folder):
         self.src_wildcards_folder = src_wildcards_folder
         self._wildcards_dict = {}
         # 루프카드 인덱스 관리 딕셔너리 추가
         self._loopcard_indices = {}
+        # 반복 카운터 추가 - 각 와일드카드별로 현재 반복 횟수 추적
+        self._repeat_counters = {}  # {'wildcard_name': {'current': 0, 'target': 2}}
         self._current_snapshot = {}
         self._used_keys = set()
         
@@ -98,46 +101,7 @@ class WildcardApplier():
             index += 1
         
         return result
-
-    def _apply_loopcard_once_with_snapshot(self, target_str, except_list=[]):
-        """스냅샷된 인덱스를 사용한 루프카드 처리"""
-        result = target_str
-        applied_loopcard_list = []
-        prev_point = 0
-        
-        while "##" in result:
-            p_left = result.find("##", prev_point)
-            if p_left == -1:
-                break
-            p_right = result.find("##", p_left + 2)
-            if p_right == -1:
-                break
-
-            str_left = result[0:p_left]
-            str_center = result[p_left + 2:p_right].lower().strip()
-            str_right = result[p_right + 2:len(result)]
-
-            if str_center in self._wildcards_dict and not (str_center in except_list):
-                wc_list = self._wildcards_dict[str_center]
-                if wc_list:
-                    # 키 사용 기록
-                    self._used_keys.add(str_center)
-                    
-                    # 스냅샷에서 인덱스 가져오기
-                    idx = self._current_snapshot.get(str_center, 0)
-                    str_center = wc_list[idx].strip()
-                    applied_loopcard_list.append(str_center)
-                else:
-                    str_center = "##" + str_center + "##"
-            else:
-                str_center = "##" + str_center + "##"
-
-            result_left = str_left + str_center
-            prev_point = len(result_left)
-            result = result_left + str_right
-
-        return result, applied_loopcard_list
-
+   
     def advance_loopcard_indices(self):
         """사용된 루프카드 인덱스만 다음으로 진행"""
         for key in self._used_keys:  # 실제 사용된 키만
@@ -189,9 +153,9 @@ class WildcardApplier():
             result = result_left + str_right
 
         return result, applied_wildcard_list
-
+    
     def _apply_loopcard_once(self, target_str, except_list=[]):
-        """루프카드 (순차 적용) 처리"""
+        """루프카드 (순차 적용) 처리 - 순차 반복 기능 추가"""
         result = target_str
         applied_loopcard_list = []
         prev_point = 0
@@ -210,23 +174,116 @@ class WildcardApplier():
             str_center = result[p_left + 2:p_right].lower().strip()
             str_right = result[p_right + 2:len(result)]
 
-            if str_center in self._wildcards_dict and not (str_center in except_list):
-                wc_list = self._wildcards_dict[str_center]
+            # 순차 반복 와일드카드 패턴 확인: wildcard_name*repeat_count
+            repeat_count = 1  # 기본값
+            wildcard_name = str_center
+            
+            # *숫자 패턴 확인
+            if '*' in str_center:
+                parts = str_center.split('*')
+                if len(parts) == 2 and parts[0] and parts[1]:
+                    try:
+                        repeat_count = int(parts[1])
+                        wildcard_name = parts[0]
+                        if repeat_count <= 0:
+                            raise ValueError("반복 횟수는 양수여야 합니다")
+                    except ValueError:
+                        # 잘못된 형식이면 원본 구문 그대로 유지
+                        str_center = "##" + str_center + "##"
+                        result_left = str_left + str_center
+                        prev_point = len(result_left)
+                        result = result_left + str_right
+                        continue
+
+            if wildcard_name in self._wildcards_dict and not (wildcard_name in except_list):
+                wc_list = self._wildcards_dict[wildcard_name]
                 if wc_list:
-                                        
-                    # 원래 키를 저장
-                    original_key = str_center
-                                        
-                    # 인덱스 관리
-                    if original_key not in self._loopcard_indices:
-                        self._loopcard_indices[original_key] = 0
-                                        
-                    idx = self._loopcard_indices[original_key]
-                    str_center = wc_list[idx].strip()
-                                        
-                    # 원래 키로 인덱스 증가
-                    self._loopcard_indices[original_key] = (idx + 1) % len(wc_list)
+                    # 반복 카운터 초기화
+                    counter_key = f"{wildcard_name}*{repeat_count}"
+                    if counter_key not in self._repeat_counters:
+                        self._repeat_counters[counter_key] = {'current': 0, 'target': repeat_count}
                     
+                    # 인덱스 관리
+                    if wildcard_name not in self._loopcard_indices:
+                        self._loopcard_indices[wildcard_name] = 0
+                    
+                    idx = self._loopcard_indices[wildcard_name]
+                    selected_line = wc_list[idx].strip()
+                    
+                    # 단일 캐릭터만 사용 (반복 없이)
+                    str_center = selected_line
+                    
+                    # 반복 카운터 증가
+                    self._repeat_counters[counter_key]['current'] += 1
+                    
+                    # 목표 반복 횟수에 도달하면 다음 캐릭터로 이동
+                    if self._repeat_counters[counter_key]['current'] >= repeat_count:
+                        self._loopcard_indices[wildcard_name] = (idx + 1) % len(wc_list)
+                        self._repeat_counters[counter_key]['current'] = 0  # 카운터 리셋
+                    
+                    applied_loopcard_list.append(str_center)
+                else:
+                    str_center = "##" + str_center + "##"
+            else:
+                str_center = "##" + str_center + "##"
+
+            result_left = str_left + str_center
+            prev_point = len(result_left)
+            result = result_left + str_right
+
+        return result, applied_loopcard_list
+        
+    def _apply_loopcard_once_with_snapshot(self, target_str, except_list=[]):
+        """스냅샷된 인덱스를 사용한 루프카드 처리 - 순차 반복 기능 추가"""
+        result = target_str
+        applied_loopcard_list = []
+        prev_point = 0
+        
+        while "##" in result:
+            p_left = result.find("##", prev_point)
+            if p_left == -1:
+                break
+            p_right = result.find("##", p_left + 2)
+            if p_right == -1:
+                break
+
+            str_left = result[0:p_left]
+            str_center = result[p_left + 2:p_right].lower().strip()
+            str_right = result[p_right + 2:len(result)]
+
+            # 순차 반복 와일드카드 패턴 확인: wildcard_name*repeat_count
+            repeat_count = 1  # 기본값
+            wildcard_name = str_center
+            
+            # *숫자 패턴 확인
+            if '*' in str_center:
+                parts = str_center.split('*')
+                if len(parts) == 2 and parts[0] and parts[1]:
+                    try:
+                        repeat_count = int(parts[1])
+                        wildcard_name = parts[0]
+                        if repeat_count <= 0:
+                            raise ValueError("반복 횟수는 양수여야 합니다")
+                    except ValueError:
+                        # 잘못된 형식이면 원본 구문 그대로 유지
+                        str_center = "##" + str_center + "##"
+                        result_left = str_left + str_center
+                        prev_point = len(result_left)
+                        result = result_left + str_right
+                        continue
+
+            if wildcard_name in self._wildcards_dict and not (wildcard_name in except_list):
+                wc_list = self._wildcards_dict[wildcard_name]
+                if wc_list:
+                    # 키 사용 기록
+                    self._used_keys.add(wildcard_name)
+                    
+                    # 스냅샷에서 인덱스 가져오기
+                    idx = self._current_snapshot.get(wildcard_name, 0)
+                    selected_line = wc_list[idx].strip()
+                    
+                    # 단일 캐릭터만 사용 (스냅샷에서는 반복 없이)
+                    str_center = selected_line
                     applied_loopcard_list.append(str_center)
                 else:
                     str_center = "##" + str_center + "##"
