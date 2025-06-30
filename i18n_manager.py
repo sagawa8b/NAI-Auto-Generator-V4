@@ -68,7 +68,6 @@ class I18nManager(QObject):
             "language_name": "한국어",
             "language_code": "ko",
             "translations": {
-                # 메뉴
                 "menu": {
                     "languages": "언어",
                     "file": "파일(Files)",
@@ -83,8 +82,6 @@ class I18nManager(QObject):
                     "etc": "기타(Etc)",
                     "about": "만든 이(About)"
                 },
-                
-                # 상태바
                 "statusbar": {
                     "before_login": "로그인이 필요합니다.",
                     "logged_in": "로그인 완료. 이제 생성이 가능합니다.",
@@ -98,8 +95,6 @@ class I18nManager(QObject):
                     "auto_wait": "다음 생성 대기 중... ({}초)",
                     "auto_error_wait": "에러 발생. {}초 후 재시도..."
                 },
-                
-                # UI 요소
                 "ui": {
                     "languages": "언어",
                     "prompt_group": "프롬프트",
@@ -112,17 +107,15 @@ class I18nManager(QObject):
                     "ai_position": "AI 위치 선택",
                     "add_character": "+ 캐릭터 추가",
                     "clear_all": "모두 삭제",
-                    "sync_width": "너비 동기화",
                     "character_n": "캐릭터 {}",
-                    "character_prompt": "캐릭터 프롬프트:",
                     "position": "위치",
                     "negative_prompt_add": "네거티브 프롬프트 추가",
+                    "sync_width": "너비 동기화",
+                    "character_prompt": "캐릭터 프롬프트:",
                     "reset_image_size": "이미지 크기 초기화",
                     "reset_image_size_tooltip": "결과 이미지 창을 기본 크기로 복원합니다"
-                },
-                
-                # 이미지 옵션
-                "image_options": {
+                },      
+          "image_options": {
                     "title": "Image Options",
                     "size": "Size:",
                     "width": "W:",
@@ -134,8 +127,6 @@ class I18nManager(QObject):
                     "fix": "고정 (Fix)",
                     "random_button": "랜덤 (Random)"
                 },
-                
-                # 고급 설정
                 "advanced": {
                     "title": "Advanced Settings",
                     "prompt_guidance": "Prompt Guidance:",
@@ -145,8 +136,6 @@ class I18nManager(QObject):
                     "noise_schedule": "Noise Schedule:",
                     "legacy_mode": "Legacy Prompt Conditioning Mode"
                 },
-                
-                # 생성 버튼
                 "generate": {
                     "title": "Generate",
                     "once": "1회 생성",
@@ -154,24 +143,18 @@ class I18nManager(QObject):
                     "auto": "연속 생성 (Auto)",
                     "stop": "생성 중지"
                 },
-                
-                # 폴더
                 "folders": {
                     "title": "폴더 열기",
                     "results": "생성 결과 폴더",
                     "wildcards": "와일드카드 폴더",
                     "settings": "세팅 파일 폴더"
                 },
-                
-                # 결과
                 "result": {
                     "image_title": "결과 이미지 (Result Image)",
                     "no_image": "결과 이미지가 없습니다",
                     "save_image": "이미지 저장 (Save Image)",
                     "prompt_title": "결과 프롬프트 (Result Prompt)"
                 },
-                
-                # 대화상자
                 "dialogs": {
                     "login_title": "NAI API 로그인",
                     "login_welcome": "안녕하세요!\\nNovel AI 계정으로 로그인해 주세요.",
@@ -188,8 +171,6 @@ class I18nManager(QObject):
                     "login_success": "로그인에 성공했습니다.",
                     "login_failed": "로그인에 실패했습니다.\\n아이디와 비밀번호를 확인해주세요."
                 },
-                
-                # 에러 메시지
                 "errors": {
                     "title": "오류",
                     "warning": "경고",
@@ -202,8 +183,6 @@ class I18nManager(QObject):
                     "file_save_error": "파일 저장 중 오류 발생",
                     "file_load_error": "파일 로드 중 오류 발생"
                 },
-                
-                # 연결 상태
                 "connection": {
                     "server": "서버:",
                     "connected": "연결됨",
@@ -212,8 +191,6 @@ class I18nManager(QObject):
                     "network_disconnected": "네트워크 연결 없음",
                     "network_restored": "인터넷 연결이 복구되었습니다."
                 },
-                
-                # 기타
                 "misc": {
                     "login_state": "로그인 상태",
                     "logged_in": "로그인 됨",
@@ -222,14 +199,13 @@ class I18nManager(QObject):
                     "unknown": "알 수 없음"
                 }
             }
-        }
-        
+        } 
+       
         # 영어 파일
         en_data = {
             "language_name": "English",
             "language_code": "en",
             "translations": {
-                # 메뉴
                 "menu": {
                     "languages": "Languages",
                     "file": "Files",
@@ -244,8 +220,6 @@ class I18nManager(QObject):
                     "etc": "Etc",
                     "about": "About"
                 },
-                
-                # 상태바
                 "statusbar": {
                     "before_login": "Login required.",
                     "logged_in": "Login complete. You can now generate images.",
@@ -259,30 +233,26 @@ class I18nManager(QObject):
                     "auto_wait": "Waiting for next generation... ({} seconds)",
                     "auto_error_wait": "Error occurred. Retrying in {} seconds..."
                 },
-                
-                # UI 요소
                 "ui": {
                     "languages": "Languages",
-                    "prompt_group": "Prompt",
+                    "prompt_group": "Prompt", 
                     "prompt": "Prompt:",
                     "negative_prompt": "Negative Prompt:",
                     "prompt_placeholder": "Enter what to include in the image...",
                     "negative_prompt_placeholder": "Enter what to exclude from the image...",
                     "character_prompts": "Character Prompts (V4)",
-                    "character_prompt_info": "Character prompt: V4 models allow you to specify multiple characters individually in an image.",
-                    "ai_position": "Select AI position",
-                    "add_character": "+ Add character",
-                    "clear_all": "Clear all",
-                    "sync_width": "Sync width",
+                    "character_prompt_info": "Character Prompts: In V4 model, you can specify multiple characters individually.",
+                    "ai_position": "AI Position Selection",
+                    "add_character": "+ Add Character",
+                    "clear_all": "Clear All",
                     "character_n": "Character {}",
-                    "character_prompt": "Character prompt:",
                     "position": "Position",
                     "negative_prompt_add": "Add Negative Prompt",
+                    "sync_width": "Sync width",
+                    "character_prompt": "Character prompt:",
                     "reset_image_size": "Reset image size",
                     "reset_image_size_tooltip": "Restores the resulting image window to its default size"
                 },
-                
-                # 이미지 옵션
                 "image_options": {
                     "title": "Image Options",
                     "size": "Size:",
@@ -295,8 +265,6 @@ class I18nManager(QObject):
                     "fix": "Fix",
                     "random_button": "Random"
                 },
-                
-                # 고급 설정
                 "advanced": {
                     "title": "Advanced Settings",
                     "prompt_guidance": "Prompt Guidance:",
@@ -306,8 +274,6 @@ class I18nManager(QObject):
                     "noise_schedule": "Noise Schedule:",
                     "legacy_mode": "Legacy Prompt Conditioning Mode"
                 },
-                
-                # 생성 버튼
                 "generate": {
                     "title": "Generate",
                     "once": "Generate Once",
@@ -315,24 +281,18 @@ class I18nManager(QObject):
                     "auto": "Auto Generate",
                     "stop": "Stop Generation"
                 },
-                
-                # 폴더
                 "folders": {
                     "title": "Open Folder",
                     "results": "Results Folder",
                     "wildcards": "Wildcards Folder",
                     "settings": "Settings Folder"
                 },
-                
-                # 결과
                 "result": {
                     "image_title": "Result Image",
                     "no_image": "No result image",
                     "save_image": "Save Image",
                     "prompt_title": "Result Prompt"
                 },
-                
-                # 대화상자
                 "dialogs": {
                     "login_title": "NAI API Login",
                     "login_welcome": "Hello!\\nPlease log in with your Novel AI account.",
@@ -349,8 +309,6 @@ class I18nManager(QObject):
                     "login_success": "Login successful.",
                     "login_failed": "Login failed.\\nPlease check your username and password."
                 },
-                
-                # 에러 메시지
                 "errors": {
                     "title": "Error",
                     "warning": "Warning",
@@ -363,8 +321,6 @@ class I18nManager(QObject):
                     "file_save_error": "Error saving file",
                     "file_load_error": "Error loading file"
                 },
-                
-                # 연결 상태
                 "connection": {
                     "server": "Server:",
                     "connected": "Connected",
@@ -373,8 +329,6 @@ class I18nManager(QObject):
                     "network_disconnected": "No network connection",
                     "network_restored": "Internet connection restored."
                 },
-                
-                # 기타
                 "misc": {
                     "login_state": "Login State",
                     "logged_in": "Logged In",
@@ -383,8 +337,8 @@ class I18nManager(QObject):
                     "unknown": "Unknown"
                 }
             }
-        }
-        
+        }        
+
         # 파일 저장
         try:
             with open(os.path.join(self.language_path, "ko.json"), 'w', encoding='utf-8') as f:
