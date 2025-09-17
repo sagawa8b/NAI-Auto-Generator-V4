@@ -342,12 +342,40 @@ class NAIAutoGeneratorWindow(QMainWindow):
         
         self.is_initializing = False  # 초기화 완료 표시
         self.show()
+        
+        # Character Reference UI 초기화 확인 (디버깅용 - 나중에 제거 가능)
+        #QTimer.singleShot(1000, self.test_character_reference_ui)
 
         # NAI 관련 기능 초기화
         self.init_nai()
         self.init_wc()
         self.init_tagger()
         self.init_completion()
+    
+    def test_character_reference_ui(self):
+        """Character Reference UI 테스트 - 디버깅용"""
+        try:
+            from PyQt5.QtWidgets import QGroupBox  # import 추가
+            
+            logger.info("=== Character Reference UI 테스트 시작 ===")
+            
+            # 필요한 속성들이 있는지 확인
+            attrs_to_check = ['image_options_group', 'image_options_layout', 'char_ref_group']
+            for attr in attrs_to_check:
+                if hasattr(self, attr):
+                    logger.info(f"✓ {attr} 존재")
+                else:
+                    logger.error(f"✗ {attr} 없음")
+            
+            # Image References 그룹박스 찾기
+            for widget in self.findChildren(QGroupBox):
+                if "Image" in widget.title() or "Reference" in widget.title():
+                    logger.info(f"발견된 GroupBox: {widget.title()}")
+            
+            logger.info("=== Character Reference UI 테스트 완료 ===")
+        except Exception as e:
+            logger.error(f"Character Reference UI 테스트 중 오류: {e}")  
+    
     
     
     def start_session_monitoring(self, interval=1800000):
@@ -931,6 +959,10 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.set_statusbar_text("BEFORE_LOGIN")
 
     def init_menubar(self):
+        """메뉴바 초기화"""
+        menubar = self.menuBar()
+        menubar.setNativeMenuBar(False)
+
         # 기존 액션들을 번역된 텍스트로 변경
         openAction = QAction(tr('menu.open_file'), self)
         openAction.setShortcut('Ctrl+O')
@@ -973,12 +1005,14 @@ class NAIAutoGeneratorWindow(QMainWindow):
         togglePanelAction.setShortcut('F11')
         togglePanelAction.triggered.connect(self.on_click_expand)
         
+        # Character Reference 토글 액션
+        self.char_ref_action = QAction("Character Reference 패널", self)
+        self.char_ref_action.setCheckable(True)
+        self.char_ref_action.setChecked(False)  # 초기값은 숨김
+        self.char_ref_action.triggered.connect(self.toggle_character_reference_panel)
+        
         # 메뉴 생성
-        menubar = self.menuBar()
-        menubar.setNativeMenuBar(False)
-        
-        
-        # 기존 메뉴 추가
+        # 파일 메뉴
         filemenu_file = menubar.addMenu(tr('menu.file')) 
         filemenu_file.addAction(openAction)
         filemenu_file.addAction(saveSettingsAction)
@@ -988,20 +1022,107 @@ class NAIAutoGeneratorWindow(QMainWindow):
         filemenu_file.addAction(optionAction)
         filemenu_file.addAction(exitAction)
         
-        #filemenu_tool = menubar.addMenu(tr('menu.tools'))
-        #filemenu_tool.addAction(getterAction)
-        #filemenu_tool.addAction(taggerAction)
-        
-        # 보기 메뉴 추가
+        # 보기 메뉴 - 한 번만 생성
         viewMenu = menubar.addMenu(tr('menu.view'))
         viewMenu.addAction(togglePanelAction)
+        viewMenu.addAction(self.char_ref_action)  # Character Reference 액션 추가
         
+        # 기타 메뉴
         filemenu_etc = menubar.addMenu(tr('menu.etc'))
         filemenu_etc.addAction(aboutAction)
         
         # 언어 메뉴 추가
         self.lang_menu = menubar.addMenu(tr('menu.languages', 'Languages'))
         self.setup_language_menu()
+        
+    def toggle_character_reference_panel(self, checked):
+        """Character Reference 패널 표시/숨김 토글"""
+        logger.info(f"Character Reference 패널 토글 요청: {checked}")
+        
+        if hasattr(self, 'char_ref_group'):
+            self.char_ref_group.setVisible(checked)
+            logger.info(f"Character Reference 패널 {'표시' if checked else '숨김'}")
+            
+            # 패널이 표시될 때 안내 메시지
+            if checked:
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self, "Character Reference", 
+                    "Character Reference 기능이 활성화되었습니다.\n\n"
+                    "• V4.5 모델에서만 작동합니다\n"
+                    "• Vibe Transfer와 동시 사용 불가\n"
+                    "• 전신 샷 이미지 권장"
+                )
+        else:
+            logger.error("char_ref_group이 없습니다. UI 초기화를 확인하세요.")
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "오류", "Character Reference UI를 찾을 수 없습니다.")
+
+    def toggle_char_ref_panel(self, checked):
+        """Character Reference 패널 토글 (짧은 이름 버전)"""
+        self.toggle_character_reference_panel(checked)
+        
+    
+    def init_character_reference_ui(self):
+        """Character Reference UI 동적 생성"""
+        logger.info("Character Reference UI 초기화 시작")
+        
+        try:
+            # image_options_group 내부에 Character Reference 위젯 추가
+            if hasattr(self, 'image_options_layout'):
+                # CharacterReferenceWidget 생성
+                self.char_ref_settings_group = CharacterReferenceWidget(self)
+                self.image_options_layout.addWidget(self.char_ref_settings_group)
+                
+                # Character Reference 설정 패널 생성
+                self.char_ref_settings = QGroupBox("Character Reference Settings")
+                char_ref_settings_layout = QVBoxLayout()
+                self.char_ref_settings.setLayout(char_ref_settings_layout)
+                
+                # Style Aware 체크박스
+                self.dict_ui_settings["character_reference_style_aware"] = QCheckBox("Style Aware")
+                self.dict_ui_settings["character_reference_style_aware"].setChecked(True)
+                self.dict_ui_settings["character_reference_style_aware"].setToolTip(
+                    "캐릭터 관련 스타일 정보를 자동으로 전달합니다."
+                )
+                char_ref_settings_layout.addWidget(self.dict_ui_settings["character_reference_style_aware"])
+                
+                # 경고 라벨
+                warning_label = QLabel("⚠️ V4.5 모델 전용 기능")
+                warning_label.setStyleSheet("color: orange; font-size: 10px;")
+                char_ref_settings_layout.addWidget(warning_label)
+                
+                self.image_options_layout.addWidget(self.char_ref_settings)
+                self.char_ref_settings.setVisible(False)
+                
+                # 시그널 연결
+                self.char_ref_settings_group.is_active_changed.connect(
+                    lambda active: self.char_ref_settings.setVisible(active)
+                )
+                
+                logger.info("Character Reference UI 초기화 완료")
+            else:
+                logger.error("image_options_layout을 찾을 수 없습니다")
+                
+        except Exception as e:
+            logger.error(f"Character Reference UI 초기화 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            
+    
+    def toggle_char_ref_panel(self, checked):
+        """Character Reference 패널 토글"""
+        if hasattr(self, 'char_ref_group'):
+            self.char_ref_group.setVisible(checked)
+            logger.info(f"Character Reference 패널 {'표시' if checked else '숨김'}")
+        else:
+            logger.error("char_ref_group을 찾을 수 없습니다")
+    
+    def toggle_character_reference_panel(self):
+        """Character Reference 패널 표시/숨김 토글"""
+        if hasattr(self, 'image_options_group'):
+            current_visible = self.image_options_group.isVisible()
+            self.image_options_group.setVisible(not current_visible)    
 
     def setup_language_menu(self):
         """언어 선택 메뉴 설정"""
@@ -1423,6 +1544,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     # Warning! Don't interact with pyqt gui in this function
     def _get_data_for_generate(self):
+        """생성용 데이터 가져오기"""
+        data = {}
         try:
             logger.debug("_get_data_for_generate 시작")
             
@@ -1614,6 +1737,23 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         data[field] = ""  # 텍스트 필드 기본값
             
             logger.debug("_get_data_for_generate 완료")
+            
+            # Character Reference 데이터 추가
+            if hasattr(self, 'char_ref_image_data') and self.char_ref_image_data:
+                data['character_reference'] = self.char_ref_image_data
+                
+                if hasattr(self, 'char_ref_style_aware'):
+                    data['character_reference_style_aware'] = self.char_ref_style_aware.isChecked()
+                
+                # V4.5 모델 강제
+                data['model'] = 'nai-diffusion-4-5-full'
+                logger.info("Character Reference 사용 - V4.5 모델로 전환")
+                
+                # Vibe Transfer 제거
+                if 'reference_image' in data:
+                    del data['reference_image']
+                    logger.info("Character Reference와 충돌하는 Vibe Transfer 제거")
+            
             return data
             
         except Exception as e:
@@ -2667,6 +2807,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.close()
         self.app.closeAllWindows()
         QCoreApplication.exit(0)
+    
 
 
 class CompletionTagLoadThread(QThread):
@@ -2978,6 +3119,7 @@ class GenerateThread(QThread):
     def stop(self):
         self.is_stopped = True
         self.wait()  # 스레드가 종료될 때까지 대기
+
 
 class TokenValidateThread(QThread):
     validation_result = pyqtSignal(int)

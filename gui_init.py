@@ -287,6 +287,74 @@ def init_main_widget(parent):
     # 고급 설정 그룹 초기화
     advanced_group = init_advanced_group(parent)
     
+    
+    # ========== Character Reference 그룹 추가 ==========
+    char_ref_group = QGroupBox("Character Reference (V4.5 전용)")
+    char_ref_layout = QVBoxLayout()
+    char_ref_group.setLayout(char_ref_layout)
+    
+    # 이미지 표시 영역
+    parent.char_ref_image_label = QLabel("캐릭터 이미지를 업로드하세요")
+    parent.char_ref_image_label.setAlignment(Qt.AlignCenter)
+    parent.char_ref_image_label.setMinimumHeight(120)
+    parent.char_ref_image_label.setMaximumHeight(200)
+    parent.char_ref_image_label.setStyleSheet("""
+        QLabel {
+            background-color: #2a2a2a;
+            border: 2px dashed #666;
+            border-radius: 5px;
+            color: #999;
+            font-size: 12px;
+        }
+    """)
+    char_ref_layout.addWidget(parent.char_ref_image_label)
+    
+    # 버튼 영역
+    char_ref_buttons = QHBoxLayout()
+    
+    parent.char_ref_load_btn = QPushButton("📁 이미지 불러오기")
+    parent.char_ref_load_btn.clicked.connect(lambda: load_character_reference(parent))
+    char_ref_buttons.addWidget(parent.char_ref_load_btn)
+    
+    parent.char_ref_remove_btn = QPushButton("🗑️ 제거")
+    parent.char_ref_remove_btn.clicked.connect(lambda: remove_character_reference(parent))
+    parent.char_ref_remove_btn.setEnabled(False)  # 초기에는 비활성화
+    char_ref_buttons.addWidget(parent.char_ref_remove_btn)
+    
+    char_ref_layout.addLayout(char_ref_buttons)
+    
+    # Style Aware 체크박스
+    parent.char_ref_style_aware = QCheckBox("Style Aware (캐릭터 스타일 정보 유지)")
+    parent.char_ref_style_aware.setChecked(True)
+    parent.char_ref_style_aware.setToolTip(
+        "캐릭터의 특징적인 스타일 정보를 자동으로 전달합니다.\n"
+        "눈이나 머리카락 같은 세부 특징이 더 정확하게 재현됩니다."
+    )
+    char_ref_layout.addWidget(parent.char_ref_style_aware)
+    
+    # 정보 라벨
+    info_label = QLabel("💡 팁: 전신 샷, 중립 포즈, 단순 배경의 이미지가 가장 좋습니다")
+    info_label.setWordWrap(True)
+    info_label.setStyleSheet("color: #888; font-size: 10px; padding: 5px;")
+    char_ref_layout.addWidget(info_label)
+    
+    # 경고 라벨
+    warning_label = QLabel("⚠️ V4.5 모델에서만 작동 | Vibe Transfer와 동시 사용 불가")
+    warning_label.setStyleSheet("color: orange; font-size: 10px; padding: 5px;")
+    char_ref_layout.addWidget(warning_label)
+    
+    # 레이아웃에 추가
+    left_layout.addWidget(char_ref_group)
+    char_ref_group.setVisible(False)  # 초기에는 숨김
+    parent.char_ref_group = char_ref_group  # 참조 저장 (중요!)
+    
+    # Character Reference 데이터 저장용 변수 초기화
+    parent.char_ref_image_data = None
+    parent.char_ref_image_path = None
+    
+    logger.info("Character Reference UI 생성 완료")
+    # ========== Character Reference 그룹 추가 끝 ==========    
+
 
     # Generate 버튼 그룹
     generate_group = QGroupBox("Generate")
@@ -411,13 +479,69 @@ def init_main_widget(parent):
     image_options_group.setLayout(image_options_layout)
     parent.image_options_layout = image_options_layout
 
+    # Character Reference 그룹 생성
+    char_ref_group = QGroupBox("Character Reference (V4.5)")
+    char_ref_layout = QVBoxLayout()
+    char_ref_group.setLayout(char_ref_layout)
+    
+    # 이미지 표시 영역
+    parent.char_ref_image_label = QLabel("캐릭터 이미지를 업로드하세요")
+    parent.char_ref_image_label.setAlignment(Qt.AlignCenter)
+    parent.char_ref_image_label.setMinimumHeight(100)
+    parent.char_ref_image_label.setStyleSheet("""
+        QLabel {
+            background-color: rgba(0, 0, 0, 50);
+            border: 2px dashed #666;
+            border-radius: 5px;
+            color: #999;
+        }
+    """)
+    char_ref_layout.addWidget(parent.char_ref_image_label)
+    
+    # 버튼 영역
+    char_ref_buttons = QHBoxLayout()
+    
+    char_ref_load_btn = QPushButton("이미지 불러오기")
+    char_ref_load_btn.clicked.connect(lambda: load_character_reference(parent))
+    char_ref_buttons.addWidget(char_ref_load_btn)
+    
+    char_ref_remove_btn = QPushButton("제거")
+    char_ref_remove_btn.clicked.connect(lambda: remove_character_reference(parent))
+    char_ref_buttons.addWidget(char_ref_remove_btn)
+    
+    char_ref_layout.addLayout(char_ref_buttons)
+    
+    # Style Aware 체크박스
+    parent.char_ref_style_aware = QCheckBox("Style Aware (캐릭터 스타일 유지)")
+    parent.char_ref_style_aware.setChecked(True)
+    char_ref_layout.addWidget(parent.char_ref_style_aware)
+    
+    # 정보 라벨
+    info_label = QLabel("💡 V4.5 모델 전용 | 전신 샷 권장")
+    info_label.setStyleSheet("color: #888; font-size: 10px;")
+    char_ref_layout.addWidget(info_label)
+    
+    # 레이아웃에 추가 (left_layout에 추가해야 함)
+    left_layout.addWidget(char_ref_group)
+    char_ref_group.setVisible(False)  # 초기에는 숨김
+    parent.char_ref_group = char_ref_group  # 참조 저장
+    
+    # Character Reference 데이터 저장용 변수
+    parent.char_ref_image_data = None
+    parent.char_ref_image_path = None
+
+
     # img2img 옵션
     parent.i2i_settings_group = ImageToImageWidget("img2img", parent)
     image_options_layout.addWidget(parent.i2i_settings_group)
 
-    # Reference Image 옵션
+    # Reference Image 옵션 (기존 - Vibe Transfer)
     parent.vibe_settings_group = ImageToImageWidget("vibe", parent)
     image_options_layout.addWidget(parent.vibe_settings_group)
+
+    # Character Reference 옵션 (새로 추가)
+    parent.char_ref_settings_group = CharacterReferenceWidget(parent)
+    image_options_layout.addWidget(parent.char_ref_settings_group)
 
     # img2img 전용 설정
     parent.i2i_settings = QGroupBox("img2img Settings")
@@ -468,9 +592,31 @@ def init_main_widget(parent):
     image_options_layout.addWidget(parent.vibe_settings)
     parent.vibe_settings.setVisible(False)
 
-    # UI에 그룹은 추가하되 숨김 처리
+    # Character Reference 전용 설정 추가
+    parent.char_ref_settings = QGroupBox("Character Reference Settings")
+    char_ref_settings_layout = QVBoxLayout()
+    parent.char_ref_settings.setLayout(char_ref_settings_layout)
+    
+    # Style Aware 체크박스
+    parent.dict_ui_settings["character_reference_style_aware"] = QCheckBox("Style Aware")
+    parent.dict_ui_settings["character_reference_style_aware"].setChecked(True)
+    parent.dict_ui_settings["character_reference_style_aware"].setToolTip(
+        "캐릭터 관련 스타일 정보를 자동으로 전달합니다. 캐릭터를 더 쉽게 인식할 수 있게 합니다."
+    )
+    char_ref_settings_layout.addWidget(parent.dict_ui_settings["character_reference_style_aware"])
+    
+    # V4.5 모델 전용 경고 라벨
+    warning_label = QLabel("⚠️ Character Reference는 V4.5 모델에서만 사용 가능합니다")
+    warning_label.setStyleSheet("color: orange; font-size: 10px;")
+    char_ref_settings_layout.addWidget(warning_label)
+    
+    image_options_layout.addWidget(parent.char_ref_settings)
+    parent.char_ref_settings.setVisible(False)
+
+
+    # 그룹 표시/숨김 제어
     left_layout.addWidget(image_options_group)
-    image_options_group.setVisible(False) 
+    image_options_group.setVisible(False)  # 초기에는 숨김
 
 
     # 1.5: 버튼 레이아웃
@@ -1290,3 +1436,324 @@ class ResizableImageWidget(QFrame):
         painter.drawLine(self.width() - size, self.height(), self.width(), self.height() - size)
         painter.drawLine(self.width() - size * 2, self.height(), self.width(), self.height() - size * 2)
         painter.drawLine(self.width() - size * 3, self.height(), self.width(), self.height() - size * 3)
+
+class CharacterReferenceWidget(QGroupBox):
+    """Character Reference 전용 위젯"""
+    is_active_changed = pyqtSignal(bool)
+    
+    def __init__(self, parent):
+        super().__init__("Character Reference (V4.5)")
+        self.parent = parent
+        self.src = None
+        self.image_data = None
+        
+        self.setMinimumHeight(150)
+        self.setMaximumWidth(300)  # 너비 제한
+        self.init_ui()
+        
+        logger.debug("CharacterReferenceWidget 생성됨")
+    
+    def init_ui(self):
+        layout = QVBoxLayout()
+        layout.setSpacing(5)
+        
+        # 이미지 표시 라벨
+        self.image_label = QLabel("캐릭터 이미지 없음")
+        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.image_label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 0, 0, 128);
+                border: 2px dashed #666;
+                border-radius: 5px;
+                color: #999;
+                font-size: 11px;
+            }
+        """)
+        self.image_label.setMinimumHeight(100)
+        layout.addWidget(self.image_label)
+        
+        # 버튼 레이아웃
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(5)
+        
+        # 업로드 버튼
+        self.upload_button = QPushButton("📁 불러오기")
+        self.upload_button.clicked.connect(self.load_character_image)
+        button_layout.addWidget(self.upload_button)
+        
+        # 제거 버튼
+        self.remove_button = QPushButton("🗑️ 제거")
+        self.remove_button.clicked.connect(self.remove_image)
+        self.remove_button.setEnabled(False)
+        button_layout.addWidget(self.remove_button)
+        
+        layout.addLayout(button_layout)
+        
+        # 정보 라벨
+        info_label = QLabel("💡 전신, 중립 포즈, 단순 배경 권장")
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("font-size: 10px; color: #888;")
+        layout.addWidget(info_label)
+        
+        self.setLayout(layout)
+    
+    def load_character_image(self):
+        """캐릭터 이미지 불러오기"""
+        logger.debug("Character Reference 이미지 선택 대화상자 열기")
+        
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Character Reference 이미지 선택", "", 
+            "이미지 파일 (*.png *.jpg *.jpeg *.webp)"
+        )
+        
+        if filename:
+            logger.info(f"Character Reference 이미지 선택됨: {filename}")
+            self.set_image(filename)
+    
+    def set_image(self, src):
+        """이미지 설정"""
+        self.src = src
+        
+        if src and os.path.exists(src):
+            try:
+                # 이미지 로드 및 표시
+                pixmap = QPixmap(src)
+                if not pixmap.isNull():
+                    scaled_pixmap = pixmap.scaledToHeight(100, Qt.SmoothTransformation)
+                    self.image_label.setPixmap(scaled_pixmap)
+                    
+                    # Base64 인코딩
+                    with open(src, 'rb') as f:
+                        self.image_data = base64.b64encode(f.read()).decode('utf-8')
+                    
+                    self.remove_button.setEnabled(True)
+                    
+                    # Vibe Transfer 충돌 체크
+                    if hasattr(self.parent, 'vibe_settings_group') and self.parent.vibe_settings_group.src:
+                        reply = QMessageBox.question(
+                            self, "경고", 
+                            "Character Reference와 Vibe Transfer는 동시 사용 불가합니다.\n"
+                            "Character Reference를 사용하시겠습니까?",
+                            QMessageBox.Yes | QMessageBox.No
+                        )
+                        if reply == QMessageBox.Yes:
+                            self.parent.vibe_settings_group.on_click_removebutton()
+                        else:
+                            self.remove_image()
+                            return
+                    
+                    logger.info("Character Reference 이미지 설정 완료")
+                    self.is_active_changed.emit(True)
+                else:
+                    logger.error("이미지 로드 실패")
+                    QMessageBox.warning(self, "오류", "이미지를 로드할 수 없습니다.")
+                    
+            except Exception as e:
+                logger.error(f"Character Reference 이미지 설정 오류: {e}")
+                QMessageBox.critical(self, "오류", f"이미지 처리 실패: {str(e)}")
+        else:
+            self.remove_image()
+    
+    def remove_image(self):
+        """이미지 제거"""
+        logger.debug("Character Reference 이미지 제거")
+        
+        self.src = None
+        self.image_data = None
+        self.image_label.setText("캐릭터 이미지 없음")
+        self.image_label.setPixmap(QPixmap())
+        self.remove_button.setEnabled(False)
+        
+        self.is_active_changed.emit(False)
+    
+    def get_image_data(self):
+        """Base64 인코딩된 이미지 데이터 반환"""
+        return self.image_data
+
+class CharacterReferenceWidget(QGroupBox):
+    """Character Reference 전용 위젯"""
+    is_active_changed = pyqtSignal(bool)
+    
+    def __init__(self, parent):
+        super().__init__("Character Reference")
+        self.parent = parent
+        self.src = None
+        self.image_data = None
+        
+        self.setMinimumHeight(150)
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # 이미지 표시 라벨
+        self.image_label = QLabel("Character Reference 이미지 없음")
+        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128);")
+        self.image_label.setAcceptDrops(True)
+        layout.addWidget(self.image_label)
+        
+        # 버튼 레이아웃
+        button_layout = QHBoxLayout()
+        
+        # 업로드 버튼
+        self.upload_button = QPushButton("캐릭터 이미지 불러오기")
+        self.upload_button.clicked.connect(self.load_character_image)
+        button_layout.addWidget(self.upload_button)
+        
+        # 제거 버튼
+        self.remove_button = QPushButton("제거")
+        self.remove_button.clicked.connect(self.remove_image)
+        button_layout.addWidget(self.remove_button)
+        
+        layout.addLayout(button_layout)
+        
+        # 정보 라벨
+        info_label = QLabel("💡 전신 샷, 중립 포즈, 단순 배경의 이미지가 가장 좋습니다")
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("font-size: 10px; color: gray;")
+        layout.addWidget(info_label)
+        
+        self.setLayout(layout)
+    
+    def load_character_image(self):
+        """캐릭터 이미지 불러오기"""
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Character Reference 이미지 선택", "", 
+            "이미지 파일 (*.png *.jpg *.jpeg *.webp)"
+        )
+        
+        if filename:
+            self.set_image(filename)
+    
+    def set_image(self, src):
+        """이미지 설정"""
+        self.src = src
+        
+        if src:
+            # 이미지 로드 및 표시
+            pixmap = QPixmap(src)
+            scaled_pixmap = pixmap.scaledToHeight(128, Qt.SmoothTransformation)
+            self.image_label.setPixmap(scaled_pixmap)
+            
+            # Base64 인코딩
+            import base64
+            with open(src, 'rb') as f:
+                self.image_data = base64.b64encode(f.read()).decode('utf-8')
+            
+            # 부모 위젯에 표시 상태 변경 알림
+            self.parent.char_ref_settings.setVisible(True)
+            self.parent.image_options_group.setVisible(True)
+            
+            # Vibe Transfer와 충돌 체크
+            if self.parent.vibe_settings_group.src:
+                reply = QMessageBox.question(
+                    self, "경고", 
+                    "Character Reference와 Vibe Transfer는 동시에 사용할 수 없습니다.\n"
+                    "Character Reference를 사용하시겠습니까?",
+                    QMessageBox.Yes | QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    self.parent.vibe_settings_group.on_click_removebutton()
+                else:
+                    self.remove_image()
+                    return
+        else:
+            self.image_label.setText("Character Reference 이미지 없음")
+            self.image_label.setPixmap(QPixmap())
+            self.image_data = None
+        
+        self.is_active_changed.emit(bool(src))
+    
+    def remove_image(self):
+        """이미지 제거"""
+        self.src = None
+        self.image_data = None
+        self.image_label.setText("Character Reference 이미지 없음")
+        self.image_label.setPixmap(QPixmap())
+        self.parent.char_ref_settings.setVisible(False)
+        
+        # 다른 이미지 참조가 없으면 전체 그룹 숨김
+        if not self.parent.i2i_settings_group.src and not self.parent.vibe_settings_group.src:
+            self.parent.image_options_group.setVisible(False)
+        
+        self.is_active_changed.emit(False)
+    
+    def get_image_data(self):
+        """Base64 인코딩된 이미지 데이터 반환"""
+        return self.image_data
+
+def load_character_reference(parent):
+    """Character Reference 이미지 로드"""
+    from PyQt5.QtWidgets import QFileDialog, QMessageBox
+    from PyQt5.QtGui import QPixmap
+    from PyQt5.QtCore import Qt
+    import base64
+    import os
+    
+    logger.info("Character Reference 이미지 선택 대화상자 열기")
+    
+    filename, _ = QFileDialog.getOpenFileName(
+        parent, "Character Reference 이미지 선택", "", 
+        "이미지 파일 (*.png *.jpg *.jpeg *.webp)"
+    )
+    
+    if filename and os.path.exists(filename):
+        try:
+            # 이미지 표시
+            pixmap = QPixmap(filename)
+            if not pixmap.isNull():
+                # 이미지 크기 조정하여 표시
+                scaled = pixmap.scaled(
+                    parent.char_ref_image_label.width() - 10,
+                    parent.char_ref_image_label.height() - 10,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                )
+                parent.char_ref_image_label.setPixmap(scaled)
+                
+                # Base64 인코딩
+                with open(filename, 'rb') as f:
+                    parent.char_ref_image_data = base64.b64encode(f.read()).decode('utf-8')
+                parent.char_ref_image_path = filename
+                
+                # 버튼 상태 업데이트
+                parent.char_ref_remove_btn.setEnabled(True)
+                
+                logger.info(f"Character Reference 이미지 로드 성공: {filename}")
+                
+                # Vibe Transfer와 충돌 체크
+                if hasattr(parent, 'vibe_settings_group') and parent.vibe_settings_group.src:
+                    reply = QMessageBox.question(
+                        parent, "경고", 
+                        "Character Reference와 Vibe Transfer는 동시 사용이 불가능합니다.\n"
+                        "Character Reference를 사용하시겠습니까?",
+                        QMessageBox.Yes | QMessageBox.No
+                    )
+                    if reply == QMessageBox.Yes:
+                        parent.vibe_settings_group.on_click_removebutton()
+                        logger.info("Vibe Transfer 비활성화됨")
+                    else:
+                        # Character Reference 취소
+                        remove_character_reference(parent)
+                        return
+            else:
+                raise Exception("이미지를 읽을 수 없습니다")
+                
+        except Exception as e:
+            logger.error(f"Character Reference 이미지 로드 실패: {e}")
+            QMessageBox.critical(parent, "오류", f"이미지 로드 실패:\n{str(e)}")
+
+def remove_character_reference(parent):
+    """Character Reference 이미지 제거"""
+    from PyQt5.QtGui import QPixmap
+    
+    parent.char_ref_image_label.setText("캐릭터 이미지를 업로드하세요")
+    parent.char_ref_image_label.setPixmap(QPixmap())
+    parent.char_ref_image_data = None
+    parent.char_ref_image_path = None
+    parent.char_ref_remove_btn.setEnabled(False)
+    
+    logger.info("Character Reference 이미지 제거됨")

@@ -284,6 +284,9 @@ class NAIParam(Enum):
     reference_image = 16
     reference_information_extracted = 17
     reference_strength = 18
+    # Character Reference 파라미터 추가
+    character_reference = 35  # 새로운 번호 할당
+    character_reference_style_aware = 36    
     image = 19
     noise = 20
     strength = 21
@@ -320,6 +323,9 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.reference_image: str,
     NAIParam.reference_information_extracted: float,
     NAIParam.reference_strength: float,
+    # Character Reference 타입 추가
+    NAIParam.character_reference: str,  # base64 인코딩된 이미지
+    NAIParam.character_reference_style_aware: bool,    
     NAIParam.image: str,
     NAIParam.noise: float,
     NAIParam.strength: float,
@@ -420,10 +426,14 @@ class NAIGenerator():
             "noise": 0.0,
             "strength": 0.7,
             
-            # 참조 이미지 설정 (reference)
+            # 참조 이미지 설정 (Vibe Transfer용 - 기존)
             "reference_image": None,
             "reference_strength": 0.6,
             "reference_information_extracted": 1.0,
+            
+            # Character Reference 설정 (새로 추가)
+            "character_reference": None,
+            "character_reference_style_aware": True,  # 기본값 True
             
             # 캐릭터 프롬프트
             "characterPrompts": [],
@@ -529,8 +539,9 @@ class NAIGenerator():
     def set_param_dict(self, param_dict):
         # V4 API에서만 사용하는 특별한 파라미터들
         special_params = ["legacy_v3_extend", "noise_schedule", "params_version", 
-                          "characterPrompts", "v4_prompt", "v4_negative_prompt", "model"]  # model 추가
-        
+                      "characterPrompts", "v4_prompt", "v4_negative_prompt", "model",
+                      "character_reference", "character_reference_style_aware"]  # 추가
+                      
         for k, v in param_dict.items():
             if k:
                 if k in special_params:
@@ -753,7 +764,38 @@ class NAIGenerator():
             "legacy_uc": legacy_mode
         }
         
+        # Character Reference 데이터 구조 생성
+        self.parameters["v4_character_reference"] = {
+            "image": self.parameters["character_reference"],  # base64 이미지
+            "style_aware": self.parameters.get("character_reference_style_aware", True)
+        }
+        
+        # API 전송시 사용할 파라미터 이름으로 변경 (NovelAI API 스펙에 따라 조정 필요)
+        self.parameters["character_ref"] = self.parameters["v4_character_reference"]
+        
+        # 원본 파라미터 제거 (API에 불필요한 파라미터 제거)
+        if "character_reference" in self.parameters:
+            del self.parameters["character_reference"]
+        if "character_reference_style_aware" in self.parameters:
+            del self.parameters["character_reference_style_aware"]
+        
+        
         logger.debug(f"📍 v4_prompt 초기 구조 생성 완료 - use_coords: {use_coords}")
+        
+        # Character Reference와 Vibe Transfer 동시 사용 방지
+        if self.parameters.get("character_reference") and self.parameters.get("reference_image"):
+            logger.warning("Character Reference와 Vibe Transfer는 동시에 사용할 수 없습니다. Character Reference를 우선 사용합니다.")
+            self.parameters["reference_image"] = None
+            self.parameters["reference_strength"] = 0.6
+            self.parameters["reference_information_extracted"] = 1.0            
+        
+        # 모델 확인 - Character Reference는 V4.5에서만 작동
+        model = self.parameters.get("model", "nai-diffusion-4-5-full")
+        if self.parameters.get("character_reference") and "4-5" not in model:
+            logger.warning("Character Reference는 V4.5 모델에서만 사용 가능합니다. V4.5 모델로 자동 전환합니다.")
+            model = "nai-diffusion-4-5-full"
+            self.parameters["model"] = model
+                
         
         # 캐릭터 프롬프트 처리
         if self.parameters.get("characterPrompts") and len(self.parameters["characterPrompts"]) > 0:
