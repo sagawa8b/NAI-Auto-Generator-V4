@@ -13,6 +13,7 @@
       "exit": "Exit",
       "view": "View",
       "toggle_panel": "Toggle Result Panel",
+	  "character_reference_panel": "Character Reference Panel",
       "etc": "Etc",
       "about": "About"
     },
@@ -53,7 +54,19 @@
 	  "character_prompt": "Character prompt:",
 	  "position": "Position",
 	  "reset_image_size": "Reset image size",
-	  "reset_image_size_tooltip": "Restores the resulting image window to its default size"
+	  "reset_image_size_tooltip": "Restores the resulting image window to its default size",
+	  "character_reference": "Character Reference",
+      "character_reference_group": "Character Reference (V4.5 Only)",
+      "character_reference_info": "Set a reference image for consistent character appearance.",
+      "load_image": "Select Image",
+      "remove_image": "Remove",
+      "style_aware": "Style Aware (Reflect Character's Unique Style)",
+      "character_reference_warning": "Cannot be used with Vibe Transfer | V4.5 Model Only",
+      "select_image_placeholder": "Please select an image",
+      "character_reference_loaded": "Character Reference image has been loaded",
+      "character_reference_removed": "Character Reference image has been removed",
+      "invalid_image_file": "Invalid image file",
+      "image_load_failed": "Failed to load image"
     },
     "image_options": {
       "title": "Image Options",

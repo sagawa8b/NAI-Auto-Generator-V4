@@ -268,6 +268,7 @@ class NAIAction(Enum):
     infill = "infill"
 
 
+# NAIParam enum에 Character Reference 파라미터 추가
 class NAIParam(Enum):
     # 기본 파라미터
     prompt = 1
@@ -284,14 +285,10 @@ class NAIParam(Enum):
     reference_image = 16
     reference_information_extracted = 17
     reference_strength = 18
-    # Character Reference 파라미터 추가
-    character_reference = 35  # 새로운 번호 할당
-    character_reference_style_aware = 36    
     image = 19
     noise = 20
     strength = 21
     mask = 22
-    
     
     # V4 전용 파라미터
     autoSmea = 23
@@ -305,9 +302,14 @@ class NAIParam(Enum):
     dynamic_thresholding = 31
     quality_toggle = 32
     characterPrompts = 33
-    skip_cfg_above_sigma = 34  # 새로운 파라미터 번호 추가
+    skip_cfg_above_sigma = 34
+    
+    # Character Reference 파라미터 (V4.5 전용)
+    character_reference = 35
+    character_reference_style_aware = 36
 
 
+# TYPE_NAIPARAM_DICT에 Character Reference 타입 추가
 TYPE_NAIPARAM_DICT = {
     NAIParam.prompt: str,
     NAIParam.negative_prompt: str,
@@ -323,9 +325,6 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.reference_image: str,
     NAIParam.reference_information_extracted: float,
     NAIParam.reference_strength: float,
-    # Character Reference 타입 추가
-    NAIParam.character_reference: str,  # base64 인코딩된 이미지
-    NAIParam.character_reference_style_aware: bool,    
     NAIParam.image: str,
     NAIParam.noise: float,
     NAIParam.strength: float,
@@ -343,9 +342,12 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.dynamic_thresholding: bool,
     NAIParam.quality_toggle: bool,
     NAIParam.characterPrompts: list,
-    NAIParam.skip_cfg_above_sigma: (int, type(None))  # int 또는 None 타입 허용
+    NAIParam.skip_cfg_above_sigma: (int, type(None)),
+    
+    # Character Reference 파라미터 타입
+    NAIParam.character_reference: str,  # base64 인코딩된 이미지
+    NAIParam.character_reference_style_aware: bool,
 }
-
 
 def argon_hash(email: str, password: str, size: int, domain: str) -> str:
     pre_salt = f"{password[:6]}{email}{domain}"
@@ -431,9 +433,9 @@ class NAIGenerator():
             "reference_strength": 0.6,
             "reference_information_extracted": 1.0,
             
-            # Character Reference 설정 (새로 추가)
+            # Character Reference 설정 (V4.5 전용)
             "character_reference": None,
-            "character_reference_style_aware": True,  # 기본값 True
+            "character_reference_style_aware": True,
             
             # 캐릭터 프롬프트
             "characterPrompts": [],
@@ -580,6 +582,24 @@ class NAIGenerator():
         
         logger.debug("=== generate_image 메서드 시작 ===")
         
+        # Character Reference와 Vibe Transfer 동시 사용 방지
+        char_ref = self.parameters.get("character_reference")
+        vibe_transfer = self.parameters.get("reference_image")
+        
+        if char_ref and vibe_transfer:
+            logger.warning("⚠️ Character Reference와 Vibe Transfer는 동시에 사용할 수 없습니다. Character Reference를 우선 적용합니다.")
+            # Vibe Transfer 제거
+            self.parameters["reference_image"] = None
+            self.parameters["reference_strength"] = 0.6
+            self.parameters["reference_information_extracted"] = 1.0
+        
+        # Character Reference 사용 시 V4.5 모델 자동 전환
+        if char_ref:
+            current_model = self.parameters.get("model", "")
+            if not current_model.startswith("nai-diffusion-4-5"):
+                logger.info("📷 Character Reference 사용을 위해 V4.5 모델로 자동 전환됩니다.")
+                self.parameters["model"] = "nai-diffusion-4-5-full"
+        
         
         # 요청 추적을 위한 ID 생성
         import uuid
@@ -607,6 +627,19 @@ class NAIGenerator():
         logger.info(f"📍 [{request_id}] V4 파라미터 변환 호출 직전")
         self._prepare_v4_parameters()
         logger.info(f"📍 [{request_id}] V4 파라미터 변환 호출 완료")
+        
+        # API 전송 직전 Character Reference 확인 로깅
+        if self.parameters.get("director_reference_strengths"):
+            logger.info("📷 API 전송: Director Reference 포함됨 (Character Reference)")
+            logger.info(f"📷 director_reference_strengths: {self.parameters.get('director_reference_strengths')}")
+            
+            # director_reference_images 확인
+            director_images = self.parameters.get("director_reference_images")
+            if director_images:
+                logger.info(f"📷 director_reference_images 수: {len(director_images)}")
+            else:
+                logger.warning("📷 director_reference_images가 없음!")
+            
 
         url = BASE_URL + f"/ai/generate-image"
 
@@ -729,7 +762,6 @@ class NAIGenerator():
     
     def _prepare_v4_parameters(self):
         """V4 API에 필요한 파라미터 구조로 변환"""
-        print("=== _prepare_v4_parameters 메서드 호출됨 ===")  # 강제 출력
         logger.info("📍 _prepare_v4_parameters 메서드 시작")
         
         # 내부 파라미터 처리 - use_character_coords 값 저장 후 제거
@@ -737,6 +769,63 @@ class NAIGenerator():
         logger.info(f"📍 원본 use_character_coords: {use_coords}")
         if "use_character_coords" in self.parameters:
             del self.parameters["use_character_coords"]
+
+        # === Character Reference 처리 (배열 길이 맞춤) ===
+        char_ref_image = self.parameters.get("character_reference")
+        char_ref_style_aware = self.parameters.get("character_reference_style_aware", True)
+        
+        if char_ref_image:
+            logger.info("📷 Character Reference를 Director Reference 형식으로 변환 중...")
+            
+            # 기존 reference 파라미터들 완전 제거 (충돌 방지)
+            if "reference_image" in self.parameters:
+                del self.parameters["reference_image"]
+            if "reference_strength" in self.parameters:
+                del self.parameters["reference_strength"]
+            if "reference_information_extracted" in self.parameters:
+                del self.parameters["reference_information_extracted"]
+            
+            logger.debug("📷 기존 reference 파라미터들 제거 완료")
+            
+            # Director Reference 파라미터 설정 - 모든 배열 길이를 1로 맞춤
+            self.parameters["director_reference_images"] = [char_ref_image]  # 배열: 1개
+            self.parameters["director_reference_descriptions"] = [None]     # 배열: 1개 (None 값)
+            self.parameters["director_reference_information_extracted"] = [None]  # 배열: 1개 (None 값)
+            self.parameters["director_reference_strengths"] = [1.0]         # 배열: 1개 (1.0 값)
+            
+            # reference_*_multiple 파라미터를 빈 배열로 설정
+            self.parameters["reference_information_extracted_multiple"] = []
+            self.parameters["reference_strength_multiple"] = []
+            
+            # extra_passthrough_testing 제거 (API에서 허용되지 않음)
+            if "extra_passthrough_testing" in self.parameters:
+                del self.parameters["extra_passthrough_testing"]
+            
+            logger.info(f"📷 Style Aware 설정: {char_ref_style_aware}")
+            logger.info("📷 Character Reference → Director Reference 변환 완료")
+            logger.debug(f"📷 director_reference_images 수: {len(self.parameters['director_reference_images'])}")
+            logger.debug(f"📷 director_reference_descriptions 수: {len(self.parameters['director_reference_descriptions'])}")
+            logger.debug(f"📷 director_reference_information_extracted 수: {len(self.parameters['director_reference_information_extracted'])}")
+            logger.debug(f"📷 director_reference_strengths 수: {len(self.parameters['director_reference_strengths'])}")
+            logger.debug(f"📷 reference_strength_multiple: {self.parameters['reference_strength_multiple']}")
+            logger.debug(f"📷 reference_information_extracted_multiple: {self.parameters['reference_information_extracted_multiple']}")
+
+            # V4.5 모델 자동 전환
+            model = self.parameters.get("model", "nai-diffusion-4-5-full")
+            if "4-5" not in model:
+                logger.warning("📷 Character Reference는 V4.5 모델에서만 사용 가능합니다. V4.5 모델로 자동 전환합니다.")
+                self.parameters["model"] = "nai-diffusion-4-5-full"
+
+            # Character Reference 원본 파라미터 정리 (API에 전송하지 않음)
+            del self.parameters["character_reference"]
+            if "character_reference_style_aware" in self.parameters:
+                del self.parameters["character_reference_style_aware"]
+            logger.debug("📷 Character Reference 원본 파라미터 정리 완료")
+
+        else:
+            # Character Reference를 사용하지 않는 경우, reference_*_multiple을 빈 배열로 초기화
+            self.parameters["reference_information_extracted_multiple"] = []
+            self.parameters["reference_strength_multiple"] = []
 
         # Legacy 모드 확인
         legacy_mode = bool(self.parameters.get("legacy", False))
@@ -764,38 +853,7 @@ class NAIGenerator():
             "legacy_uc": legacy_mode
         }
         
-        # Character Reference 데이터 구조 생성
-        self.parameters["v4_character_reference"] = {
-            "image": self.parameters["character_reference"],  # base64 이미지
-            "style_aware": self.parameters.get("character_reference_style_aware", True)
-        }
-        
-        # API 전송시 사용할 파라미터 이름으로 변경 (NovelAI API 스펙에 따라 조정 필요)
-        self.parameters["character_ref"] = self.parameters["v4_character_reference"]
-        
-        # 원본 파라미터 제거 (API에 불필요한 파라미터 제거)
-        if "character_reference" in self.parameters:
-            del self.parameters["character_reference"]
-        if "character_reference_style_aware" in self.parameters:
-            del self.parameters["character_reference_style_aware"]
-        
-        
         logger.debug(f"📍 v4_prompt 초기 구조 생성 완료 - use_coords: {use_coords}")
-        
-        # Character Reference와 Vibe Transfer 동시 사용 방지
-        if self.parameters.get("character_reference") and self.parameters.get("reference_image"):
-            logger.warning("Character Reference와 Vibe Transfer는 동시에 사용할 수 없습니다. Character Reference를 우선 사용합니다.")
-            self.parameters["reference_image"] = None
-            self.parameters["reference_strength"] = 0.6
-            self.parameters["reference_information_extracted"] = 1.0            
-        
-        # 모델 확인 - Character Reference는 V4.5에서만 작동
-        model = self.parameters.get("model", "nai-diffusion-4-5-full")
-        if self.parameters.get("character_reference") and "4-5" not in model:
-            logger.warning("Character Reference는 V4.5 모델에서만 사용 가능합니다. V4.5 모델로 자동 전환합니다.")
-            model = "nai-diffusion-4-5-full"
-            self.parameters["model"] = model
-                
         
         # 캐릭터 프롬프트 처리
         if self.parameters.get("characterPrompts") and len(self.parameters["characterPrompts"]) > 0:

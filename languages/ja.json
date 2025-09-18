@@ -13,6 +13,7 @@
       "exit": "終了(Exit)",
       "view": "表示",
       "toggle_panel": "結果パネル切替",
+	  "character_reference_panel": "Character Referenceパネル",
       "etc": "その他(Etc)",
       "about": "作成者について(About)"
     },
@@ -47,7 +48,19 @@
       "sync_width": "幅を同期",
       "character_prompt": "キャラクタープロンプト:",
       "reset_image_size": "画像サイズ初期化",
-      "reset_image_size_tooltip": "結果画像ウィンドウをデフォルトサイズに復元します"
+      "reset_image_size_tooltip": "結果画像ウィンドウをデフォルトサイズに復元します",
+	  "character_reference": "Character Reference",
+      "character_reference_group": "Character Reference (V4.5専用)",
+      "character_reference_info": "一貫したキャラクター外観のためのリファレンス画像を設定してください。",
+      "load_image": "画像選択",
+      "remove_image": "削除",
+      "style_aware": "Style Aware (キャラクター固有スタイルを反映)",
+      "character_reference_warning": "Vibe Transferと同時使用不可 | V4.5モデル専用",
+      "select_image_placeholder": "画像を選択してください",
+      "character_reference_loaded": "Character Reference画像が読み込まれました",
+      "character_reference_removed": "Character Reference画像が削除されました",
+      "invalid_image_file": "無効な画像ファイルです",
+      "image_load_failed": "画像の読み込みに失敗しました"
     },
     "image_options": {
       "title": "画像オプション",

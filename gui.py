@@ -1011,6 +1011,14 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.char_ref_action.setChecked(False)  # 초기값은 숨김
         self.char_ref_action.triggered.connect(self.toggle_character_reference_panel)
         
+        # Character Reference 패널 토글 액션 추가
+        toggleCharRefAction = QAction('Character Reference 패널', self)
+        toggleCharRefAction.setShortcut('Ctrl+R')
+        toggleCharRefAction.setCheckable(True)  # 체크 가능한 액션으로 설정
+        toggleCharRefAction.setChecked(False)   # 초기에는 체크 해제 (숨김 상태)
+        toggleCharRefAction.triggered.connect(self.toggle_character_reference_panel)
+        
+        
         # 메뉴 생성
         # 파일 메뉴
         filemenu_file = menubar.addMenu(tr('menu.file')) 
@@ -1024,9 +1032,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
         
         # 보기 메뉴 - 한 번만 생성
         viewMenu = menubar.addMenu(tr('menu.view'))
-        viewMenu.addAction(togglePanelAction)
-        viewMenu.addAction(self.char_ref_action)  # Character Reference 액션 추가
-        
+        viewMenu.addAction(togglePanelAction)  # 기존 결과 패널 토글
+        viewMenu.addAction(toggleCharRefAction)  # Character Reference 패널 토글 추가
+            
         # 기타 메뉴
         filemenu_etc = menubar.addMenu(tr('menu.etc'))
         filemenu_etc.addAction(aboutAction)
@@ -1120,9 +1128,23 @@ class NAIAutoGeneratorWindow(QMainWindow):
     
     def toggle_character_reference_panel(self):
         """Character Reference 패널 표시/숨김 토글"""
-        if hasattr(self, 'image_options_group'):
-            current_visible = self.image_options_group.isVisible()
-            self.image_options_group.setVisible(not current_visible)    
+        if hasattr(self, 'char_ref_group'):
+            is_visible = self.char_ref_group.isVisible()
+            self.char_ref_group.setVisible(not is_visible)
+            
+            # 메뉴 액션 상태 업데이트
+            for action in self.menuBar().actions():
+                menu = action.menu()
+                if menu and 'view' in action.text().lower():
+                    for sub_action in menu.actions():
+                        if 'Character Reference' in sub_action.text():
+                            sub_action.setChecked(not is_visible)
+                            break
+            
+            # 상태바 메시지 표시
+            status_text = "Character Reference 패널이 표시되었습니다." if not is_visible else "Character Reference 패널이 숨겨졌습니다."
+            self.set_statusbar_text("IDLE")
+            self.statusBar().showMessage(status_text, 2000)
 
     def setup_language_menu(self):
         """언어 선택 메뉴 설정"""
@@ -1417,6 +1439,46 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # 체크박스 설정
         dict_ui["autoSmea"].setChecked(bool(data_dict.get("autoSmea", True)))
 
+        # === Character Reference 데이터 복원 (기존 코드 끝에 추가) ===
+        if "character_reference" in data_dict and hasattr(self, 'char_ref_image_data'):
+            char_ref_data = data_dict["character_reference"]
+            style_aware = data_dict.get("character_reference_style_aware", True)
+            
+            if char_ref_data:
+                # 이미지 데이터 복원
+                self.char_ref_image_data = char_ref_data
+                
+                # Style Aware 체크박스 상태 복원
+                if hasattr(self, 'char_ref_style_aware'):
+                    self.char_ref_style_aware.setChecked(style_aware)
+                
+                # 미리보기 복원 (base64 데이터로부터)
+                if hasattr(self, 'char_ref_preview'):
+                    try:
+                        import base64
+                        from PyQt5.QtGui import QPixmap
+                        from PyQt5.QtCore import Qt
+                        
+                        # base64를 이미지로 변환하여 미리보기 설정
+                        image_data = base64.b64decode(char_ref_data)
+                        pixmap = QPixmap()
+                        pixmap.loadFromData(image_data)
+                        
+                        if not pixmap.isNull():
+                            scaled_pixmap = pixmap.scaled(100, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                            self.char_ref_preview.setPixmap(scaled_pixmap)
+                            self.char_ref_preview.setText("")
+                            
+                            # 제거 버튼 활성화
+                            if hasattr(self, 'char_ref_remove_btn'):
+                                self.char_ref_remove_btn.setEnabled(True)
+                    
+                    except Exception as e:
+                        logger.error(f"Character Reference 미리보기 복원 실패: {e}")
+                
+                logger.info("📷 Character Reference 데이터가 복원되었습니다.")
+
+
     def load_data(self):
         data_dict = {}
         for key in DEFAULT_PARAMS:
@@ -1492,14 +1554,33 @@ class NAIAutoGeneratorWindow(QMainWindow):
             "strength": self.dict_ui_settings["strength"].text(),
             "noise": self.dict_ui_settings["noise"].text(),
             "reference_information_extracted": self.dict_ui_settings["reference_information_extracted"].text(),
+            # Character Reference 데이터 추가
+            "character_reference": getattr(self, 'char_ref_image_data', None),
+            "character_reference_style_aware": getattr(self, 'char_ref_style_aware', None) and 
+                                              self.char_ref_style_aware.isChecked() if hasattr(self, 'char_ref_style_aware') else True,
             "reference_strength": self.dict_ui_settings["reference_strength"].text(),
             "quality_toggle": str(self.settings.value("quality_toggle", True)),
             "dynamic_thresholding": str(self.settings.value("dynamic_thresholding", False)),
             "anti_artifacts": str(self.settings.value("anti_artifacts", 0.0)),
             "v4_model_preset": self.settings.value("v4_model_preset", "Artistic"),
-            "model": self.dict_ui_settings["model"].currentData()  # 모델 ID 추가
+            "model": self.dict_ui_settings["model"].currentData()
+
         }
         
+        # === Character Reference 데이터 추가 ===
+        # Character Reference 이미지 데이터 추가
+        if hasattr(self, 'char_ref_image_data'):
+            data["character_reference"] = self.char_ref_image_data
+        else:
+            data["character_reference"] = None
+        
+        # Style Aware 설정 추가
+        if hasattr(self, 'char_ref_style_aware') and self.char_ref_style_aware:
+            data["character_reference_style_aware"] = self.char_ref_style_aware.isChecked()
+        else:
+            data["character_reference_style_aware"] = True  # 기본값
+        
+                
         # 샘플러 UI 이름을 API 값으로 변환
         if hasattr(self, 'sampler_mapping') and data["sampler"] in self.sampler_mapping:
             data["sampler"] = self.sampler_mapping[data["sampler"]]
@@ -1544,8 +1625,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     # Warning! Don't interact with pyqt gui in this function
     def _get_data_for_generate(self):
-        """생성용 데이터 가져오기"""
-        data = {}
         try:
             logger.debug("_get_data_for_generate 시작")
             
@@ -1553,8 +1632,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
             data = self.get_data(True)
             if not data:
                 logger.error("get_data 메서드가 None 또는 빈 데이터를 반환했습니다.")
-                return {}  # 빈 딕셔너리 반환 (None 대신)
-                
+                return {}
+                    
             # 설정 저장
             self.save_data()
 
@@ -1738,45 +1817,41 @@ class NAIAutoGeneratorWindow(QMainWindow):
             
             logger.debug("_get_data_for_generate 완료")
             
-            # Character Reference 데이터 추가
+            # === Character Reference 데이터 처리 개선 ===
             if hasattr(self, 'char_ref_image_data') and self.char_ref_image_data:
+                logger.info("📷 Character Reference 데이터 처리 중...")
+                
+                # Character Reference 이미지 데이터 추가
                 data['character_reference'] = self.char_ref_image_data
                 
+                # Style Aware 설정 추가
                 if hasattr(self, 'char_ref_style_aware'):
                     data['character_reference_style_aware'] = self.char_ref_style_aware.isChecked()
+                else:
+                    data['character_reference_style_aware'] = True  # 기본값
                 
-                # V4.5 모델 강제
+                # V4.5 모델 자동 전환
                 data['model'] = 'nai-diffusion-4-5-full'
-                logger.info("Character Reference 사용 - V4.5 모델로 전환")
+                logger.info("📷 Character Reference 사용: V4.5 모델로 자동 전환")
                 
-                # Vibe Transfer 제거
-                if 'reference_image' in data:
-                    del data['reference_image']
-                    logger.info("Character Reference와 충돌하는 Vibe Transfer 제거")
+                # Vibe Transfer와 충돌 방지
+                if data.get('reference_image'):
+                    logger.warning("⚠️ Character Reference와 Vibe Transfer 동시 사용 감지. Character Reference 우선 적용.")
+                    # Vibe Transfer 관련 파라미터 제거
+                    data['reference_image'] = None
+                    data['reference_strength'] = None  # None으로 설정
+                    data['reference_information_extracted'] = None  # None으로 설정
+                
+                logger.debug(f"📷 Character Reference 설정: style_aware={data['character_reference_style_aware']}")
             
+            logger.debug(f"최종 데이터 키 목록: {list(data.keys())}")
             return data
             
         except Exception as e:
-            logger.error(f"_get_data_for_generate 오류: {e}", exc_info=True)
-            # 기본 데이터 반환 (오류 발생 시)
-            return {
-                "prompt": "",
-                "negative_prompt": "",
-                "width": 1024,
-                "height": 1024,
-                "steps": 28,
-                "scale": 5.0,
-                "seed": random.randint(0, 2**32-1),
-                "sampler": "k_euler_ancestral",
-                "autoSmea": True,
-                "params_version": 3,
-                "add_original_image": True,
-                "legacy": False,
-                "noise_schedule": "karras",
-                "prefer_brownian": True,
-                "deliberate_euler_ancestral_bug": True,
-                "quality_toggle": True
-            }
+            logger.error(f"_get_data_for_generate 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return {}      
         
         
     def _preedit_prompt(self, prompt, nprompt):

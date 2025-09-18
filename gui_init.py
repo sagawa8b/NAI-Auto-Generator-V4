@@ -124,6 +124,10 @@ def init_main_widget(parent):
     # 7. 왼쪽 레이아웃에 스플리터 추가
     left_layout.addWidget(prompt_char_splitter)
 
+    # 8. Character Reference 그룹 추가 (캐릭터 프롬프트 그룹 다음에)
+    char_ref_group = init_character_reference_group(parent)
+    left_layout.addWidget(char_ref_group)
+
     def adjust_group_size(group_box, size):
         """이미지 위젯 크기가 변경될 때 그룹박스 크기도 조정"""
         # 여백과 버튼 영역을 고려한 추가 공간
@@ -747,6 +751,186 @@ def init_responsive_prompt_group(parent):
     prompt_layout.setStretch(3, 4)  # 네거티브 프롬프트 영역: 40%
     
     return prompt_group
+
+
+def init_character_reference_group(parent):
+    """Character Reference UI 그룹 초기화"""
+    from PyQt5.QtWidgets import (QGroupBox, QVBoxLayout, QHBoxLayout, QPushButton, 
+                                QLabel, QCheckBox, QSizePolicy, QFrame)
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtGui import QPixmap
+    from i18n_manager import tr
+    
+    # Character Reference 그룹 박스
+    char_ref_group = QGroupBox("Character Reference (V4.5 전용)")
+    char_ref_group.setVisible(False)  # 초기에는 숨김
+    char_ref_layout = QVBoxLayout()
+    char_ref_layout.setContentsMargins(8, 8, 8, 8)
+    char_ref_layout.setSpacing(6)
+    char_ref_group.setLayout(char_ref_layout)
+    
+    # 안내 메시지
+    info_label = QLabel("📷 캐릭터의 일관된 외형을 위한 레퍼런스 이미지를 설정하세요.")
+    info_label.setStyleSheet("color: #666666; font-size: 11px; padding: 4px;")
+    info_label.setWordWrap(True)
+    char_ref_layout.addWidget(info_label)
+    
+    # 이미지 로드 영역
+    image_container = QFrame()
+    image_container.setFrameStyle(QFrame.StyledPanel)
+    image_container.setStyleSheet("QFrame { background-color: #f8f8f8; border: 2px dashed #cccccc; }")
+    image_container.setMinimumHeight(120)
+    image_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    
+    image_layout = QVBoxLayout()
+    image_layout.setContentsMargins(10, 10, 10, 10)
+    image_container.setLayout(image_layout)
+    
+    # 이미지 미리보기 라벨
+    char_ref_preview = QLabel("이미지를 선택해주세요")
+    char_ref_preview.setAlignment(Qt.AlignCenter)
+    char_ref_preview.setStyleSheet("color: #999999; font-size: 12px;")
+    char_ref_preview.setMinimumSize(100, 80)
+    char_ref_preview.setScaledContents(True)
+    image_layout.addWidget(char_ref_preview)
+    
+    char_ref_layout.addWidget(image_container)
+    
+    # 버튼 영역
+    button_layout = QHBoxLayout()
+    button_layout.setSpacing(8)
+    
+    # 이미지 로드 버튼
+    load_image_btn = QPushButton("📁 이미지 선택")
+    load_image_btn.setStyleSheet("""
+        QPushButton {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+        QPushButton:hover {
+            background-color: #45a049;
+        }
+        QPushButton:pressed {
+            background-color: #3d8b40;
+        }
+    """)
+    
+    # 이미지 제거 버튼
+    remove_image_btn = QPushButton("🗑️ 제거")
+    remove_image_btn.setStyleSheet("""
+        QPushButton {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+        }
+        QPushButton:hover {
+            background-color: #da190b;
+        }
+        QPushButton:pressed {
+            background-color: #be1e0c;
+        }
+    """)
+    remove_image_btn.setEnabled(False)  # 초기에는 비활성화
+    
+    button_layout.addWidget(load_image_btn)
+    button_layout.addWidget(remove_image_btn)
+    button_layout.addStretch()
+    
+    char_ref_layout.addLayout(button_layout)
+    
+    # Style Aware 옵션
+    style_aware_layout = QHBoxLayout()
+    style_aware_checkbox = QCheckBox("Style Aware (캐릭터 고유 스타일 반영)")
+    style_aware_checkbox.setChecked(True)  # 기본값 True
+    style_aware_checkbox.setStyleSheet("color: #333333; font-size: 11px;")
+    
+    style_aware_layout.addWidget(style_aware_checkbox)
+    style_aware_layout.addStretch()
+    char_ref_layout.addLayout(style_aware_layout)
+    
+    # 주의사항 라벨
+    warning_label = QLabel("⚠️ Vibe Transfer와 동시 사용 불가 | V4.5 모델 전용")
+    warning_label.setStyleSheet("color: #ff6b35; font-size: 10px; font-weight: bold;")
+    warning_label.setWordWrap(True)
+    char_ref_layout.addWidget(warning_label)
+    
+    # 부모 객체에 참조 저장
+    parent.char_ref_group = char_ref_group
+    parent.char_ref_preview = char_ref_preview
+    parent.char_ref_load_btn = load_image_btn
+    parent.char_ref_remove_btn = remove_image_btn
+    parent.char_ref_style_aware = style_aware_checkbox
+    parent.char_ref_image_data = None  # base64 이미지 데이터 저장용
+    
+    # 이벤트 핸들러 연결을 위한 헬퍼 함수들 정의
+    def load_character_reference():
+        """Character Reference 이미지 로드"""
+        from PyQt5.QtWidgets import QFileDialog, QMessageBox
+        from PyQt5.QtGui import QPixmap
+        import base64
+        
+        file_path, _ = QFileDialog.getOpenFileName(
+            parent,
+            "Character Reference 이미지 선택",
+            "",
+            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif)"
+        )
+        
+        if file_path:
+            try:
+                # 이미지 파일을 base64로 인코딩
+                with open(file_path, "rb") as image_file:
+                    encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                
+                # 미리보기 업데이트
+                pixmap = QPixmap(file_path)
+                if not pixmap.isNull():
+                    scaled_pixmap = pixmap.scaled(100, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                    char_ref_preview.setPixmap(scaled_pixmap)
+                    char_ref_preview.setText("")
+                    
+                    # 데이터 저장
+                    parent.char_ref_image_data = encoded_string
+                    
+                    # 버튼 상태 업데이트
+                    remove_image_btn.setEnabled(True)
+                    
+                    # 이미지 컨테이너 스타일 변경
+                    image_container.setStyleSheet("QFrame { background-color: #e8f5e8; border: 2px solid #4CAF50; }")
+                    
+                else:
+                    QMessageBox.warning(parent, "오류", "유효하지 않은 이미지 파일입니다.")
+                    
+            except Exception as e:
+                QMessageBox.critical(parent, "오류", f"이미지 로드 실패:\n{str(e)}")
+    
+    def remove_character_reference():
+        """Character Reference 이미지 제거"""
+        # 미리보기 초기화
+        char_ref_preview.clear()
+        char_ref_preview.setText("이미지를 선택해주세요")
+        char_ref_preview.setStyleSheet("color: #999999; font-size: 12px;")
+        
+        # 데이터 초기화
+        parent.char_ref_image_data = None
+        
+        # 버튼 상태 업데이트
+        remove_image_btn.setEnabled(False)
+        
+        # 이미지 컨테이너 스타일 초기화
+        image_container.setStyleSheet("QFrame { background-color: #f8f8f8; border: 2px dashed #cccccc; }")
+    
+    # 이벤트 연결
+    load_image_btn.clicked.connect(load_character_reference)
+    remove_image_btn.clicked.connect(remove_character_reference)
+    
+    return char_ref_group
 
 
 
