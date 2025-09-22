@@ -66,7 +66,17 @@
       "character_prompt": "캐릭터 프롬프트:",
       "position": "위치",
 	  "reset_image_size": "이미지 크기 초기화",
-	  "reset_image_size_tooltip": "결과 이미지 창을 기본 크기로 복원합니다"	  
+	  "reset_image_size_tooltip": "결과 이미지 창을 기본 크기로 복원합니다",
+	  "character_reference_group": "캐릭터 레퍼런스 설정",
+	  "load_character_reference": "캐릭터 레퍼런스 이미지 로드",
+      "remove_character_reference": "제거",
+      "character_reference_style_aware": "스타일 인식",
+      "character_reference_info": "⚠️ 캐릭터 레퍼런스는 V4.5 전용이며 바이브 트랜스퍼와 호환되지 않습니다",
+      "character_reference_panel": "캐릭터 레퍼런스 패널",
+      "no_character_reference": "캐릭터 레퍼런스 이미지 없음",
+      "character_reference_loaded": "캐릭터 레퍼런스 로드됨\n(미리보기 불가능)",
+      "character_reference_model_changed": "캐릭터 레퍼런스는 V4.5 모델 전용입니다. 모델이 자동으로 변경되었습니다.",
+      "character_reference_vibe_conflict": "캐릭터 레퍼런스와 바이브 트랜스퍼 동시 사용 불가 - 바이브 트랜스퍼 비활성화"
     },
     "image_options": {
       "title": "Image Options",

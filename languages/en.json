@@ -66,7 +66,17 @@
       "character_reference_loaded": "Character Reference image has been loaded",
       "character_reference_removed": "Character Reference image has been removed",
       "invalid_image_file": "Invalid image file",
-      "image_load_failed": "Failed to load image"
+      "image_load_failed": "Failed to load image",
+      "character_reference_group": "Character Reference Settings",
+      "load_character_reference": "Load Character Reference Image", 
+      "remove_character_reference": "Remove",
+      "character_reference_style_aware": "Style Aware",
+      "character_reference_info": "⚠️ Character Reference is V4.5 only and incompatible with Vibe Transfer",
+      "character_reference_panel": "Character Reference Panel",
+      "no_character_reference": "No Character Reference Image",
+      "character_reference_loaded": "Character Reference Loaded\n(Preview not available)",
+      "character_reference_model_changed": "Character Reference requires V4.5 model. Model has been automatically changed.",
+      "character_reference_vibe_conflict": "Character Reference and Vibe Transfer cannot be used together - Vibe Transfer disabled"
     },
     "image_options": {
       "title": "Image Options",

@@ -3176,6 +3176,182 @@ def _threadfunc_generate_image(thread_self, path):
         return 4, str(e)
 
 
+def load_character_reference_image(self):
+    """Character Reference 이미지 로드"""
+    try:
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Load Character Reference Image", "", 
+            "Image Files (*.png *.jpg *.jpeg *.webp)"
+        )
+        
+        if file_path:
+            self._load_character_reference_from_path(file_path)
+            
+    except Exception as e:
+        logger.error(f"Character Reference 이미지 로드 실패: {e}")
+        QMessageBox.warning(self, "Error", f"이미지 로드에 실패했습니다: {str(e)}")
+
+def remove_character_reference_image(self):
+    """Character Reference 이미지 제거"""
+    self.character_reference_data = None
+    self.character_reference_src = ""
+    
+    # UI 업데이트
+    self.character_reference_preview.clear()
+    self.character_reference_preview.setText("No Character Reference Image")
+    self.character_reference_remove_btn.setEnabled(False)
+    self.character_reference_load_btn.setText("Load Character Reference Image")
+    
+    logger.info("Character Reference 이미지가 제거되었습니다")
+
+def _load_character_reference_from_path(self, file_path):
+    """파일 경로로부터 Character Reference 이미지 로드"""
+    try:
+        # 이미지 파일 읽기 및 base64 인코딩
+        with open(file_path, 'rb') as f:
+            image_data = f.read()
+            
+        # base64 인코딩
+        import base64
+        self.character_reference_data = base64.b64encode(image_data).decode('utf-8')
+        self.character_reference_src = file_path
+        
+        # 미리보기 이미지 로드
+        pixmap = QPixmap(file_path)
+        if not pixmap.isNull():
+            # 256x256에 맞게 스케일링
+            scaled_pixmap = pixmap.scaled(256, 256, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.character_reference_preview.setPixmap(scaled_pixmap)
+            
+            # UI 업데이트
+            self.character_reference_remove_btn.setEnabled(True)
+            self.character_reference_load_btn.setText(f"Change ({os.path.basename(file_path)})")
+            
+            logger.info(f"Character Reference 이미지 로드 완료: {file_path}")
+            
+            # V4.5 모델로 자동 전환
+            if hasattr(self, 'dict_ui_settings') and 'model' in self.dict_ui_settings:
+                current_index = self.dict_ui_settings['model'].currentIndex()
+                model_data = self.dict_ui_settings['model'].currentData()
+                
+                if not model_data or not model_data.endswith('v4.5-full'):
+                    # V4.5 모델 찾기
+                    for i in range(self.dict_ui_settings['model'].count()):
+                        if self.dict_ui_settings['model'].itemData(i) and 'v4.5-full' in self.dict_ui_settings['model'].itemData(i):
+                            self.dict_ui_settings['model'].setCurrentIndex(i)
+                            QMessageBox.information(self, "Model Changed", 
+                                "Character Reference는 V4.5 모델 전용입니다. 모델이 자동으로 변경되었습니다.")
+                            break
+            
+        else:
+            raise Exception("유효하지 않은 이미지 파일입니다")
+            
+    except Exception as e:
+        logger.error(f"Character Reference 이미지 로드 실패: {e}")
+        QMessageBox.warning(self, "Error", f"이미지 로드에 실패했습니다: {str(e)}")
+
+def character_reference_drag_enter_event(self, event):
+    """드래그 앤 드롭 진입 이벤트"""
+    if event.mimeData().hasUrls():
+        urls = event.mimeData().urls()
+        if len(urls) == 1:
+            file_path = urls[0].toLocalFile()
+            if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                event.acceptProposedAction()
+
+def character_reference_drop_event(self, event):
+    """드래그 앤 드롭 완료 이벤트"""
+    try:
+        urls = event.mimeData().urls()
+        if urls:
+            file_path = urls[0].toLocalFile()
+            self._load_character_reference_from_path(file_path)
+    except Exception as e:
+        logger.error(f"드래그 앤 드롭 Character Reference 로드 실패: {e}")
+
+def toggle_character_reference_panel(self):
+    """Character Reference 패널 토글"""
+    if hasattr(self, 'character_reference_group'):
+        visible = self.character_reference_group.isVisible()
+        self.character_reference_group.setVisible(not visible)
+        logger.debug(f"Character Reference 패널 {'숨김' if visible else '표시'}")
+
+# _get_data_for_generate 메서드에서 Character Reference 데이터 처리 추가
+def _get_data_for_generate_with_character_reference(self):
+    """Character Reference를 포함한 생성 데이터 준비"""
+    try:
+        logger.debug("_get_data_for_generate 시작")
+        
+        # 기존 데이터 가져오기
+        data = self.get_data(True)
+        if not data:
+            logger.error("get_data 메서드가 None 또는 빈 데이터를 반환했습니다.")
+            return None, "데이터 가져오기 실패"
+        
+        # Character Reference 데이터 추가
+        if hasattr(self, 'character_reference_data') and self.character_reference_data:
+            data["character_reference"] = self.character_reference_data
+            data["character_reference_style_aware"] = self.character_reference_style_aware.isChecked()
+            logger.info("Character Reference 데이터가 생성 데이터에 추가되었습니다")
+            
+            # Vibe Transfer와 충돌 체크
+            if data.get("reference_image"):
+                logger.warning("Character Reference와 Vibe Transfer 동시 사용 불가 - Vibe Transfer 비활성화")
+                data["reference_image"] = None
+                data["reference_strength"] = None
+                data["reference_information_extracted"] = None
+        
+        # ... 기존 캐릭터 프롬프트 처리 로직 ...
+        
+        return data, None
+        
+    except Exception as e:
+        logger.error(f"_get_data_for_generate 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, str(e)
+
+# get_data/set_data 메서드에서 Character Reference 데이터 처리
+def get_data_with_character_reference(self, do_convert_type=False):
+    """Character Reference를 포함한 데이터 가져오기"""
+    data = {
+        # ... 기존 데이터 ...
+        
+        # Character Reference 데이터 추가
+        "character_reference": getattr(self, 'character_reference_data', None),
+        "character_reference_style_aware": (
+            self.character_reference_style_aware.isChecked() 
+            if hasattr(self, 'character_reference_style_aware') 
+            else True
+        ),
+    }
+    
+    return data
+
+def set_data_with_character_reference(self, new_dict):
+    """Character Reference를 포함한 데이터 설정"""
+    # ... 기존 set_data 로직 ...
+    
+    # Character Reference 데이터 설정
+    if "character_reference" in new_dict and new_dict["character_reference"]:
+        self.character_reference_data = new_dict["character_reference"]
+        
+        # Style Aware 설정
+        if "character_reference_style_aware" in new_dict:
+            if hasattr(self, 'character_reference_style_aware'):
+                self.character_reference_style_aware.setChecked(
+                    new_dict["character_reference_style_aware"]
+                )
+        
+        # 미리보기 복원은 base64 데이터로는 불가능하므로 텍스트로 표시
+        if hasattr(self, 'character_reference_preview'):
+            self.character_reference_preview.setText("Character Reference Loaded\n(Preview not available)")
+            self.character_reference_remove_btn.setEnabled(True)
+            self.character_reference_load_btn.setText("Change Character Reference")
+            
+        logger.info("Character Reference 데이터가 복원되었습니다")
+
+
 class GenerateThread(QThread):
     generate_result = pyqtSignal(int, str)
 

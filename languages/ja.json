@@ -60,7 +60,17 @@
       "character_reference_loaded": "Character Reference画像が読み込まれました",
       "character_reference_removed": "Character Reference画像が削除されました",
       "invalid_image_file": "無効な画像ファイルです",
-      "image_load_failed": "画像の読み込みに失敗しました"
+      "image_load_failed": "画像の読み込みに失敗しました",
+	  "character_reference_group": "キャラクターリファレンス設定",
+      "load_character_reference": "キャラクターリファレンス画像を読み込み",
+      "remove_character_reference": "削除", 
+      "character_reference_style_aware": "スタイル認識",
+      "character_reference_info": "⚠️ キャラクターリファレンスはV4.5専用でバイブトランスファーと互換性がありません",
+      "character_reference_panel": "キャラクターリファレンスパネル",
+      "no_character_reference": "キャラクターリファレンス画像なし",
+      "character_reference_loaded": "キャラクターリファレンス読み込み済み\n(プレビュー不可)",
+      "character_reference_model_changed": "キャラクターリファレンスはV4.5モデル専用です。モデルが自動的に変更されました。",
+      "character_reference_vibe_conflict": "キャラクターリファレンスとバイブトランスファーは同時使用できません - バイブトランスファー無効化"
     },
     "image_options": {
       "title": "画像オプション",
