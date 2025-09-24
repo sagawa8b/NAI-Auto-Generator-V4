@@ -268,7 +268,6 @@ class NAIAction(Enum):
     infill = "infill"
 
 
-# NAIParam enum에 Character Reference 파라미터 추가
 class NAIParam(Enum):
     # 기본 파라미터
     prompt = 1
@@ -290,6 +289,7 @@ class NAIParam(Enum):
     strength = 21
     mask = 22
     
+    
     # V4 전용 파라미터
     autoSmea = 23
     v4_model_preset = 24
@@ -302,14 +302,9 @@ class NAIParam(Enum):
     dynamic_thresholding = 31
     quality_toggle = 32
     characterPrompts = 33
-    skip_cfg_above_sigma = 34
-    
-    # Character Reference 파라미터 (V4.5 전용)
-    character_reference = 35
-    character_reference_style_aware = 36
+    skip_cfg_above_sigma = 34  # 새로운 파라미터 번호 추가
 
 
-# TYPE_NAIPARAM_DICT에 Character Reference 타입 추가
 TYPE_NAIPARAM_DICT = {
     NAIParam.prompt: str,
     NAIParam.negative_prompt: str,
@@ -342,12 +337,9 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.dynamic_thresholding: bool,
     NAIParam.quality_toggle: bool,
     NAIParam.characterPrompts: list,
-    NAIParam.skip_cfg_above_sigma: (int, type(None)),
-    
-    # Character Reference 파라미터 타입
-    NAIParam.character_reference: str,  # base64 인코딩된 이미지
-    NAIParam.character_reference_style_aware: bool,
+    NAIParam.skip_cfg_above_sigma: (int, type(None))  # int 또는 None 타입 허용
 }
+
 
 def argon_hash(email: str, password: str, size: int, domain: str) -> str:
     pre_salt = f"{password[:6]}{email}{domain}"
@@ -428,14 +420,10 @@ class NAIGenerator():
             "noise": 0.0,
             "strength": 0.7,
             
-            # 참조 이미지 설정 (Vibe Transfer용 - 기존)
+            # 참조 이미지 설정 (reference)
             "reference_image": None,
             "reference_strength": 0.6,
             "reference_information_extracted": 1.0,
-            
-            # Character Reference 설정 (V4.5 전용)
-            "character_reference": None,
-            "character_reference_style_aware": True,
             
             # 캐릭터 프롬프트
             "characterPrompts": [],
@@ -540,19 +528,8 @@ class NAIGenerator():
 
     def set_param_dict(self, param_dict):
         # V4 API에서만 사용하는 특별한 파라미터들
-        special_params = [
-            "legacy_v3_extend", "noise_schedule", "params_version", 
-            "characterPrompts", "v4_prompt", "v4_negative_prompt", "model",
-            # Director Reference 파라미터들
-            "director_reference_images",
-            "director_reference_descriptions", 
-            "director_reference_information_extracted",
-            "director_reference_strength_values",
-            # 추가된 Character Reference 관련 파라미터들
-            "controlnet_strength",
-            "inpaintImg2ImgStrength", 
-            "normalize_reference_strength_multiple"
-        ]
+        special_params = ["legacy_v3_extend", "noise_schedule", "params_version", 
+                          "characterPrompts", "v4_prompt", "v4_negative_prompt", "model"]  # model 추가
         
         for k, v in param_dict.items():
             if k:
@@ -592,24 +569,6 @@ class NAIGenerator():
         
         logger.debug("=== generate_image 메서드 시작 ===")
         
-        # Character Reference와 Vibe Transfer 동시 사용 방지
-        char_ref = self.parameters.get("character_reference")
-        vibe_transfer = self.parameters.get("reference_image")
-        
-        if char_ref and vibe_transfer:
-            logger.warning("⚠️ Character Reference와 Vibe Transfer는 동시에 사용할 수 없습니다. Character Reference를 우선 적용합니다.")
-            # Vibe Transfer 제거
-            self.parameters["reference_image"] = None
-            self.parameters["reference_strength"] = 0.6
-            self.parameters["reference_information_extracted"] = 1.0
-        
-        # Character Reference 사용 시 V4.5 모델 자동 전환
-        if char_ref:
-            current_model = self.parameters.get("model", "")
-            if not current_model.startswith("nai-diffusion-4-5"):
-                logger.info("📷 Character Reference 사용을 위해 V4.5 모델로 자동 전환됩니다.")
-                self.parameters["model"] = "nai-diffusion-4-5-full"
-        
         
         # 요청 추적을 위한 ID 생성
         import uuid
@@ -637,19 +596,6 @@ class NAIGenerator():
         logger.info(f"📍 [{request_id}] V4 파라미터 변환 호출 직전")
         self._prepare_v4_parameters()
         logger.info(f"📍 [{request_id}] V4 파라미터 변환 호출 완료")
-        
-        # API 전송 직전 Character Reference 확인 로깅
-        if self.parameters.get("director_reference_strengths"):
-            logger.info("📷 API 전송: Director Reference 포함됨 (Character Reference)")
-            logger.info(f"📷 director_reference_strengths: {self.parameters.get('director_reference_strengths')}")
-            
-            # director_reference_images 확인
-            director_images = self.parameters.get("director_reference_images")
-            if director_images:
-                logger.info(f"📷 director_reference_images 수: {len(director_images)}")
-            else:
-                logger.warning("📷 director_reference_images가 없음!")
-            
 
         url = BASE_URL + f"/ai/generate-image"
 
@@ -661,110 +607,11 @@ class NAIGenerator():
         }
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
-
-        # Director Reference 파라미터 상세 로깅
-        if any(key.startswith("director_reference") for key in self.parameters.keys()):
-            logger.info(f"📷 [{request_id}] Director Reference 파라미터 상세 검사:")
-            
-            # director_reference_images 확인
-            if "director_reference_images" in self.parameters:
-                images = self.parameters["director_reference_images"]
-                logger.info(f"  - director_reference_images: 배열 길이={len(images) if images else 0}")
-                if images and len(images) > 0:
-                    # 첫 번째 이미지 데이터 타입과 길이만 로깅 (전체 base64는 너무 길어서)
-                    img_data = images[0]
-                    logger.info(f"  - 첫 번째 이미지: 타입={type(img_data)}, 길이={len(str(img_data)) if img_data else 0}")
-                    if isinstance(img_data, str) and len(img_data) > 100:
-                        logger.info(f"  - 이미지 데이터 프리뷰: {img_data[:50]}...{img_data[-20:]}")
-            
-            # director_reference_descriptions 확인
-            if "director_reference_descriptions" in self.parameters:
-                descriptions = self.parameters["director_reference_descriptions"]
-                logger.info(f"  - director_reference_descriptions: 배열 길이={len(descriptions) if descriptions else 0}")
-                if descriptions and len(descriptions) > 0:
-                    logger.info(f"  - 첫 번째 description 구조: {descriptions[0]}")
-            
-            # director_reference_information_extracted 확인
-            if "director_reference_information_extracted" in self.parameters:
-                info_extracted = self.parameters["director_reference_information_extracted"]
-                logger.info(f"  - director_reference_information_extracted: {info_extracted}")
-            
-            # director_reference_strength_values 확인
-            if "director_reference_strength_values" in self.parameters:
-                strength_values = self.parameters["director_reference_strength_values"]
-                logger.info(f"  - director_reference_strength_values: {strength_values}")
-            
-            # 추가된 Character Reference 관련 파라미터들 확인 (새로 추가)
-            char_ref_params = [
-                "controlnet_strength",
-                "inpaintImg2ImgStrength", 
-                "normalize_reference_strength_multiple"
-            ]
-            
-            logger.info(f"  - 추가 Character Reference 파라미터들:")
-            for param in char_ref_params:
-                if param in self.parameters:
-                    logger.info(f"    - {param}: {self.parameters[param]}")
-                else:
-                    logger.warning(f"    - {param}: 누락됨!")
-            
-            # 모든 Director Reference 관련 키 나열
-            director_keys = [key for key in self.parameters.keys() if key.startswith("director_reference")]
-            logger.info(f"  - 전체 Director Reference 키: {director_keys}")
-            
-        # 추가: Character Reference 관련 모든 파라미터 상세 로깅
-        char_ref_all_params = [
-            "director_reference_images", "director_reference_descriptions",
-            "director_reference_information_extracted", "director_reference_strength_values",
-            "controlnet_strength", "inpaintImg2ImgStrength", "normalize_reference_strength_multiple"
-        ]
-
-        logger.info(f"📷 [{request_id}] Character Reference 전체 파라미터 검사:")
-        for param in char_ref_all_params:
-            if param in self.parameters:
-                value = self.parameters[param]
-                if param == "director_reference_images" and isinstance(value, list) and len(value) > 0:
-                    logger.info(f"  ✅ {param}: 배열[{len(value)}], 첫 번째 이미지 길이={len(str(value[0]))}")
-                elif param == "director_reference_descriptions" and isinstance(value, list) and len(value) > 0:
-                    logger.info(f"  ✅ {param}: {value}")
-                else:
-                    logger.info(f"  ✅ {param}: {value}")
-            else:
-                logger.error(f"  ❌ {param}: 파라미터 누락!")
-
-        # API 스펙과 비교 검증
-        logger.info(f"📷 [{request_id}] API 스펙 대비 검증:")
-        logger.info(f"  - director_reference_images 타입: {type(self.parameters.get('director_reference_images', 'None'))}")
-        logger.info(f"  - director_reference_descriptions 타입: {type(self.parameters.get('director_reference_descriptions', 'None'))}")
-        logger.info(f"  - director_reference_information_extracted 타입: {type(self.parameters.get('director_reference_information_extracted', 'None'))}")
-        logger.info(f"  - director_reference_strength_values 타입: {type(self.parameters.get('director_reference_strength_values', 'None'))}")
-
-        # 전체 parameters 키 목록 로깅 (디버깅용)
-        logger.debug(f"📍 [{request_id}] 전체 parameters 키 목록:")
-        for key in sorted(self.parameters.keys()):
-            value = self.parameters[key]
-            if key.startswith("director_reference"):
-                value_preview = f"배열[{len(value)}]" if isinstance(value, list) else str(type(value))
-                logger.debug(f"  - {key}: {value_preview}")
-            elif key in ["prompt", "negative_prompt"]:
-                logger.debug(f"  - {key}: '{str(value)[:30]}...'")
-            elif key in ["character_reference"]:
-                # Character Reference는 base64라 길어서 타입만 로깅
-                logger.debug(f"  - {key}: {type(value)} (길이: {len(str(value)) if value else 0})")
-            else:
-                logger.debug(f"  - {key}: {value}")
-
-        # API 요청 직전 최종 검증
-        logger.info(f"📍 [{request_id}] API 요청 데이터 최종 검증:")
-        logger.info(f"  - URL: {url}")
-        logger.info(f"  - Method: POST")
-        logger.info(f"  - Headers: Authorization Bearer [HIDDEN]")
-        logger.info(f"  - Data structure:")
-        logger.info(f"    - input: '{data['input'][:50]}...'")
-        logger.info(f"    - model: {data['model']}")
-        logger.info(f"    - action: {data['action']}")
-        logger.info(f"    - parameters 키 수: {len(data['parameters'])}")
-                
+        # API 전송 직전 최종 데이터 로깅 강화
+        logger.info(f"📍 [{request_id}] API 전송 직전 최종 데이터 검증:")
+        logger.info(f"  - 모델: {model}")
+        logger.info(f"  - 액션: {action.name}")
+        
         if "v4_prompt" in self.parameters:
             v4_prompt = self.parameters["v4_prompt"]
             logger.info(f"  - v4_prompt use_coords: {v4_prompt.get('use_coords', False)}")
@@ -871,7 +718,7 @@ class NAIGenerator():
     
     def _prepare_v4_parameters(self):
         """V4 API에 필요한 파라미터 구조로 변환"""
-        print("=== _prepare_v4_parameters 메서드 호출됨 ===")
+        print("=== _prepare_v4_parameters 메서드 호출됨 ===")  # 강제 출력
         logger.info("📍 _prepare_v4_parameters 메서드 시작")
         
         # 내부 파라미터 처리 - use_character_coords 값 저장 후 제거
@@ -960,48 +807,7 @@ class NAIGenerator():
                 logger.debug(f"  - 캐릭터 {i+1}: centers={char_cap['centers']}")
         else:
             logger.debug("📍 캐릭터 프롬프트 없음 - 기본 프롬프트만 사용")
-
-        # Character Reference Director 파라미터 처리
-        if self.parameters.get("director_reference_images"):
-            logger.info("📍 Character Reference Director 파라미터 처리 시작")
-            
-            # Character Reference 활성화시 skip_cfg_above_sigma 제거
-            if "skip_cfg_above_sigma" in self.parameters:
-                del self.parameters["skip_cfg_above_sigma"]
-                logger.warning("⚠️ Character Reference 활성화로 인해 skip_cfg_above_sigma 파라미터 제거")
-            
-            # 필수 파라미터 추가
-            if "normalize_reference_strength_multiple" not in self.parameters:
-                self.parameters["normalize_reference_strength_multiple"] = True
-                logger.info("📍 normalize_reference_strength_multiple 파라미터 추가")
-            
-            if "inpaintImg2ImgStrength" not in self.parameters:
-                self.parameters["inpaintImg2ImgStrength"] = 1.0
-                logger.info("📍 inpaintImg2ImgStrength 파라미터 추가")
-            
-            # Vibe Transfer와의 충돌 방지
-            vibe_params_to_remove = [
-                "reference_image", "reference_strength", "reference_information_extracted",
-                "reference_image_multiple", "reference_strength_multiple", 
-                "reference_information_extracted_multiple"
-            ]
-            for param in vibe_params_to_remove:
-                if param in self.parameters:
-                    del self.parameters[param]
-                    logger.warning(f"⚠️ Character Reference와 충돌하는 파라미터 제거: {param}")
-            
-            logger.info("📍 Character Reference Director 파라미터 처리 완료")
-
-        # 기존 Character Reference 파라미터 완전 제거 (충돌 방지)
-        legacy_params_to_remove = ["character_reference", "character_reference_style_aware"]
-        for param in legacy_params_to_remove:
-            if param in self.parameters:
-                try:
-                    del self.parameters[param]
-                    logger.info(f"📍 충돌 방지를 위한 레거시 파라미터 제거: {param}")
-                except KeyError as e:
-                    logger.warning(f"⚠️ 파라미터 제거 실패: {param} - {e}")
-
+        
         logger.debug("*** _prepare_v4_parameters 메서드 완료 ***")
                         
     def check_logged_in(self):

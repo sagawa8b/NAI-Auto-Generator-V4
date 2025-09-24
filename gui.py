@@ -37,7 +37,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.09.12"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.06.25"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -342,40 +342,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         
         self.is_initializing = False  # 초기화 완료 표시
         self.show()
-        
-        # Character Reference UI 초기화 확인 (디버깅용 - 나중에 제거 가능)
-        #QTimer.singleShot(1000, self.test_character_reference_ui)
 
         # NAI 관련 기능 초기화
         self.init_nai()
         self.init_wc()
         self.init_tagger()
         self.init_completion()
-    
-    def test_character_reference_ui(self):
-        """Character Reference UI 테스트 - 디버깅용"""
-        try:
-            from PyQt5.QtWidgets import QGroupBox  # import 추가
-            
-            logger.info("=== Character Reference UI 테스트 시작 ===")
-            
-            # 필요한 속성들이 있는지 확인
-            attrs_to_check = ['image_options_group', 'image_options_layout', 'char_ref_group']
-            for attr in attrs_to_check:
-                if hasattr(self, attr):
-                    logger.info(f"✓ {attr} 존재")
-                else:
-                    logger.error(f"✗ {attr} 없음")
-            
-            # Image References 그룹박스 찾기
-            for widget in self.findChildren(QGroupBox):
-                if "Image" in widget.title() or "Reference" in widget.title():
-                    logger.info(f"발견된 GroupBox: {widget.title()}")
-            
-            logger.info("=== Character Reference UI 테스트 완료 ===")
-        except Exception as e:
-            logger.error(f"Character Reference UI 테스트 중 오류: {e}")  
-    
     
     
     def start_session_monitoring(self, interval=1800000):
@@ -959,10 +931,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.set_statusbar_text("BEFORE_LOGIN")
 
     def init_menubar(self):
-        """메뉴바 초기화"""
-        menubar = self.menuBar()
-        menubar.setNativeMenuBar(False)
-
         # 기존 액션들을 번역된 텍스트로 변경
         openAction = QAction(tr('menu.open_file'), self)
         openAction.setShortcut('Ctrl+O')
@@ -1005,22 +973,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         togglePanelAction.setShortcut('F11')
         togglePanelAction.triggered.connect(self.on_click_expand)
         
-        # Character Reference 토글 액션
-        self.char_ref_action = QAction("Character Reference 패널", self)
-        self.char_ref_action.setCheckable(True)
-        self.char_ref_action.setChecked(False)  # 초기값은 숨김
-        self.char_ref_action.triggered.connect(self.toggle_character_reference_panel)
-        
-        # Character Reference 패널 토글 액션 추가
-        toggleCharRefAction = QAction('Character Reference 패널', self)
-        toggleCharRefAction.setShortcut('Ctrl+R')
-        toggleCharRefAction.setCheckable(True)  # 체크 가능한 액션으로 설정
-        toggleCharRefAction.setChecked(False)   # 초기에는 체크 해제 (숨김 상태)
-        toggleCharRefAction.triggered.connect(self.toggle_character_reference_panel)
-        
-        
         # 메뉴 생성
-        # 파일 메뉴
+        menubar = self.menuBar()
+        menubar.setNativeMenuBar(False)
+        
+        
+        # 기존 메뉴 추가
         filemenu_file = menubar.addMenu(tr('menu.file')) 
         filemenu_file.addAction(openAction)
         filemenu_file.addAction(saveSettingsAction)
@@ -1030,121 +988,20 @@ class NAIAutoGeneratorWindow(QMainWindow):
         filemenu_file.addAction(optionAction)
         filemenu_file.addAction(exitAction)
         
-        # 보기 메뉴 - 한 번만 생성
+        #filemenu_tool = menubar.addMenu(tr('menu.tools'))
+        #filemenu_tool.addAction(getterAction)
+        #filemenu_tool.addAction(taggerAction)
+        
+        # 보기 메뉴 추가
         viewMenu = menubar.addMenu(tr('menu.view'))
-        viewMenu.addAction(togglePanelAction)  # 기존 결과 패널 토글
-        viewMenu.addAction(toggleCharRefAction)  # Character Reference 패널 토글 추가
-            
-        # 기타 메뉴
+        viewMenu.addAction(togglePanelAction)
+        
         filemenu_etc = menubar.addMenu(tr('menu.etc'))
         filemenu_etc.addAction(aboutAction)
         
         # 언어 메뉴 추가
         self.lang_menu = menubar.addMenu(tr('menu.languages', 'Languages'))
         self.setup_language_menu()
-        
-    def toggle_character_reference_panel(self, checked):
-        """Character Reference 패널 표시/숨김 토글"""
-        logger.info(f"Character Reference 패널 토글 요청: {checked}")
-        
-        if hasattr(self, 'char_ref_group'):
-            self.char_ref_group.setVisible(checked)
-            logger.info(f"Character Reference 패널 {'표시' if checked else '숨김'}")
-            
-            # 패널이 표시될 때 안내 메시지
-            if checked:
-                from PyQt5.QtWidgets import QMessageBox
-                QMessageBox.information(
-                    self, "Character Reference", 
-                    "Character Reference 기능이 활성화되었습니다.\n\n"
-                    "• V4.5 모델에서만 작동합니다\n"
-                    "• Vibe Transfer와 동시 사용 불가\n"
-                    "• 전신 샷 이미지 권장"
-                )
-        else:
-            logger.error("char_ref_group이 없습니다. UI 초기화를 확인하세요.")
-            from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "오류", "Character Reference UI를 찾을 수 없습니다.")
-
-    def toggle_char_ref_panel(self, checked):
-        """Character Reference 패널 토글 (짧은 이름 버전)"""
-        self.toggle_character_reference_panel(checked)
-        
-    
-    def init_character_reference_ui(self):
-        """Character Reference UI 동적 생성"""
-        logger.info("Character Reference UI 초기화 시작")
-        
-        try:
-            # image_options_group 내부에 Character Reference 위젯 추가
-            if hasattr(self, 'image_options_layout'):
-                # CharacterReferenceWidget 생성
-                self.char_ref_settings_group = CharacterReferenceWidget(self)
-                self.image_options_layout.addWidget(self.char_ref_settings_group)
-                
-                # Character Reference 설정 패널 생성
-                self.char_ref_settings = QGroupBox("Character Reference Settings")
-                char_ref_settings_layout = QVBoxLayout()
-                self.char_ref_settings.setLayout(char_ref_settings_layout)
-                
-                # Style Aware 체크박스
-                self.dict_ui_settings["character_reference_style_aware"] = QCheckBox("Style Aware")
-                self.dict_ui_settings["character_reference_style_aware"].setChecked(True)
-                self.dict_ui_settings["character_reference_style_aware"].setToolTip(
-                    "캐릭터 관련 스타일 정보를 자동으로 전달합니다."
-                )
-                char_ref_settings_layout.addWidget(self.dict_ui_settings["character_reference_style_aware"])
-                
-                # 경고 라벨
-                warning_label = QLabel("⚠️ V4.5 모델 전용 기능")
-                warning_label.setStyleSheet("color: orange; font-size: 10px;")
-                char_ref_settings_layout.addWidget(warning_label)
-                
-                self.image_options_layout.addWidget(self.char_ref_settings)
-                self.char_ref_settings.setVisible(False)
-                
-                # 시그널 연결
-                self.char_ref_settings_group.is_active_changed.connect(
-                    lambda active: self.char_ref_settings.setVisible(active)
-                )
-                
-                logger.info("Character Reference UI 초기화 완료")
-            else:
-                logger.error("image_options_layout을 찾을 수 없습니다")
-                
-        except Exception as e:
-            logger.error(f"Character Reference UI 초기화 실패: {e}")
-            import traceback
-            traceback.print_exc()
-            
-    
-    def toggle_char_ref_panel(self, checked):
-        """Character Reference 패널 토글"""
-        if hasattr(self, 'char_ref_group'):
-            self.char_ref_group.setVisible(checked)
-            logger.info(f"Character Reference 패널 {'표시' if checked else '숨김'}")
-        else:
-            logger.error("char_ref_group을 찾을 수 없습니다")
-    
-    def toggle_character_reference_panel(self):
-        """Character Reference 패널 표시/숨김 토글"""
-        if hasattr(self, 'char_ref_group'):
-            is_visible = self.char_ref_group.isVisible()
-            self.char_ref_group.setVisible(not is_visible)
-            
-            # 메뉴 액션 상태 업데이트
-            for action in self.menuBar().actions():
-                menu = action.menu()
-                if menu and 'view' in action.text().lower():
-                    for sub_action in menu.actions():
-                        if 'Character Reference' in sub_action.text():
-                            sub_action.setChecked(not is_visible)
-                            break
-            
-            # 상태바 메시지 표시
-            status_text = "Character Reference 패널이 표시되었습니다." if not is_visible else "Character Reference 패널이 숨겨졌습니다."
-            self.set_statusbar_text("IDLE")
-            self.statusBar().showMessage(status_text, 2000)
 
     def setup_language_menu(self):
         """언어 선택 메뉴 설정"""
@@ -1439,46 +1296,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # 체크박스 설정
         dict_ui["autoSmea"].setChecked(bool(data_dict.get("autoSmea", True)))
 
-        # === Character Reference 데이터 복원 (기존 코드 끝에 추가) ===
-        if "character_reference" in data_dict and hasattr(self, 'char_ref_image_data'):
-            char_ref_data = data_dict["character_reference"]
-            style_aware = data_dict.get("character_reference_style_aware", True)
-            
-            if char_ref_data:
-                # 이미지 데이터 복원
-                self.char_ref_image_data = char_ref_data
-                
-                # Style Aware 체크박스 상태 복원
-                if hasattr(self, 'char_ref_style_aware'):
-                    self.char_ref_style_aware.setChecked(style_aware)
-                
-                # 미리보기 복원 (base64 데이터로부터)
-                if hasattr(self, 'char_ref_preview'):
-                    try:
-                        import base64
-                        from PyQt5.QtGui import QPixmap
-                        from PyQt5.QtCore import Qt
-                        
-                        # base64를 이미지로 변환하여 미리보기 설정
-                        image_data = base64.b64decode(char_ref_data)
-                        pixmap = QPixmap()
-                        pixmap.loadFromData(image_data)
-                        
-                        if not pixmap.isNull():
-                            scaled_pixmap = pixmap.scaled(100, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                            self.char_ref_preview.setPixmap(scaled_pixmap)
-                            self.char_ref_preview.setText("")
-                            
-                            # 제거 버튼 활성화
-                            if hasattr(self, 'char_ref_remove_btn'):
-                                self.char_ref_remove_btn.setEnabled(True)
-                    
-                    except Exception as e:
-                        logger.error(f"Character Reference 미리보기 복원 실패: {e}")
-                
-                logger.info("📷 Character Reference 데이터가 복원되었습니다.")
-
-
     def load_data(self):
         data_dict = {}
         for key in DEFAULT_PARAMS:
@@ -1554,33 +1371,14 @@ class NAIAutoGeneratorWindow(QMainWindow):
             "strength": self.dict_ui_settings["strength"].text(),
             "noise": self.dict_ui_settings["noise"].text(),
             "reference_information_extracted": self.dict_ui_settings["reference_information_extracted"].text(),
-            # Character Reference 데이터 추가
-            "character_reference": getattr(self, 'char_ref_image_data', None),
-            "character_reference_style_aware": getattr(self, 'char_ref_style_aware', None) and 
-                                              self.char_ref_style_aware.isChecked() if hasattr(self, 'char_ref_style_aware') else True,
             "reference_strength": self.dict_ui_settings["reference_strength"].text(),
             "quality_toggle": str(self.settings.value("quality_toggle", True)),
             "dynamic_thresholding": str(self.settings.value("dynamic_thresholding", False)),
             "anti_artifacts": str(self.settings.value("anti_artifacts", 0.0)),
             "v4_model_preset": self.settings.value("v4_model_preset", "Artistic"),
-            "model": self.dict_ui_settings["model"].currentData()
-
+            "model": self.dict_ui_settings["model"].currentData()  # 모델 ID 추가
         }
         
-        # === Character Reference 데이터 추가 ===
-        # Character Reference 이미지 데이터 추가
-        if hasattr(self, 'char_ref_image_data'):
-            data["character_reference"] = self.char_ref_image_data
-        else:
-            data["character_reference"] = None
-        
-        # Style Aware 설정 추가
-        if hasattr(self, 'char_ref_style_aware') and self.char_ref_style_aware:
-            data["character_reference_style_aware"] = self.char_ref_style_aware.isChecked()
-        else:
-            data["character_reference_style_aware"] = True  # 기본값
-        
-                
         # 샘플러 UI 이름을 API 값으로 변환
         if hasattr(self, 'sampler_mapping') and data["sampler"] in self.sampler_mapping:
             data["sampler"] = self.sampler_mapping[data["sampler"]]
@@ -1623,48 +1421,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             if character_data:
                 self.character_prompts_container.set_data(character_data)
 
-    def load_character_reference(self):
-        """Character Reference 이미지 로드 및 해상도 최적화"""
-        file_path = filedialog.askopenfilename(
-            title="Character Reference 이미지 선택",
-            filetypes=[("이미지 파일", "*.png *.jpg *.jpeg *.bmp")]
-        )
-        
-        if file_path:
-            try:
-                # 이미지 로드 및 해상도 확인
-                from PIL import Image
-                image = Image.open(file_path)
-                logger.info(f"원본 이미지 해상도: {image.size}")
-                
-                # Character Reference 필수 해상도
-                valid_sizes = [(1024, 1536), (1472, 1472), (1536, 1024)]
-                
-                # 현재 이미지가 유효한 해상도인지 확인
-                if image.size not in valid_sizes:
-                    logger.warning(f"이미지 해상도 변환 필요: {image.size} -> Character Reference 호환 해상도")
-                    
-                    # 가장 적합한 해상도 선택 (비율 기준)
-                    current_ratio = image.width / image.height
-                    best_size = min(valid_sizes, key=lambda x: abs(x[0]/x[1] - current_ratio))
-                    
-                    # 해상도 변환
-                    image = image.resize(best_size, Image.Resampling.LANCZOS)
-                    logger.info(f"이미지 해상도 변환 완료: {best_size}")
-                
-                # Base64 인코딩
-                import io
-                import base64
-                buffer = io.BytesIO()
-                image.save(buffer, format='PNG')
-                self.char_ref_image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-                
-                logger.info(f"Character Reference 이미지 로드 성공: {file_path}")
-                
-            except Exception as e:
-                logger.error(f"Character Reference 이미지 로드 실패: {e}")
-    
-    
+    # Warning! Don't interact with pyqt gui in this function
     def _get_data_for_generate(self):
         try:
             logger.debug("_get_data_for_generate 시작")
@@ -1673,8 +1430,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
             data = self.get_data(True)
             if not data:
                 logger.error("get_data 메서드가 None 또는 빈 데이터를 반환했습니다.")
-                return {}
-                    
+                return {}  # 빈 딕셔너리 반환 (None 대신)
+                
             # 설정 저장
             self.save_data()
 
@@ -1857,47 +1614,30 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         data[field] = ""  # 텍스트 필드 기본값
             
             logger.debug("_get_data_for_generate 완료")
-            
-            # === Character Reference 데이터 처리 (API 스펙 준수) ===
-            if hasattr(self, 'char_ref_image_data') and self.char_ref_image_data:
-                logger.info("📷 Character Reference 데이터 처리 중...")
-                
-                # V4.5 모델 자동 전환
-                data['model'] = 'nai-diffusion-4-5-full'
-                logger.info("📷 Character Reference 사용: V4.5 모델로 자동 전환")
-                
-                # API 스펙에 따른 Director Reference 파라미터 설정
-                data["director_reference_images"] = [self.char_ref_image_data]
-                data["director_reference_descriptions"] = [{
-                    "caption": {
-                        "base_caption": "character",
-                        "char_captions": []
-                    },
-                    "legacy_uc": False
-                }]
-                data["director_reference_information_extracted"] = [1]
-                data["director_reference_strength_values"] = [1.0]
-                
-                # 추가 필수 파라미터
-                data["controlnet_strength"] = 1
-                
-                # Vibe Transfer 충돌 방지는 유지
-                if data.get('reference_image'):
-                    logger.warning("⚠️ Character Reference와 Vibe Transfer 동시 사용 감지. Character Reference 우선 적용.")
-                    data['reference_image'] = None
-                    data['reference_strength'] = None
-                    data['reference_information_extracted'] = None
-                
-                logger.info("📷 Character Reference API 스펙 준수 방식 적용")
-            
-            logger.debug(f"최종 데이터 키 목록: {list(data.keys())}")
             return data
             
         except Exception as e:
-            logger.error(f"_get_data_for_generate 오류: {e}")
-            import traceback
-            traceback.print_exc()
-            return {}
+            logger.error(f"_get_data_for_generate 오류: {e}", exc_info=True)
+            # 기본 데이터 반환 (오류 발생 시)
+            return {
+                "prompt": "",
+                "negative_prompt": "",
+                "width": 1024,
+                "height": 1024,
+                "steps": 28,
+                "scale": 5.0,
+                "seed": random.randint(0, 2**32-1),
+                "sampler": "k_euler_ancestral",
+                "autoSmea": True,
+                "params_version": 3,
+                "add_original_image": True,
+                "legacy": False,
+                "noise_schedule": "karras",
+                "prefer_brownian": True,
+                "deliberate_euler_ancestral_bug": True,
+                "quality_toggle": True
+            }
+        
         
     def _preedit_prompt(self, prompt, nprompt):
         try_count = 0
@@ -2927,7 +2667,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.close()
         self.app.closeAllWindows()
         QCoreApplication.exit(0)
-    
 
 
 class CompletionTagLoadThread(QThread):
@@ -3221,182 +2960,6 @@ def _threadfunc_generate_image(thread_self, path):
         return 4, str(e)
 
 
-def load_character_reference_image(self):
-    """Character Reference 이미지 로드"""
-    try:
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Load Character Reference Image", "", 
-            "Image Files (*.png *.jpg *.jpeg *.webp)"
-        )
-        
-        if file_path:
-            self._load_character_reference_from_path(file_path)
-            
-    except Exception as e:
-        logger.error(f"Character Reference 이미지 로드 실패: {e}")
-        QMessageBox.warning(self, "Error", f"이미지 로드에 실패했습니다: {str(e)}")
-
-def remove_character_reference_image(self):
-    """Character Reference 이미지 제거"""
-    self.character_reference_data = None
-    self.character_reference_src = ""
-    
-    # UI 업데이트
-    self.character_reference_preview.clear()
-    self.character_reference_preview.setText("No Character Reference Image")
-    self.character_reference_remove_btn.setEnabled(False)
-    self.character_reference_load_btn.setText("Load Character Reference Image")
-    
-    logger.info("Character Reference 이미지가 제거되었습니다")
-
-def _load_character_reference_from_path(self, file_path):
-    """파일 경로로부터 Character Reference 이미지 로드"""
-    try:
-        # 이미지 파일 읽기 및 base64 인코딩
-        with open(file_path, 'rb') as f:
-            image_data = f.read()
-            
-        # base64 인코딩
-        import base64
-        self.character_reference_data = base64.b64encode(image_data).decode('utf-8')
-        self.character_reference_src = file_path
-        
-        # 미리보기 이미지 로드
-        pixmap = QPixmap(file_path)
-        if not pixmap.isNull():
-            # 256x256에 맞게 스케일링
-            scaled_pixmap = pixmap.scaled(256, 256, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.character_reference_preview.setPixmap(scaled_pixmap)
-            
-            # UI 업데이트
-            self.character_reference_remove_btn.setEnabled(True)
-            self.character_reference_load_btn.setText(f"Change ({os.path.basename(file_path)})")
-            
-            logger.info(f"Character Reference 이미지 로드 완료: {file_path}")
-            
-            # V4.5 모델로 자동 전환
-            if hasattr(self, 'dict_ui_settings') and 'model' in self.dict_ui_settings:
-                current_index = self.dict_ui_settings['model'].currentIndex()
-                model_data = self.dict_ui_settings['model'].currentData()
-                
-                if not model_data or not model_data.endswith('v4.5-full'):
-                    # V4.5 모델 찾기
-                    for i in range(self.dict_ui_settings['model'].count()):
-                        if self.dict_ui_settings['model'].itemData(i) and 'v4.5-full' in self.dict_ui_settings['model'].itemData(i):
-                            self.dict_ui_settings['model'].setCurrentIndex(i)
-                            QMessageBox.information(self, "Model Changed", 
-                                "Character Reference는 V4.5 모델 전용입니다. 모델이 자동으로 변경되었습니다.")
-                            break
-            
-        else:
-            raise Exception("유효하지 않은 이미지 파일입니다")
-            
-    except Exception as e:
-        logger.error(f"Character Reference 이미지 로드 실패: {e}")
-        QMessageBox.warning(self, "Error", f"이미지 로드에 실패했습니다: {str(e)}")
-
-def character_reference_drag_enter_event(self, event):
-    """드래그 앤 드롭 진입 이벤트"""
-    if event.mimeData().hasUrls():
-        urls = event.mimeData().urls()
-        if len(urls) == 1:
-            file_path = urls[0].toLocalFile()
-            if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                event.acceptProposedAction()
-
-def character_reference_drop_event(self, event):
-    """드래그 앤 드롭 완료 이벤트"""
-    try:
-        urls = event.mimeData().urls()
-        if urls:
-            file_path = urls[0].toLocalFile()
-            self._load_character_reference_from_path(file_path)
-    except Exception as e:
-        logger.error(f"드래그 앤 드롭 Character Reference 로드 실패: {e}")
-
-def toggle_character_reference_panel(self):
-    """Character Reference 패널 토글"""
-    if hasattr(self, 'character_reference_group'):
-        visible = self.character_reference_group.isVisible()
-        self.character_reference_group.setVisible(not visible)
-        logger.debug(f"Character Reference 패널 {'숨김' if visible else '표시'}")
-
-# _get_data_for_generate 메서드에서 Character Reference 데이터 처리 추가
-def _get_data_for_generate_with_character_reference(self):
-    """Character Reference를 포함한 생성 데이터 준비"""
-    try:
-        logger.debug("_get_data_for_generate 시작")
-        
-        # 기존 데이터 가져오기
-        data = self.get_data(True)
-        if not data:
-            logger.error("get_data 메서드가 None 또는 빈 데이터를 반환했습니다.")
-            return None, "데이터 가져오기 실패"
-        
-        # Character Reference 데이터 추가
-        if hasattr(self, 'character_reference_data') and self.character_reference_data:
-            data["character_reference"] = self.character_reference_data
-            data["character_reference_style_aware"] = self.character_reference_style_aware.isChecked()
-            logger.info("Character Reference 데이터가 생성 데이터에 추가되었습니다")
-            
-            # Vibe Transfer와 충돌 체크
-            if data.get("reference_image"):
-                logger.warning("Character Reference와 Vibe Transfer 동시 사용 불가 - Vibe Transfer 비활성화")
-                data["reference_image"] = None
-                data["reference_strength"] = None
-                data["reference_information_extracted"] = None
-        
-        # ... 기존 캐릭터 프롬프트 처리 로직 ...
-        
-        return data, None
-        
-    except Exception as e:
-        logger.error(f"_get_data_for_generate 실패: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, str(e)
-
-# get_data/set_data 메서드에서 Character Reference 데이터 처리
-def get_data_with_character_reference(self, do_convert_type=False):
-    """Character Reference를 포함한 데이터 가져오기"""
-    data = {
-        # ... 기존 데이터 ...
-        
-        # Character Reference 데이터 추가
-        "character_reference": getattr(self, 'character_reference_data', None),
-        "character_reference_style_aware": (
-            self.character_reference_style_aware.isChecked() 
-            if hasattr(self, 'character_reference_style_aware') 
-            else True
-        ),
-    }
-    
-    return data
-
-def set_data_with_character_reference(self, new_dict):
-    """Character Reference를 포함한 데이터 설정"""
-    # ... 기존 set_data 로직 ...
-    
-    # Character Reference 데이터 설정
-    if "character_reference" in new_dict and new_dict["character_reference"]:
-        self.character_reference_data = new_dict["character_reference"]
-        
-        # Style Aware 설정
-        if "character_reference_style_aware" in new_dict:
-            if hasattr(self, 'character_reference_style_aware'):
-                self.character_reference_style_aware.setChecked(
-                    new_dict["character_reference_style_aware"]
-                )
-        
-        # 미리보기 복원은 base64 데이터로는 불가능하므로 텍스트로 표시
-        if hasattr(self, 'character_reference_preview'):
-            self.character_reference_preview.setText("Character Reference Loaded\n(Preview not available)")
-            self.character_reference_remove_btn.setEnabled(True)
-            self.character_reference_load_btn.setText("Change Character Reference")
-            
-        logger.info("Character Reference 데이터가 복원되었습니다")
-
-
 class GenerateThread(QThread):
     generate_result = pyqtSignal(int, str)
 
@@ -3415,7 +2978,6 @@ class GenerateThread(QThread):
     def stop(self):
         self.is_stopped = True
         self.wait()  # 스레드가 종료될 때까지 대기
-
 
 class TokenValidateThread(QThread):
     validation_result = pyqtSignal(int)
