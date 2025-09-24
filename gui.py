@@ -1623,7 +1623,48 @@ class NAIAutoGeneratorWindow(QMainWindow):
             if character_data:
                 self.character_prompts_container.set_data(character_data)
 
-    # Warning! Don't interact with pyqt gui in this function
+    def load_character_reference(self):
+        """Character Reference 이미지 로드 및 해상도 최적화"""
+        file_path = filedialog.askopenfilename(
+            title="Character Reference 이미지 선택",
+            filetypes=[("이미지 파일", "*.png *.jpg *.jpeg *.bmp")]
+        )
+        
+        if file_path:
+            try:
+                # 이미지 로드 및 해상도 확인
+                from PIL import Image
+                image = Image.open(file_path)
+                logger.info(f"원본 이미지 해상도: {image.size}")
+                
+                # Character Reference 필수 해상도
+                valid_sizes = [(1024, 1536), (1472, 1472), (1536, 1024)]
+                
+                # 현재 이미지가 유효한 해상도인지 확인
+                if image.size not in valid_sizes:
+                    logger.warning(f"이미지 해상도 변환 필요: {image.size} -> Character Reference 호환 해상도")
+                    
+                    # 가장 적합한 해상도 선택 (비율 기준)
+                    current_ratio = image.width / image.height
+                    best_size = min(valid_sizes, key=lambda x: abs(x[0]/x[1] - current_ratio))
+                    
+                    # 해상도 변환
+                    image = image.resize(best_size, Image.Resampling.LANCZOS)
+                    logger.info(f"이미지 해상도 변환 완료: {best_size}")
+                
+                # Base64 인코딩
+                import io
+                import base64
+                buffer = io.BytesIO()
+                image.save(buffer, format='PNG')
+                self.char_ref_image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                
+                logger.info(f"Character Reference 이미지 로드 성공: {file_path}")
+                
+            except Exception as e:
+                logger.error(f"Character Reference 이미지 로드 실패: {e}")
+    
+    
     def _get_data_for_generate(self):
         try:
             logger.debug("_get_data_for_generate 시작")
@@ -1817,32 +1858,37 @@ class NAIAutoGeneratorWindow(QMainWindow):
             
             logger.debug("_get_data_for_generate 완료")
             
-            # === Character Reference 데이터 처리 개선 ===
+            # === Character Reference 데이터 처리 (API 스펙 준수) ===
             if hasattr(self, 'char_ref_image_data') and self.char_ref_image_data:
                 logger.info("📷 Character Reference 데이터 처리 중...")
-                
-                # Character Reference 이미지 데이터 추가
-                data['character_reference'] = self.char_ref_image_data
-                
-                # Style Aware 설정 추가
-                if hasattr(self, 'char_ref_style_aware'):
-                    data['character_reference_style_aware'] = self.char_ref_style_aware.isChecked()
-                else:
-                    data['character_reference_style_aware'] = True  # 기본값
                 
                 # V4.5 모델 자동 전환
                 data['model'] = 'nai-diffusion-4-5-full'
                 logger.info("📷 Character Reference 사용: V4.5 모델로 자동 전환")
                 
-                # Vibe Transfer와 충돌 방지
+                # API 스펙에 따른 Director Reference 파라미터 설정
+                data["director_reference_images"] = [self.char_ref_image_data]
+                data["director_reference_descriptions"] = [{
+                    "caption": {
+                        "base_caption": "character",
+                        "char_captions": []
+                    },
+                    "legacy_uc": False
+                }]
+                data["director_reference_information_extracted"] = [1]
+                data["director_reference_strength_values"] = [1.0]
+                
+                # 추가 필수 파라미터
+                data["controlnet_strength"] = 1
+                
+                # Vibe Transfer 충돌 방지는 유지
                 if data.get('reference_image'):
                     logger.warning("⚠️ Character Reference와 Vibe Transfer 동시 사용 감지. Character Reference 우선 적용.")
-                    # Vibe Transfer 관련 파라미터 제거
                     data['reference_image'] = None
-                    data['reference_strength'] = None  # None으로 설정
-                    data['reference_information_extracted'] = None  # None으로 설정
+                    data['reference_strength'] = None
+                    data['reference_information_extracted'] = None
                 
-                logger.debug(f"📷 Character Reference 설정: style_aware={data['character_reference_style_aware']}")
+                logger.info("📷 Character Reference API 스펙 준수 방식 적용")
             
             logger.debug(f"최종 데이터 키 목록: {list(data.keys())}")
             return data
@@ -1851,8 +1897,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             logger.error(f"_get_data_for_generate 오류: {e}")
             import traceback
             traceback.print_exc()
-            return {}      
-        
+            return {}
         
     def _preedit_prompt(self, prompt, nprompt):
         try_count = 0

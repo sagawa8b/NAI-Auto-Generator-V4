@@ -868,47 +868,52 @@ def init_character_reference_group(parent):
     parent.char_ref_style_aware = style_aware_checkbox
     parent.char_ref_image_data = None  # base64 이미지 데이터 저장용
     
-    # 이벤트 핸들러 연결을 위한 헬퍼 함수들 정의
-    def load_character_reference():
-        """Character Reference 이미지 로드"""
-        from PyQt5.QtWidgets import QFileDialog, QMessageBox
-        from PyQt5.QtGui import QPixmap
-        import base64
+    def load_character_reference(self):
+        """Character Reference 이미지 로드 및 해상도 최적화"""
+        logger.info("Character Reference 이미지 선택 대화상자 열기")
         
-        file_path, _ = QFileDialog.getOpenFileName(
-            parent,
-            "Character Reference 이미지 선택",
-            "",
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.gif)"
+        file_path = filedialog.askopenfilename(
+            title="Character Reference 이미지 선택",
+            filetypes=[("이미지 파일", "*.png *.jpg *.jpeg *.bmp")]
         )
         
         if file_path:
             try:
-                # 이미지 파일을 base64로 인코딩
-                with open(file_path, "rb") as image_file:
-                    encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                from PIL import Image
+                import io
+                import base64
                 
-                # 미리보기 업데이트
-                pixmap = QPixmap(file_path)
-                if not pixmap.isNull():
-                    scaled_pixmap = pixmap.scaled(100, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                    char_ref_preview.setPixmap(scaled_pixmap)
-                    char_ref_preview.setText("")
+                # 이미지 로드 및 해상도 확인
+                image = Image.open(file_path)
+                logger.info(f"원본 이미지 해상도: {image.size}")
+                
+                # Character Reference 필수 해상도
+                valid_sizes = [(1024, 1536), (1472, 1472), (1536, 1024)]
+                
+                # 현재 이미지가 유효한 해상도인지 확인
+                if image.size not in valid_sizes:
+                    logger.warning(f"이미지 해상도 변환 필요: {image.size} -> Character Reference 호환 해상도")
                     
-                    # 데이터 저장
-                    parent.char_ref_image_data = encoded_string
+                    # 가장 적합한 해상도 선택 (비율 기준)
+                    current_ratio = image.width / image.height
+                    best_size = min(valid_sizes, key=lambda x: abs(x[0]/x[1] - current_ratio))
                     
-                    # 버튼 상태 업데이트
-                    remove_image_btn.setEnabled(True)
-                    
-                    # 이미지 컨테이너 스타일 변경
-                    image_container.setStyleSheet("QFrame { background-color: #e8f5e8; border: 2px solid #4CAF50; }")
-                    
+                    # 해상도 변환 (고품질 리샘플링 사용)
+                    image = image.resize(best_size, Image.Resampling.LANCZOS)
+                    logger.info(f"이미지 해상도 변환 완료: {best_size}")
                 else:
-                    QMessageBox.warning(parent, "오류", "유효하지 않은 이미지 파일입니다.")
-                    
+                    logger.info(f"이미지 해상도가 Character Reference 규격에 적합함: {image.size}")
+                
+                # Base64 인코딩
+                buffer = io.BytesIO()
+                image.save(buffer, format='PNG')
+                self.char_ref_image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                
+                logger.info(f"Character Reference 이미지 로드 성공: {file_path}")
+                
             except Exception as e:
-                QMessageBox.critical(parent, "오류", f"이미지 로드 실패:\n{str(e)}")
+                logger.error(f"Character Reference 이미지 로드 실패: {e}")
+                self.char_ref_image_data = None
     
     def remove_character_reference():
         """Character Reference 이미지 제거"""

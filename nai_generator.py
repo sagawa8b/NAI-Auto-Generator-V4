@@ -961,71 +961,47 @@ class NAIGenerator():
         else:
             logger.debug("📍 캐릭터 프롬프트 없음 - 기본 프롬프트만 사용")
 
-        # Character Reference 파라미터 처리 (V4 프롬프트 구조 설정 후)
-        if self.parameters.get("character_reference"):
-            char_ref_image = self.parameters.get("character_reference")
-            char_ref_style_aware = self.parameters.get("character_reference_style_aware", True)
+        # Character Reference Director 파라미터 처리
+        if self.parameters.get("director_reference_images"):
+            logger.info("📍 Character Reference Director 파라미터 처리 시작")
             
-            logger.info(f"📍 Character Reference 이미지 처리 시작")
-            logger.debug(f"📍 Style Aware: {char_ref_style_aware}")
-            
-            # Director Reference 방식으로 파라미터 설정
-            self.parameters["director_reference_images"] = [char_ref_image]
-            
-            # director_reference_descriptions - 단순화된 구조 사용
-            if char_ref_style_aware:
-                descriptions = [{
-                    "caption": {
-                        "base_caption": "character&style",
-                        "char_captions": []
-                    },
-                    "legacy_uc": False
-                }]
-            else:
-                descriptions = [{
-                    "caption": {
-                        "base_caption": "character",
-                        "char_captions": []
-                    },
-                    "legacy_uc": False
-                }]
-            
-            self.parameters["director_reference_descriptions"] = descriptions
-            self.parameters["director_reference_information_extracted"] = [1]
-            self.parameters["director_reference_strength_values"] = [1.0]
-            
-            # 🔥 핵심 수정: Character Reference 활성화 시 skip_cfg_above_sigma 제거
+            # Character Reference 활성화시 skip_cfg_above_sigma 제거
             if "skip_cfg_above_sigma" in self.parameters:
-                logger.warning("⚠️ Character Reference 활성화로 인해 skip_cfg_above_sigma 파라미터 제거")
                 del self.parameters["skip_cfg_above_sigma"]
+                logger.warning("⚠️ Character Reference 활성화로 인해 skip_cfg_above_sigma 파라미터 제거")
             
-            # 추가 필수 파라미터들 - 조건부 추가
-            self.parameters["controlnet_strength"] = 1
-            self.parameters["inpaintImg2ImgStrength"] = 1
-            self.parameters["normalize_reference_strength_multiple"] = True
+            # 필수 파라미터 추가
+            if "normalize_reference_strength_multiple" not in self.parameters:
+                self.parameters["normalize_reference_strength_multiple"] = True
+                logger.info("📍 normalize_reference_strength_multiple 파라미터 추가")
             
-            logger.info(f"📍 Character Reference Director 파라미터 설정 완료")
+            if "inpaintImg2ImgStrength" not in self.parameters:
+                self.parameters["inpaintImg2ImgStrength"] = 1.0
+                logger.info("📍 inpaintImg2ImgStrength 파라미터 추가")
             
-            # Character Reference는 Vibe Transfer와 호환되지 않으므로 제거
-            if "reference_image" in self.parameters:
-                logger.warning("⚠️ Character Reference와 Vibe Transfer 동시 사용 불가 - Vibe Transfer 제거")
-                self.parameters.pop("reference_image", None)
-                self.parameters.pop("reference_strength", None)
-                self.parameters.pop("reference_information_extracted", None)
+            # Vibe Transfer와의 충돌 방지
+            vibe_params_to_remove = [
+                "reference_image", "reference_strength", "reference_information_extracted",
+                "reference_image_multiple", "reference_strength_multiple", 
+                "reference_information_extracted_multiple"
+            ]
+            for param in vibe_params_to_remove:
+                if param in self.parameters:
+                    del self.parameters[param]
+                    logger.warning(f"⚠️ Character Reference와 충돌하는 파라미터 제거: {param}")
             
-            # Character Reference를 위해 V4.5 모델 강제 설정
-            current_model = self.parameters.get("model", "")
-            if not current_model.endswith("v4.5-full"):
-                logger.info("📍 Character Reference를 위해 V4.5 모델로 자동 전환")
-                self.parameters["model"] = "nai-diffusion-4-5-full"
-        
-        # 내부 파라미터 정리 (API에 포함되지 않아야 함)
-        internal_params = ["character_reference", "character_reference_style_aware"]
-        for param in internal_params:
+            logger.info("📍 Character Reference Director 파라미터 처리 완료")
+
+        # 기존 Character Reference 파라미터 완전 제거 (충돌 방지)
+        legacy_params_to_remove = ["character_reference", "character_reference_style_aware"]
+        for param in legacy_params_to_remove:
             if param in self.parameters:
-                del self.parameters[param]
-                logger.debug(f"📍 내부 파라미터 제거: {param}")
-        
+                try:
+                    del self.parameters[param]
+                    logger.info(f"📍 충돌 방지를 위한 레거시 파라미터 제거: {param}")
+                except KeyError as e:
+                    logger.warning(f"⚠️ 파라미터 제거 실패: {param} - {e}")
+
         logger.debug("*** _prepare_v4_parameters 메서드 완료 ***")
                         
     def check_logged_in(self):
