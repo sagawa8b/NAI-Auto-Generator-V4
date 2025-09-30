@@ -77,6 +77,20 @@
       "auto": "连续生成 (Auto)",
       "stop": "停止生成"
     },
+	"generate_dialog": {
+	  "title": "连续生成选项",
+	  "preset_group": "连续生成数量 (点击即时生成)",
+	  "manual_group": "连续生成手动输入", 
+	  "settings_group": "其他设置",
+	  "count_5": "5张",
+	  "count_10": "10张",
+	  "count_50": "50张",
+	  "count_100": "100张",
+	  "count_label": "生成次数:",
+	  "count_unlimited": "(-1 = 无限制)",
+	  "delay_label": "生成间隔(秒):",
+	  "ignore_error": "忽略生成错误"
+	},
     "folders": {
       "title": "打开文件夹",
       "results": "生成结果文件夹",

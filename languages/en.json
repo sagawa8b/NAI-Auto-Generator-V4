@@ -83,6 +83,20 @@
       "auto": "Auto Generate",
       "stop": "Stop Generation"
     },
+	"generate_dialog": {
+	  "title": "Continuous Generation Options",
+	  "preset_group": "Quick Generation (Click to Start)",
+	  "manual_group": "Manual Input",
+	  "settings_group": "Other Settings", 
+	  "count_5": "5 images",
+	  "count_10": "10 images",
+	  "count_50": "50 images", 
+	  "count_100": "100 images",
+	  "count_label": "Generation Count:",
+	  "count_unlimited": "(-1 = Unlimited)",
+	  "delay_label": "Generation Interval (seconds):",
+	  "ignore_error": "Ignore Generation Errors"
+	},
     "folders": {
       "title": "Open Folder",
       "results": "Results Folder",

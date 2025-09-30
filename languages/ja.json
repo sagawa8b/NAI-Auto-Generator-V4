@@ -77,6 +77,20 @@
       "auto": "連続生成 (Auto)",
       "stop": "生成停止"
     },
+	"generate_dialog": {
+	  "title": "連続生成オプション",
+	  "preset_group": "連続生成枚数 (クリック即座生成)",
+	  "manual_group": "連続生成手動入力",
+	  "settings_group": "その他設定",
+	  "count_5": "5枚",
+	  "count_10": "10枚",
+	  "count_50": "50枚",
+	  "count_100": "100枚",
+	  "count_label": "生成回数:",
+	  "count_unlimited": "(-1 = 無制限)",
+	  "delay_label": "生成間隔(秒):",
+	  "ignore_error": "生成エラーを無視"
+	},
     "folders": {
       "title": "フォルダを開く",
       "results": "生成結果フォルダ",

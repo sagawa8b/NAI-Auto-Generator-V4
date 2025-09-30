@@ -68,6 +68,78 @@ def init_advanced_prompt_group(parent):
     
     return prompt_group
 
+def create_character_reference_widget(parent, left_widget):
+    """Character Reference UI 생성 (반응형)"""
+    widget = QFrame(left_widget)
+    widget.setFrameStyle(QFrame.StyledPanel)
+    widget.hide()
+    
+    # 반응형 크기 정책 설정
+    widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    
+    layout = QVBoxLayout(widget)
+    layout.setContentsMargins(10, 10, 10, 10)
+    layout.setSpacing(8)
+    
+    # 타이틀
+    title_label = QLabel("📸 Character Reference")
+    title_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
+    layout.addWidget(title_label)
+    
+    # 컨텐츠 영역 (반응형)
+    content_layout = QHBoxLayout()
+    content_layout.setSpacing(10)
+    
+    # 왼쪽: 이미지 미리보기
+    parent.character_image_label = QLabel()
+    parent.character_image_label.setFixedSize(164, 198)
+    parent.character_image_label.setAlignment(Qt.AlignCenter)
+    parent.character_image_label.setText("No Image")
+    content_layout.addWidget(parent.character_image_label)
+    
+    # 오른쪽: 컨트롤 영역
+    controls_container = QWidget()
+    controls_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+    controls_layout = QVBoxLayout(controls_container)
+    controls_layout.setContentsMargins(0, 0, 0, 0)
+    controls_layout.setSpacing(8)
+    
+    # 버튼 영역 (가로 배치)
+    buttons_layout = QHBoxLayout()
+    buttons_layout.setSpacing(8)
+    
+    # 이미지 선택 버튼
+    parent.btn_select_character_image = QPushButton("Select Image")
+    parent.btn_select_character_image.clicked.connect(parent.select_character_reference_image)
+    parent.btn_select_character_image.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    buttons_layout.addWidget(parent.btn_select_character_image)
+    
+    # 이미지 제거 버튼
+    parent.btn_remove_character_image = QPushButton("Remove Image")
+    parent.btn_remove_character_image.clicked.connect(parent.remove_character_reference_image)
+    parent.btn_remove_character_image.setEnabled(False)
+    parent.btn_remove_character_image.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    buttons_layout.addWidget(parent.btn_remove_character_image)
+    
+    controls_layout.addLayout(buttons_layout)
+    
+    # Style Aware 섹션
+    style_aware_label = QLabel("Style Aware")
+    style_aware_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    controls_layout.addWidget(style_aware_label)
+    
+    parent.character_style_aware_check = QCheckBox("Include style information from reference")
+    parent.character_style_aware_check.setChecked(True)
+    parent.character_style_aware_check.stateChanged.connect(parent.on_style_aware_changed)
+    controls_layout.addWidget(parent.character_style_aware_check)
+    
+    controls_layout.addStretch()
+    
+    content_layout.addWidget(controls_container)
+    layout.addLayout(content_layout)
+    
+    return widget
+
 
 def init_main_widget(parent):
     """메인 위젯 초기화 함수"""
@@ -403,7 +475,10 @@ def init_main_widget(parent):
     
     # 수평 레이아웃을 메인 레이아웃에 추가
     left_layout.addLayout(horizontal_container)
-        
+
+    # Character Reference 위젯 추가 (여기에 추가)
+    parent.character_reference_widget = create_character_reference_widget(parent, left_widget)
+    left_layout.addWidget(parent.character_reference_widget)        
 
     # 1.4: 이미지 옵션 (img2img, reference) 그룹 - 숨김 처리하되 객체는 생성
     image_options_group = QGroupBox("Image References")

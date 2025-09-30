@@ -37,7 +37,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.06.25"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.10.01"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -292,6 +292,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.palette = self.palette()
         self.is_initializing = True
         self.is_expand = True
+
+        # Character Reference 관련 변수 추가
+        self.character_reference_visible = False
+        self.character_reference_image = None
+        self.character_reference_path = None
+        self.character_reference_style_aware = True
 
         # 변수 및 창 초기화 (settings 초기화)
         self.init_variable()
@@ -857,6 +863,70 @@ class NAIAutoGeneratorWindow(QMainWindow):
             # 기본 테마에도 폰트 크기는 적용
             self.app.setStyleSheet(base_style)
             self.app.setPalette(self.palette)
+            
+        # Character Reference 테마 적용 추가
+        self.apply_character_reference_theme(theme_mode, font_size)
+
+    def apply_character_reference_theme(self, theme_mode, font_size):
+        """Character Reference UI에 현재 테마 적용"""
+        if not hasattr(self, 'character_reference_widget'):
+            return
+        
+        is_dark = "어두운" in theme_mode
+        
+        if is_dark:
+            # 어두운 테마
+            widget_bg = "#2D2D2D"
+            text_color = "#FFFFFF"
+            border_color = "#444444"
+            image_bg = "#1a1a1a"
+            button_bg = "#404040"
+            button_hover = "#4a4a4a"
+        else:
+            # 밝은 테마
+            widget_bg = "#FFFFFF"
+            text_color = "#000000"
+            border_color = "#CCCCCC"
+            image_bg = "#F5F5F5"
+            button_bg = "#E0E0E0"
+            button_hover = "#D0D0D0"
+        
+        # Character Reference 위젯 전체 스타일
+        widget_style = f"""
+            QWidget {{
+                background-color: {widget_bg};
+                color: {text_color};
+                font-size: {font_size}px;
+            }}
+            QLabel {{
+                color: {text_color};
+            }}
+            QPushButton {{
+                background-color: {button_bg};
+                color: {text_color};
+                border: 1px solid {border_color};
+                padding: 5px 15px;
+                border-radius: 3px;
+            }}
+            QPushButton:hover {{
+                background-color: {button_hover};
+            }}
+            QPushButton:disabled {{
+                background-color: {border_color};
+                color: #888888;
+            }}
+            QCheckBox {{
+                color: {text_color};
+            }}
+        """
+        
+        self.character_reference_widget.setStyleSheet(widget_style)
+        
+        # 이미지 라벨 스타일 (별도 적용)
+        if hasattr(self, 'character_image_label'):
+            self.character_image_label.setStyleSheet(
+                f"QLabel {{ border: 1px solid {border_color}; background: {image_bg}; color: {text_color}; }}"
+            )
 
     def init_variable(self):
         self.trying_auto_login = False
@@ -996,12 +1066,93 @@ class NAIAutoGeneratorWindow(QMainWindow):
         viewMenu = menubar.addMenu(tr('menu.view'))
         viewMenu.addAction(togglePanelAction)
         
+        # View 메뉴 찾기 또는 생성
+        view_menu = None
+        for action in self.menuBar().actions():
+            if action.text() == "View" or action.text() == "보기":
+                view_menu = action.menu()
+                break
+        
+        if view_menu is None:
+            view_menu = self.menuBar().addMenu("View")
+        
+        # Character Reference 토글 액션 추가
+        self.action_character_reference = QAction("Character Reference", self)
+        self.action_character_reference.setCheckable(True)
+        self.action_character_reference.setChecked(False)
+        self.action_character_reference.triggered.connect(self.toggle_character_reference)
+        view_menu.addAction(self.action_character_reference)        
+        
         filemenu_etc = menubar.addMenu(tr('menu.etc'))
         filemenu_etc.addAction(aboutAction)
         
         # 언어 메뉴 추가
         self.lang_menu = menubar.addMenu(tr('menu.languages', 'Languages'))
         self.setup_language_menu()
+
+    def toggle_character_reference(self):
+        """Character Reference 섹션 토글"""
+        self.character_reference_visible = not self.character_reference_visible
+        
+        if hasattr(self, 'character_reference_widget'):
+            if self.character_reference_visible:
+                self.character_reference_widget.show()
+            else:
+                self.character_reference_widget.hide()
+
+    def select_character_reference_image(self):
+        """Character Reference 이미지 선택"""
+        file_dialog = QFileDialog()
+        file_path, _ = file_dialog.getOpenFileName(
+            self, 
+            'Select Character Reference Image', 
+            '', 
+            'Image Files (*.png *.jpg *.jpeg *.webp)'
+        )
+        
+        if file_path:
+            try:
+                # 이미지 로드
+                from PIL import Image
+                self.character_reference_image = Image.open(file_path)
+                self.character_reference_path = file_path
+                
+                # 미리보기 업데이트
+                thumbnail = self.character_reference_image.copy()
+                thumbnail.thumbnail((164, 198), Image.LANCZOS)
+                
+                # PIL Image를 QPixmap으로 변환
+                img_byte_arr = io.BytesIO()
+                thumbnail.save(img_byte_arr, format='PNG')
+                img_byte_arr.seek(0)
+                
+                from PyQt5.QtGui import QPixmap
+                pixmap = QPixmap()
+                pixmap.loadFromData(img_byte_arr.read())
+                
+                self.character_image_label.setPixmap(pixmap)
+                self.btn_remove_character_image.setEnabled(True)
+                
+                logger.info(f"Character Reference image loaded: {file_path}")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
+                logger.error(f"Failed to load character reference image: {e}")
+
+    def remove_character_reference_image(self):
+        """Character Reference 이미지 제거"""
+        self.character_reference_image = None
+        self.character_reference_path = None
+        self.character_image_label.clear()
+        self.character_image_label.setText("No Image")
+        self.btn_remove_character_image.setEnabled(False)
+        logger.info("Character Reference image removed")
+
+    def on_style_aware_changed(self, state):
+        """Style Aware 체크박스 상태 변경"""
+        self.character_reference_style_aware = (state == Qt.Checked)
+        logger.debug(f"Style Aware changed: {self.character_reference_style_aware}")
+
 
     def setup_language_menu(self):
         """언어 선택 메뉴 설정"""
@@ -1159,7 +1310,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
 
     def init_content(self):
-        widget = init_main_widget(self)
+        widget = init_main_widget(self)                
         self.setCentralWidget(widget)
 
     def init_nai(self):
@@ -1613,6 +1764,24 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     else:
                         data[field] = ""  # 텍스트 필드 기본값
             
+            # Character Reference 데이터 추가            
+            if self.character_reference_image is not None:
+                # 이미지를 권장 해상도로 조정
+                processed_image = self._prepare_character_reference_image(self.character_reference_image)
+                
+                # 이미지를 Base64로 인코딩
+                img_byte_arr = io.BytesIO()
+                processed_image.save(img_byte_arr, format='PNG')
+                img_byte_arr.seek(0)
+                image_base64 = base64.b64encode(img_byte_arr.read()).decode('utf-8')
+                
+                data["reference_image_multiple"] = [image_base64]
+                data["reference_information_extracted_multiple"] = [1 if self.character_reference_style_aware else 0]
+                data["reference_strength_multiple"] = [1]
+                
+                logger.debug(f"Character Reference added - Style Aware: {self.character_reference_style_aware}")
+                logger.debug(f"Processed image size: {processed_image.size}")
+
             logger.debug("_get_data_for_generate 완료")
             return data
             
@@ -1638,7 +1807,51 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 "quality_toggle": True
             }
         
+    def _prepare_character_reference_image(self, image):
+        """
+        Character Reference 이미지를 NovelAI 권장 해상도로 조정
+        권장 해상도: 1024x1536 (세로), 1472x1472 (정사각형), 1536x1024 (가로)
+        """
+        from PIL import Image
         
+        # 원본 이미지 크기
+        orig_width, orig_height = image.size
+        aspect_ratio = orig_width / orig_height
+        
+        # 종횡비에 따라 가장 적합한 해상도 선택
+        if aspect_ratio < 0.9:  # 세로가 긴 이미지
+            target_size = (1024, 1536)
+        elif aspect_ratio > 1.1:  # 가로가 긴 이미지
+            target_size = (1536, 1024)
+        else:  # 정사각형에 가까운 이미지
+            target_size = (1472, 1472)
+        
+        # 새 이미지 생성 (검은색 배경)
+        new_image = Image.new('RGB', target_size, (0, 0, 0))
+        
+        # 종횡비를 유지하면서 리사이즈
+        image_copy = image.copy()
+        if image_copy.mode == 'RGBA':
+            # RGBA 이미지는 RGB로 변환 (투명도는 검은색으로 처리)
+            background = Image.new('RGB', image_copy.size, (0, 0, 0))
+            background.paste(image_copy, mask=image_copy.split()[3])
+            image_copy = background
+        elif image_copy.mode != 'RGB':
+            image_copy = image_copy.convert('RGB')
+        
+        # 타겟 크기에 맞게 리사이즈 (종횡비 유지)
+        image_copy.thumbnail(target_size, Image.LANCZOS)
+        
+        # 중앙에 배치
+        paste_x = (target_size[0] - image_copy.width) // 2
+        paste_y = (target_size[1] - image_copy.height) // 2
+        new_image.paste(image_copy, (paste_x, paste_y))
+        
+        logger.info(f"Character Reference 이미지 처리: {orig_width}x{orig_height} -> {target_size[0]}x{target_size[1]}")
+        
+        return new_image
+
+
     def _preedit_prompt(self, prompt, nprompt):
         try_count = 0
         edited_prompt = prompt
@@ -1765,6 +1978,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 # 세션 모니터링 업데이트
                 if hasattr(self, 'session_manager'):
                     self.session_manager.increment_image_count()
+                
+                # Anlas 실시간 업데이트 추가 (서버 업데이트 대기 시간 고려)
+                QTimer.singleShot(1000, self.refresh_anlas)  # 1초 후 Anlas 새로고침   
             
             else:
                 # 오류 케이스 - 인증 문제인지 확인

@@ -83,6 +83,20 @@
       "auto": "연속 생성 (Auto)",
       "stop": "생성 중지"
     },
+	"generate_dialog": {
+	  "title": "연속 생성 옵션",
+	  "preset_group": "연속생성 매수 (클릭 즉시 생성)",
+	  "manual_group": "연속생성 수동 입력",
+	  "settings_group": "기타 설정",
+	  "count_5": "5장",
+	  "count_10": "10장", 
+	  "count_50": "50장",
+	  "count_100": "100장",
+	  "count_label": "생성 횟수:",
+	  "count_unlimited": "(-1 = 무제한)",
+	  "delay_label": "생성 간격(초):",
+	  "ignore_error": "생성 오류 무시하기"
+	},
     "folders": {
       "title": "폴더 열기",
       "results": "생성 결과 폴더",
@@ -137,6 +151,15 @@
       "not_logged_in": "로그인 필요",
       "anlas": "Anlas:",
       "unknown": "알 수 없음"
-    }
+    },
+	"character_reference": {
+		"title": "Character Reference",
+		"select_image": "이미지 선택",
+		"remove_image": "이미지 제거",
+		"no_image": "이미지 없음",
+		"style_aware": "Style Aware",
+		"style_aware_description": "레퍼런스에서 스타일 정보 포함",
+		"error_load_image": "이미지 로딩 실패: {}"
+	}
   }
 }

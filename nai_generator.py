@@ -303,6 +303,12 @@ class NAIParam(Enum):
     quality_toggle = 32
     characterPrompts = 33
     skip_cfg_above_sigma = 34  # 새로운 파라미터 번호 추가
+    
+    # Character Reference 파라미터 추가
+    reference_image_multiple = 35
+    reference_information_extracted_multiple = 36
+    reference_strength_multiple = 37
+    
 
 
 TYPE_NAIPARAM_DICT = {
@@ -337,7 +343,14 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.dynamic_thresholding: bool,
     NAIParam.quality_toggle: bool,
     NAIParam.characterPrompts: list,
-    NAIParam.skip_cfg_above_sigma: (int, type(None))  # int 또는 None 타입 허용
+    NAIParam.skip_cfg_above_sigma: (int, type(None)),  # int 또는 None 타입 허용
+    
+    # Character Reference 타입 추가
+    NAIParam.reference_image_multiple: list,
+    NAIParam.reference_information_extracted_multiple: list,
+    NAIParam.reference_strength_multiple: list,
+    
+    
 }
 
 
@@ -427,6 +440,11 @@ class NAIGenerator():
             
             # 캐릭터 프롬프트
             "characterPrompts": [],
+            
+            # Character Reference 파라미터 추가
+            "reference_image_multiple": None,
+            "reference_information_extracted_multiple": None,
+            "reference_strength_multiple": None,        
                         
         }
     
@@ -605,6 +623,14 @@ class NAIGenerator():
             "action": action.name,
             "parameters": self.parameters,
         }
+        
+        # 디버깅: director_reference_* 파라미터 확인
+        if "director_reference_descriptions" in self.parameters:
+            logger.info(f"📍 API 전송 데이터에 director_reference_descriptions 포함됨")
+            logger.info(f"📍 descriptions 내용: {self.parameters['director_reference_descriptions']}")
+        if "director_reference_images" in self.parameters:
+            logger.info(f"📍 API 전송 데이터에 director_reference_images 포함됨: {len(self.parameters['director_reference_images'])}개")
+        
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
         # API 전송 직전 최종 데이터 로깅 강화
@@ -807,8 +833,68 @@ class NAIGenerator():
                 logger.debug(f"  - 캐릭터 {i+1}: centers={char_cap['centers']}")
         else:
             logger.debug("📍 캐릭터 프롬프트 없음 - 기본 프롬프트만 사용")
-        
-        logger.debug("*** _prepare_v4_parameters 메서드 완료 ***")
+
+        # Character Reference 처리 (캐릭터 프롬프트 처리 이후에 추가)
+        if (self.parameters.get("reference_image_multiple") and 
+            len(self.parameters["reference_image_multiple"]) > 0):
+            
+            logger.info("📍 Character Reference 데이터 처리 중")
+            
+            # *** 기존 단일 reference 파라미터 제거 (충돌 방지) ***
+            if "reference_image" in self.parameters:
+                del self.parameters["reference_image"]
+            if "reference_strength" in self.parameters:
+                del self.parameters["reference_strength"]
+            if "reference_information_extracted" in self.parameters:
+                del self.parameters["reference_information_extracted"]
+            
+            # Character Reference는 director_reference_* 파라미터 사용
+            ref_images = self.parameters["reference_image_multiple"]
+            ref_info_extracted = self.parameters.get("reference_information_extracted_multiple", [1])
+            ref_strength = self.parameters.get("reference_strength_multiple", [1])
+            
+            # Style Aware 설정에 따라 description 생성
+            style_aware = ref_info_extracted[0] == 1
+            
+            if style_aware:
+                descriptions = [{
+                    "caption": {
+                        "base_caption": "character&style",
+                        "char_captions": []
+                    },
+                    "legacy_uc": False
+                }]
+            else:
+                descriptions = [{
+                    "caption": {
+                        "base_caption": "character",
+                        "char_captions": []
+                    },
+                    "legacy_uc": False
+                }]
+            
+            # director_reference_* 파라미터 설정
+            self.parameters["director_reference_descriptions"] = descriptions
+            self.parameters["director_reference_images"] = ref_images
+            self.parameters["director_reference_information_extracted"] = ref_info_extracted
+            self.parameters["director_reference_strength_values"] = ref_strength
+            
+            # reference_*_multiple 파라미터는 제거 (director_reference_*와 중복 방지)
+            del self.parameters["reference_image_multiple"]
+            del self.parameters["reference_information_extracted_multiple"]
+            del self.parameters["reference_strength_multiple"]
+            
+            # 디버깅 로깅 추가
+            logger.info(f"📍 director_reference_descriptions: {descriptions}")
+            logger.info(f"📍 director_reference_images 개수: {len(ref_images)}")
+            logger.info(f"📍 director_reference_images[0] 길이: {len(ref_images[0]) if ref_images else 0}")
+            logger.info(f"📍 director_reference_information_extracted: {ref_info_extracted}")
+            logger.info(f"📍 director_reference_strength_values: {ref_strength}")
+            
+            
+            logger.info(f"📍 Character Reference 적용 완료 - Style Aware: {style_aware}")
+
+        logger.info("📍 _prepare_v4_parameters 메서드 완료")
                         
     def check_logged_in(self):
         """더 나은 오류 처리를 포함한 로그인 확인"""
