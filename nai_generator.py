@@ -850,12 +850,16 @@ class NAIGenerator():
             
             # Character Reference는 director_reference_* 파라미터 사용
             ref_images = self.parameters["reference_image_multiple"]
-            ref_info_extracted = self.parameters.get("reference_information_extracted_multiple", [1])
+            ref_info_extracted_input = self.parameters.get("reference_information_extracted_multiple", [1])
             ref_strength = self.parameters.get("reference_strength_multiple", [1])
             
-            # Style Aware 설정에 따라 description 생성
-            style_aware = ref_info_extracted[0] == 1
+            # Style Aware 설정 확인 (base_caption 결정용)
+            style_aware = ref_info_extracted_input[0] == 1
             
+            # API 요구사항: director_reference_information_extracted는 항상 [1]이어야 함
+            ref_info_extracted = [1]
+            
+            # Style Aware는 base_caption으로 제어
             if style_aware:
                 descriptions = [{
                     "caption": {
@@ -873,26 +877,46 @@ class NAIGenerator():
                     "legacy_uc": False
                 }]
             
+            # Fidelity 값 추출
+            ref_fidelity = self.parameters.get("reference_fidelity_multiple", [1.0])
+            
             # director_reference_* 파라미터 설정
             self.parameters["director_reference_descriptions"] = descriptions
             self.parameters["director_reference_images"] = ref_images
-            self.parameters["director_reference_information_extracted"] = ref_info_extracted
+            self.parameters["director_reference_information_extracted"] = ref_info_extracted  # 항상 [1]
             self.parameters["director_reference_strength_values"] = ref_strength
+            self.parameters["director_reference_secondary_strength_values"] = ref_fidelity  # Fidelity 추가
             
             # reference_*_multiple 파라미터는 제거 (director_reference_*와 중복 방지)
             del self.parameters["reference_image_multiple"]
             del self.parameters["reference_information_extracted_multiple"]
             del self.parameters["reference_strength_multiple"]
+            if "reference_fidelity_multiple" in self.parameters:
+                del self.parameters["reference_fidelity_multiple"]
             
-            # 디버깅 로깅 추가
+            # 디버깅 로깅
             logger.info(f"📍 director_reference_descriptions: {descriptions}")
             logger.info(f"📍 director_reference_images 개수: {len(ref_images)}")
             logger.info(f"📍 director_reference_images[0] 길이: {len(ref_images[0]) if ref_images else 0}")
             logger.info(f"📍 director_reference_information_extracted: {ref_info_extracted}")
             logger.info(f"📍 director_reference_strength_values: {ref_strength}")
+            logger.info(f"📍 director_reference_secondary_strength_values (Fidelity): {ref_fidelity}")
+            logger.info(f"📍 Character Reference 적용 완료 - Style Aware: {style_aware}, Fidelity: {ref_fidelity[0]}")
+        else:
+            # Character Reference가 없을 때 모든 director_reference_* 파라미터 명시적으로 제거
+            self.parameters.pop("director_reference_descriptions", None)
+            self.parameters.pop("director_reference_images", None)
+            self.parameters.pop("director_reference_information_extracted", None)
+            self.parameters.pop("director_reference_strength_values", None)
+            self.parameters.pop("director_reference_secondary_strength_values", None)
             
+            # reference_*_multiple 파라미터도 제거
+            self.parameters.pop("reference_image_multiple", None)
+            self.parameters.pop("reference_information_extracted_multiple", None)
+            self.parameters.pop("reference_strength_multiple", None)
+            self.parameters.pop("reference_fidelity_multiple", None)
             
-            logger.info(f"📍 Character Reference 적용 완료 - Style Aware: {style_aware}")
+            logger.info("📍 Character Reference 없음 - 모든 director_reference_* 파라미터 제거됨")
 
         logger.info("📍 _prepare_v4_parameters 메서드 완료")
                         

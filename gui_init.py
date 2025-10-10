@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
                              QLabel, QLineEdit, QPushButton, QPlainTextEdit, 
                              QTextBrowser, QComboBox, QSplitter, QCheckBox, 
                              QRadioButton, QButtonGroup, QSizePolicy, QMessageBox, 
-                             QFileDialog, QApplication, QCompleter, QFrame)
+                             QFileDialog, QApplication, QCompleter, QFrame, QSlider)
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QSize
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QMouseEvent, QBrush, QPalette
 from consts import RESOLUTION_FAMILIY
@@ -132,6 +132,34 @@ def create_character_reference_widget(parent, left_widget):
     parent.character_style_aware_check.setChecked(True)
     parent.character_style_aware_check.stateChanged.connect(parent.on_style_aware_changed)
     controls_layout.addWidget(parent.character_style_aware_check)
+    
+    # Fidelity 섹션 추가
+    fidelity_label = QLabel("Fidelity")
+    fidelity_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    controls_layout.addWidget(fidelity_label)
+    
+    fidelity_description = QLabel("0: Old version (flexible), 1: New version (detailed)")
+    fidelity_description.setStyleSheet("font-size: 9pt; color: #888;")
+    controls_layout.addWidget(fidelity_description)
+    
+    # Fidelity 슬라이더와 값 표시를 위한 수평 레이아웃
+    fidelity_layout = QHBoxLayout()
+    
+    parent.character_fidelity_slider = QSlider(Qt.Horizontal)
+    parent.character_fidelity_slider.setMinimum(0)
+    parent.character_fidelity_slider.setMaximum(20)  # 0.00 ~ 1.00, 0.05 단위 (20 steps)
+    parent.character_fidelity_slider.setValue(20)  # 기본값 1.0
+    parent.character_fidelity_slider.setTickPosition(QSlider.TicksBelow)
+    parent.character_fidelity_slider.setTickInterval(1)
+    parent.character_fidelity_slider.valueChanged.connect(parent.on_fidelity_changed)
+    fidelity_layout.addWidget(parent.character_fidelity_slider)
+    
+    parent.character_fidelity_value_label = QLabel("1.00")
+    parent.character_fidelity_value_label.setStyleSheet("font-weight: bold; min-width: 35px;")
+    parent.character_fidelity_value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    fidelity_layout.addWidget(parent.character_fidelity_value_label)
+    
+    controls_layout.addLayout(fidelity_layout)
     
     controls_layout.addStretch()
     

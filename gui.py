@@ -37,7 +37,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.10.01"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.10.10"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -298,6 +298,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.character_reference_image = None
         self.character_reference_path = None
         self.character_reference_style_aware = True
+        self.character_reference_fidelity = 1.0  # Fidelity 기본값 1.0
 
         # 변수 및 창 초기화 (settings 초기화)
         self.init_variable()
@@ -1153,6 +1154,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.character_reference_style_aware = (state == Qt.Checked)
         logger.debug(f"Style Aware changed: {self.character_reference_style_aware}")
 
+    def on_fidelity_changed(self, value):
+        """Fidelity 슬라이더 값 변경 이벤트"""
+        # 슬라이더 값(0-20)을 실제 값(0.00-1.00)으로 변환
+        self.character_reference_fidelity = value * 0.05
+        self.character_fidelity_value_label.setText(f"{self.character_reference_fidelity:.2f}")
+        logger.debug(f"Fidelity changed: {self.character_reference_fidelity}")
 
     def setup_language_menu(self):
         """언어 선택 메뉴 설정"""
@@ -1778,9 +1785,17 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 data["reference_image_multiple"] = [image_base64]
                 data["reference_information_extracted_multiple"] = [1 if self.character_reference_style_aware else 0]
                 data["reference_strength_multiple"] = [1]
+                data["reference_fidelity_multiple"] = [self.character_reference_fidelity]  # Fidelity 추가
                 
-                logger.debug(f"Character Reference added - Style Aware: {self.character_reference_style_aware}")
+                logger.debug(f"Character Reference added - Style Aware: {self.character_reference_style_aware}, Fidelity: {self.character_reference_fidelity}")
                 logger.debug(f"Processed image size: {processed_image.size}")
+            else:
+                # Character Reference 이미지가 없을 때 관련 파라미터 명시적으로 제거
+                data.pop("reference_image_multiple", None)
+                data.pop("reference_information_extracted_multiple", None)
+                data.pop("reference_strength_multiple", None)
+                data.pop("reference_fidelity_multiple", None)
+                logger.debug("Character Reference not applied - all reference parameters removed")
 
             logger.debug("_get_data_for_generate 완료")
             return data
