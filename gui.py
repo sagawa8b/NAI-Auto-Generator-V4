@@ -37,7 +37,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.10.10"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.10.31"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -1066,6 +1066,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # 보기 메뉴 추가
         viewMenu = menubar.addMenu(tr('menu.view'))
         viewMenu.addAction(togglePanelAction)
+        
+        # 구분선 추가
+        viewMenu.addSeparator()
+
+        # 레이아웃 초기화 액션 추가
+        resetLayoutAction = QAction(tr('menu.reset_layout', 'Reset Layout'), self)
+        resetLayoutAction.setShortcut('Ctrl+R')
+        resetLayoutAction.triggered.connect(self.reset_layout)
+        viewMenu.addAction(resetLayoutAction)
         
         # View 메뉴 찾기 또는 생성
         view_menu = None
@@ -2451,6 +2460,41 @@ class NAIAutoGeneratorWindow(QMainWindow):
         
         self.update_expand_button()
         QTimer.singleShot(50, self.image_result.refresh_size)
+
+
+    def reset_layout(self):
+        """모든 레이아웃을 초기 설정으로 되돌립니다"""
+        try:
+            # 1. 프롬프트 내부 스플리터 초기화 (Prompt ↔ Negative Prompt)
+            if hasattr(self, 'prompt_splitter'):
+                self.prompt_splitter.setSizes([600, 400])
+            
+            # 2. 프롬프트-캐릭터 스플리터 초기화
+            if hasattr(self, 'prompt_char_splitter'):
+                self.prompt_char_splitter.setSizes([600, 400])
+            
+            # 3. 메인 수직 스플리터 초기화 (프롬프트 영역 ↔ 설정 영역)
+            if hasattr(self, 'main_vertical_splitter'):
+                self.main_vertical_splitter.setSizes([600, 400])
+            
+            # 4. 설정 영역 수평 스플리터 초기화 (Image Options ↔ Advanced ↔ Folder ↔ Generate)
+            if hasattr(self, 'settings_splitter'):
+                self.settings_splitter.setSizes([400, 400, 200, 300])
+            
+            # 5. 메인 좌우 스플리터 초기화
+            if hasattr(self, 'main_splitter'):
+                self.set_default_splitter()
+            
+            # 6. 저장된 설정 초기화
+            self.settings.remove("splitterSizes")
+            
+            # 사용자에게 알림
+            self.set_statusbar_text("IDLE")
+            logger.info("레이아웃이 초기 설정으로 리셋되었습니다")
+            
+        except Exception as e:
+            logger.error(f"레이아웃 초기화 중 오류 발생: {e}")
+
 
     def update_expand_button(self):
         self.button_expand.setText("◀▶" if self.is_expand else "▶◀")

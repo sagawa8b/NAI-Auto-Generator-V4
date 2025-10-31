@@ -237,7 +237,21 @@ def init_main_widget(parent):
         )
 
     # 이미지 옵션, 고급 설정, 생성 버튼을 수평으로 배치할 컨테이너
-    horizontal_container = QHBoxLayout()
+    
+    # ===== 전체 영역을 상하로 조정 가능하도록 큰 수직 스플리터로 묶기 =====
+    main_vertical_splitter = QSplitter(Qt.Vertical)
+    
+    # 1. 프롬프트 영역 추가 (이미 수직 스플리터로 구성됨)
+    main_vertical_splitter.addWidget(prompt_char_splitter)
+
+    # 2. 설정 영역을 담을 컨테이너 위젯 생성
+    settings_container = QWidget()
+    settings_layout = QVBoxLayout(settings_container)
+    settings_layout.setContentsMargins(0, 0, 0, 0)
+    settings_layout.setSpacing(5)
+    
+    # QHBoxLayout 대신 QSplitter 사용으로 각 영역의 크기 조정 가능
+    horizontal_container = QSplitter(Qt.Horizontal)
     
     # 이미지 옵션 그룹
     img_option_group = QGroupBox("Image Options")
@@ -494,15 +508,51 @@ def init_main_widget(parent):
     # 폴더 그룹 크기 정책 설정
     folder_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
     
-    # 위젯들을 수평 레이아웃에 원하는 순서로 추가
-    horizontal_container.addWidget(img_option_group, 4)  # Image Options (비율 4)
-    horizontal_container.addWidget(advanced_group, 4)    # Advanced Settings (비율 4)
-    horizontal_container.addWidget(folder_group, 2)      # Folder Open (비율 2)
-    horizontal_container.addWidget(generate_group, 3)    # Generate (비율 3)
+    # 위젯들을 수평 스플리터에 추가
+    horizontal_container.addWidget(img_option_group)     # Image Options
+    horizontal_container.addWidget(advanced_group)       # Advanced Settings
+    horizontal_container.addWidget(folder_group)         # Folder Open
+    horizontal_container.addWidget(generate_group)       # Generate
+    
+    # 스플리터 핸들 설정
+    horizontal_container.setHandleWidth(8)
+    horizontal_container.setChildrenCollapsible(False)  # 영역이 완전히 접히지 않도록
+    horizontal_container.setStyleSheet("QSplitter::handle { background-color: #cccccc; }")
+
+    # 초기 크기 비율 설정 (4:4:2:3 비율로)
+    horizontal_container.setSizes([400, 400, 200, 300])
+
+    # 스플리터 참조 저장
+    parent.settings_splitter = horizontal_container
+
+    # 수평 스플리터를 메인 레이아웃에 추가 (addLayout → addWidget로 변경)
+    left_layout.addWidget(horizontal_container)
+    
+    # 수평 스플리터를 설정 컨테이너에 추가
+    settings_layout.addWidget(horizontal_container)
+
+    # Character Reference 위젯도 설정 컨테이너에 추가
+    parent.character_reference_widget = create_character_reference_widget(parent, left_widget)
+    settings_layout.addWidget(parent.character_reference_widget)
+
+    # 3. 설정 컨테이너를 메인 수직 스플리터에 추가
+    main_vertical_splitter.addWidget(settings_container)
+
+    # 4. 메인 수직 스플리터 설정
+    main_vertical_splitter.setHandleWidth(8)
+    main_vertical_splitter.setChildrenCollapsible(False)
+    main_vertical_splitter.setStyleSheet("QSplitter::handle { background-color: #cccccc; }")
+
+    # 초기 크기 비율 설정 (프롬프트:설정 = 60:40)
+    main_vertical_splitter.setSizes([600, 400])
+
+    # 스플리터 참조 저장
+    parent.main_vertical_splitter = main_vertical_splitter
+
+    # 5. left_layout에 메인 수직 스플리터 추가
+    left_layout.addWidget(main_vertical_splitter)
     
     
-    # 수평 레이아웃을 메인 레이아웃에 추가
-    left_layout.addLayout(horizontal_container)
 
     # Character Reference 위젯 추가 (여기에 추가)
     parent.character_reference_widget = create_character_reference_widget(parent, left_widget)
