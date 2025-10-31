@@ -13,6 +13,7 @@
       "exit": "退出(Exit)",
       "view": "查看",
       "toggle_panel": "切换结果面板",
+	  "reset_layout": "重置布局", 
       "etc": "其他(Etc)",
       "about": "关于(About)"
     },
