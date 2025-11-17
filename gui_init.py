@@ -68,19 +68,140 @@ def init_advanced_prompt_group(parent):
     
     return prompt_group
 
+def create_img2img_widget(parent, left_widget):
+    """Image to Image UI 생성 (반응형)"""
+    widget = QFrame(left_widget)
+    widget.setFrameStyle(QFrame.StyledPanel)
+    widget.hide()
+
+    # 반응형 크기 정책 설정
+    widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    layout = QVBoxLayout(widget)
+    layout.setContentsMargins(10, 10, 10, 10)
+    layout.setSpacing(8)
+
+    # 타이틀
+    title_label = QLabel("🖼️ Image to Image")
+    title_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
+    layout.addWidget(title_label)
+
+    # 컨텐츠 영역 (반응형)
+    content_layout = QHBoxLayout()
+    content_layout.setSpacing(10)
+
+    # 왼쪽: 이미지 미리보기
+    parent.img2img_image_label = QLabel()
+    parent.img2img_image_label.setFixedSize(164, 198)
+    parent.img2img_image_label.setAlignment(Qt.AlignCenter)
+    parent.img2img_image_label.setText("No Image")
+    parent.img2img_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
+    content_layout.addWidget(parent.img2img_image_label)
+
+    # 오른쪽: 컨트롤 영역
+    controls_container = QWidget()
+    controls_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+    controls_layout = QVBoxLayout(controls_container)
+    controls_layout.setContentsMargins(0, 0, 0, 0)
+    controls_layout.setSpacing(8)
+
+    # 버튼 영역 (가로 배치)
+    buttons_layout = QHBoxLayout()
+    buttons_layout.setSpacing(8)
+
+    # 이미지 선택 버튼
+    parent.btn_select_img2img_image = QPushButton("Select Image")
+    parent.btn_select_img2img_image.clicked.connect(parent.select_img2img_image)
+    parent.btn_select_img2img_image.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    buttons_layout.addWidget(parent.btn_select_img2img_image)
+
+    # 이미지 제거 버튼
+    parent.btn_remove_img2img_image = QPushButton("Remove Image")
+    parent.btn_remove_img2img_image.clicked.connect(parent.remove_img2img_image)
+    parent.btn_remove_img2img_image.setEnabled(False)
+    parent.btn_remove_img2img_image.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    buttons_layout.addWidget(parent.btn_remove_img2img_image)
+
+    controls_layout.addLayout(buttons_layout)
+
+    # Strength 섹션
+    strength_label = QLabel("Strength")
+    strength_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    controls_layout.addWidget(strength_label)
+
+    strength_description = QLabel("How much to transform the image (0.0 = original, 1.0 = completely new)")
+    strength_description.setStyleSheet("font-size: 9pt; color: #888;")
+    strength_description.setWordWrap(True)
+    controls_layout.addWidget(strength_description)
+
+    # Strength 슬라이더와 값 표시를 위한 수평 레이아웃
+    strength_layout = QHBoxLayout()
+
+    parent.img2img_strength_slider = QSlider(Qt.Horizontal)
+    parent.img2img_strength_slider.setMinimum(0)
+    parent.img2img_strength_slider.setMaximum(100)  # 0.00 ~ 1.00, 0.01 단위
+    parent.img2img_strength_slider.setValue(70)  # 기본값 0.7
+    parent.img2img_strength_slider.setTickPosition(QSlider.TicksBelow)
+    parent.img2img_strength_slider.setTickInterval(10)
+    parent.img2img_strength_slider.valueChanged.connect(parent.on_img2img_strength_changed)
+    strength_layout.addWidget(parent.img2img_strength_slider)
+
+    parent.img2img_strength_value_label = QLabel("0.70")
+    parent.img2img_strength_value_label.setStyleSheet("font-weight: bold; min-width: 35px;")
+    parent.img2img_strength_value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    strength_layout.addWidget(parent.img2img_strength_value_label)
+
+    controls_layout.addLayout(strength_layout)
+
+    # Noise 섹션
+    noise_label = QLabel("Noise")
+    noise_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    controls_layout.addWidget(noise_label)
+
+    noise_description = QLabel("Extra noise to add (0.0 = none, 1.0 = maximum)")
+    noise_description.setStyleSheet("font-size: 9pt; color: #888;")
+    noise_description.setWordWrap(True)
+    controls_layout.addWidget(noise_description)
+
+    # Noise 슬라이더와 값 표시를 위한 수평 레이아웃
+    noise_layout = QHBoxLayout()
+
+    parent.img2img_noise_slider = QSlider(Qt.Horizontal)
+    parent.img2img_noise_slider.setMinimum(0)
+    parent.img2img_noise_slider.setMaximum(100)  # 0.00 ~ 1.00, 0.01 단위
+    parent.img2img_noise_slider.setValue(0)  # 기본값 0.0
+    parent.img2img_noise_slider.setTickPosition(QSlider.TicksBelow)
+    parent.img2img_noise_slider.setTickInterval(10)
+    parent.img2img_noise_slider.valueChanged.connect(parent.on_img2img_noise_changed)
+    noise_layout.addWidget(parent.img2img_noise_slider)
+
+    parent.img2img_noise_value_label = QLabel("0.00")
+    parent.img2img_noise_value_label.setStyleSheet("font-weight: bold; min-width: 35px;")
+    parent.img2img_noise_value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    noise_layout.addWidget(parent.img2img_noise_value_label)
+
+    controls_layout.addLayout(noise_layout)
+
+    controls_layout.addStretch()
+
+    content_layout.addWidget(controls_container)
+    layout.addLayout(content_layout)
+
+    return widget
+
 def create_character_reference_widget(parent, left_widget):
     """Character Reference UI 생성 (반응형)"""
     widget = QFrame(left_widget)
     widget.setFrameStyle(QFrame.StyledPanel)
     widget.hide()
-    
+
     # 반응형 크기 정책 설정
     widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-    
+
     layout = QVBoxLayout(widget)
     layout.setContentsMargins(10, 10, 10, 10)
     layout.setSpacing(8)
-    
+
     # 타이틀
     title_label = QLabel("📸 Character Reference")
     title_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
@@ -535,6 +656,10 @@ def init_main_widget(parent):
     parent.character_reference_widget = create_character_reference_widget(parent, left_widget)
     settings_layout.addWidget(parent.character_reference_widget)
 
+    # Image to Image 위젯 추가
+    parent.img2img_widget = create_img2img_widget(parent, left_widget)
+    settings_layout.addWidget(parent.img2img_widget)
+
     # 3. 설정 컨테이너를 메인 수직 스플리터에 추가
     main_vertical_splitter.addWidget(settings_container)
 
@@ -672,9 +797,7 @@ def init_main_widget(parent):
     hbox_image_buttons.addWidget(button_reset_size)
     
     result_image_layout.addLayout(hbox_image_buttons)
-    
-    right_layout.addWidget(result_image_group)
-    
+
     # 저장된 크기 기준으로 초기 그룹 크기 설정
     initial_width = parent.image_result.width() + 30  # 여백 고려
     initial_height = parent.image_result.height() + 80  # 버튼 영역과 여백 고려
@@ -689,7 +812,24 @@ def init_main_widget(parent):
     parent.prompt_result = QTextBrowser()
     result_prompt_layout.addWidget(parent.prompt_result)
 
-    right_layout.addWidget(result_prompt_group)
+    # 2.3: 오른쪽 패널을 위한 수직 스플리터 생성 (결과 이미지와 결과 프롬프트 사이 조정 가능)
+    right_vertical_splitter = QSplitter(Qt.Vertical)
+    right_vertical_splitter.addWidget(result_image_group)
+    right_vertical_splitter.addWidget(result_prompt_group)
+
+    # 스플리터 핸들 설정
+    right_vertical_splitter.setHandleWidth(8)
+    right_vertical_splitter.setChildrenCollapsible(False)  # 영역이 완전히 접히지 않도록
+    right_vertical_splitter.setStyleSheet("QSplitter::handle { background-color: #cccccc; }")
+
+    # 초기 크기 비율 설정 (이미지:프롬프트 = 70:30)
+    right_vertical_splitter.setSizes([700, 300])
+
+    # 스플리터 참조 저장
+    parent.right_vertical_splitter = right_vertical_splitter
+
+    # 오른쪽 레이아웃에 스플리터 추가
+    right_layout.addWidget(right_vertical_splitter)
 
     # 스플리터에 좌우 레이아웃 추가
     parent.main_splitter.addWidget(left_widget)
@@ -847,7 +987,7 @@ def set_resolution(parent, idx):
         parent.dict_ui_settings["width"].setText(width)
         parent.dict_ui_settings["height"].setText(height)
     except Exception as e:
-        print(e)
+        logger.error(f"Error parsing resolution: {e}")
 
 def init_advanced_group(parent):
     advanced_group = QGroupBox("Advanced Settings")
@@ -1275,9 +1415,9 @@ class ResizableImageWidget(QFrame):
         
         # 부모 위젯에게 크기 변경 알림
         self.size_changed.emit(QSize(self.DEFAULT_WIDTH, self.DEFAULT_HEIGHT))
-        
+
         # 로그 출력
-        print(f"이미지 크기 기본값으로 재설정: {self.DEFAULT_WIDTH}x{self.DEFAULT_HEIGHT}")
+        logger.info(f"이미지 크기 기본값으로 재설정: {self.DEFAULT_WIDTH}x{self.DEFAULT_HEIGHT}")
     
     def set_custom_pixmap(self, src):
         """이미지 설정"""
@@ -1312,7 +1452,7 @@ class ResizableImageWidget(QFrame):
                     self.image_path = None
                     self.original_image_data = None
         except Exception as e:
-            print(e)
+            logger.error(f"Error loading custom pixmap: {e}")
             self.image_label.setText("이미지 로드 오류: " + str(e))
             self.image_path = None
             self.original_image_data = None

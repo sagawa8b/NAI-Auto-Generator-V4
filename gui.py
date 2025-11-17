@@ -37,7 +37,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.10.31"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.15"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -299,6 +299,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.character_reference_path = None
         self.character_reference_style_aware = True
         self.character_reference_fidelity = 1.0  # Fidelity 기본값 1.0
+
+        # Image to Image 관련 변수 추가
+        self.img2img_visible = False
+        self.img2img_image = None
+        self.img2img_path = None
+        self.img2img_strength = 0.7  # 기본값 0.7
+        self.img2img_noise = 0.0  # 기본값 0.0
 
         # 변수 및 창 초기화 (settings 초기화)
         self.init_variable()
@@ -984,7 +991,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.resize(saved_size)
             else:
                 # 저장된 값이 QSize가 아니면 기본값 사용
-                print("저장된 크기 정보가 유효하지 않습니다. 기본 HD 해상도를 사용합니다.")
+                logger.warning("저장된 크기 정보가 유효하지 않습니다. 기본 HD 해상도를 사용합니다.")
                 self.resize(default_size)
         else:
             # 설정 없으면 기본값 사용
@@ -1091,8 +1098,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.action_character_reference.setCheckable(True)
         self.action_character_reference.setChecked(False)
         self.action_character_reference.triggered.connect(self.toggle_character_reference)
-        view_menu.addAction(self.action_character_reference)        
-        
+        view_menu.addAction(self.action_character_reference)
+
+        # Image to Image 토글 액션 추가
+        self.action_img2img = QAction("Image to Image", self)
+        self.action_img2img.setCheckable(True)
+        self.action_img2img.setChecked(False)
+        self.action_img2img.triggered.connect(self.toggle_img2img)
+        view_menu.addAction(self.action_img2img)
+
         filemenu_etc = menubar.addMenu(tr('menu.etc'))
         filemenu_etc.addAction(aboutAction)
         
@@ -1103,12 +1117,22 @@ class NAIAutoGeneratorWindow(QMainWindow):
     def toggle_character_reference(self):
         """Character Reference 섹션 토글"""
         self.character_reference_visible = not self.character_reference_visible
-        
+
         if hasattr(self, 'character_reference_widget'):
             if self.character_reference_visible:
                 self.character_reference_widget.show()
             else:
                 self.character_reference_widget.hide()
+
+    def toggle_img2img(self):
+        """Image to Image 섹션 토글"""
+        self.img2img_visible = not self.img2img_visible
+
+        if hasattr(self, 'img2img_widget'):
+            if self.img2img_visible:
+                self.img2img_widget.show()
+            else:
+                self.img2img_widget.hide()
 
     def select_character_reference_image(self):
         """Character Reference 이미지 선택"""
@@ -1169,6 +1193,69 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.character_reference_fidelity = value * 0.05
         self.character_fidelity_value_label.setText(f"{self.character_reference_fidelity:.2f}")
         logger.debug(f"Fidelity changed: {self.character_reference_fidelity}")
+
+    def select_img2img_image(self):
+        """Image to Image 이미지 선택"""
+        file_dialog = QFileDialog()
+        file_path, _ = file_dialog.getOpenFileName(
+            self,
+            'Select Image to Image Source',
+            '',
+            'Image Files (*.png *.jpg *.jpeg *.webp)'
+        )
+
+        if file_path:
+            try:
+                # 이미지 로드
+                from PIL import Image
+                self.img2img_image = Image.open(file_path)
+                self.img2img_path = file_path
+
+                # 미리보기 업데이트
+                thumbnail = self.img2img_image.copy()
+                thumbnail.thumbnail((164, 198), Image.LANCZOS)
+
+                # PIL Image를 QPixmap으로 변환
+                img_byte_arr = io.BytesIO()
+                thumbnail.save(img_byte_arr, format='PNG')
+                img_byte_arr.seek(0)
+
+                from PyQt5.QtGui import QPixmap
+                pixmap = QPixmap()
+                pixmap.loadFromData(img_byte_arr.read())
+
+                self.img2img_image_label.setPixmap(pixmap)
+                self.btn_remove_img2img_image.setEnabled(True)
+
+                logger.info(f"Image to Image source loaded: {file_path}")
+
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
+                logger.error(f"Failed to load img2img image: {e}")
+
+    def remove_img2img_image(self):
+        """Image to Image 이미지 제거"""
+        self.img2img_image = None
+        self.img2img_path = None
+        self.img2img_image_label.clear()
+        self.img2img_image_label.setText("No Image")
+        self.img2img_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
+        self.btn_remove_img2img_image.setEnabled(False)
+        logger.info("Image to Image source removed")
+
+    def on_img2img_strength_changed(self, value):
+        """Image to Image Strength 슬라이더 값 변경 이벤트"""
+        # 슬라이더 값(0-100)을 실제 값(0.00-1.00)으로 변환
+        self.img2img_strength = value / 100.0
+        self.img2img_strength_value_label.setText(f"{self.img2img_strength:.2f}")
+        logger.debug(f"img2img strength changed: {self.img2img_strength}")
+
+    def on_img2img_noise_changed(self, value):
+        """Image to Image Noise 슬라이더 값 변경 이벤트"""
+        # 슬라이더 값(0-100)을 실제 값(0.00-1.00)으로 변환
+        self.img2img_noise = value / 100.0
+        self.img2img_noise_value_label.setText(f"{self.img2img_noise:.2f}")
+        logger.debug(f"img2img noise changed: {self.img2img_noise}")
 
     def setup_language_menu(self):
         """언어 선택 메뉴 설정"""
@@ -1399,7 +1486,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
     def init_completion(self, force_reload=False):
         # 이미 태그가 로드되었는지 확인하는 플래그 추가
         if (not hasattr(self, '_tags_loaded') or force_reload) and strtobool(self.settings.value("will_complete_tag", True)):
-            print("태그 자동 완성 초기화 시작")
+            logger.info("태그 자동 완성 초기화 시작")
             generate_thread = CompletionTagLoadThread(self, force_reload)
             generate_thread.on_load_completiontag_sucess.connect(self._on_load_completiontag_sucess)
             generate_thread.start()
@@ -1458,7 +1545,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             if key in data_dict:
                 dict_ui[key].setText(str(data_dict[key]))
             else:
-                print(key)
+                logger.debug(f"Missing key in data_dict: {key}")
         
         # 체크박스 설정
         dict_ui["autoSmea"].setChecked(bool(data_dict.get("autoSmea", True)))
@@ -1512,15 +1599,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
             # 캐릭터 프롬프트 컨테이너에도 태그 자동 완성 적용
             if hasattr(self, 'character_prompts_container'):
                 try:
-                    print("캐릭터 프롬프트 필드에 자동 완성 적용 시도...")
+                    logger.debug("캐릭터 프롬프트 필드에 자동 완성 적용 시도...")
                     self.character_prompts_container.set_tag_completion(tag_list)
-                    logger.error(f"캐릭터 프롬프트 필드에 자동 완성 활성화됨 ({len(tag_list)}개 태그)")
+                    logger.info(f"캐릭터 프롬프트 필드에 자동 완성 활성화됨 ({len(tag_list)}개 태그)")
                 except Exception as e:
                     logger.error(f"캐릭터 프롬프트 필드 자동 완성 설정 실패: {str(e)}")
                     import traceback
                     traceback.print_exc()
         else:
-            print("태그 목록이 비어 있음")
+            logger.warning("태그 목록이 비어 있음")
         logger.error(f"----- 자동 완성 적용 종료 -----")
 
     def get_data(self, do_convert_type=False):
@@ -1627,25 +1714,26 @@ class NAIAutoGeneratorWindow(QMainWindow):
             data["image"] = None
             data["reference_image"] = None
             data["mask"] = None
-            
-            # img2img 설정
-            if hasattr(self, 'i2i_settings_group') and self.i2i_settings_group.src:
+
+            # img2img 설정 (새 위젯 사용)
+            if hasattr(self, 'img2img_image') and self.img2img_image and self.img2img_path:
                 try:
-                    imgdata_i2i = self.nai.convert_src_to_imagedata(
-                        self.i2i_settings_group.src)
+                    # 이미지를 base64로 인코딩
+                    from danbooru_tagger import convert_src_to_imagedata
+                    imgdata_i2i = convert_src_to_imagedata(self.img2img_path)
                     if imgdata_i2i:
                         data["image"] = imgdata_i2i
                         # 만약 i2i가 켜져있다면 autoSmea 설정을 반드시 꺼야함
                         data['autoSmea'] = False
 
-                        # mask 체크
-                        if hasattr(self.i2i_settings_group, 'mask') and self.i2i_settings_group.mask:
-                            data['mask'] = convert_qimage_to_imagedata(
-                                self.i2i_settings_group.mask)
+                        # strength와 noise 파라미터 설정
+                        data["strength"] = self.img2img_strength
+                        data["noise"] = self.img2img_noise
+
+                        logger.info(f"img2img enabled: strength={self.img2img_strength}, noise={self.img2img_noise}")
                     else:
-                        # 이미지 로딩 실패 시 초기화
-                        if hasattr(self, 'i2i_settings_group') and hasattr(self.i2i_settings_group, 'on_click_removebutton'):
-                            self.i2i_settings_group.on_click_removebutton()
+                        logger.error("Failed to encode img2img image")
+                        self.remove_img2img_image()
                 except Exception as e:
                     logger.error(f"img2img 설정 중 오류: {e}")
                     # 오류가 있어도 계속 진행
@@ -2195,35 +2283,35 @@ class NAIAutoGeneratorWindow(QMainWindow):
         """와일드카드 시스템 디버깅 - 개선된 버전"""
         if not hasattr(self, 'wcapplier'):
             self.init_wc()
-            
-        print("=== 루프카드 디버깅 시작 ===")
-        
+
+        logger.debug("=== 루프카드 디버깅 시작 ===")
+
         # 1. 와일드카드 로딩 확인
         self.wcapplier.load_wildcards()
         wildcards = self.wcapplier._wildcards_dict
-        
-        print(f"로드된 와일드카드 수: {len(wildcards)}")
-        print("사용 가능한 키들:")
+
+        logger.debug(f"로드된 와일드카드 수: {len(wildcards)}")
+        logger.debug("사용 가능한 키들:")
         for key in wildcards.keys():
-            print(f"  - '{key}': {len(wildcards[key])}개 라인")
-        
+            logger.debug(f"  - '{key}': {len(wildcards[key])}개 라인")
+
         # 2. 특정 키 확인
         test_key = "1_chara"
-        print(f"\n키 '{test_key}' 확인:")
+        logger.debug(f"\n키 '{test_key}' 확인:")
         if test_key in wildcards:
-            print(f"✅ 발견! 내용: {wildcards[test_key]}")
+            logger.debug(f"✅ 발견! 내용: {wildcards[test_key]}")
         else:
-            print(f"❌ 없음")
-        
+            logger.debug(f"❌ 없음")
+
         # 3. 루프카드 테스트
         test_prompt = "##1_chara##"
-        print(f"\n루프카드 테스트: {test_prompt}")
-        
+        logger.debug(f"\n루프카드 테스트: {test_prompt}")
+
         for i in range(3):
             result = self.wcapplier.apply_wildcards(test_prompt)
-            print(f"시도 {i+1}: {result}")
-        
-        print("=== 루프카드 디버깅 완료 ===")
+            logger.debug(f"시도 {i+1}: {result}")
+
+        logger.debug("=== 루프카드 디버깅 완료 ===")
                 
                 
     def on_click_open_folder(self, target_pathcode):
@@ -2280,9 +2368,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     f.write(json_str)
                     
                 QMessageBox.information(self, '알림', "설정이 성공적으로 저장되었습니다.")
-                
+
             except Exception as e:
-                print(e)
+                logger.error(f"Error saving settings: {e}")
                 QMessageBox.information(
                     self, '경고', "세팅 저장에 실패했습니다.\n\n" + str(e))
 
@@ -2337,7 +2425,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 
             # 메타데이터 처리 (필요시)
             if "metadata" in json_obj:
-                print(f"설정 파일 메타데이터: {json_obj['metadata']}")
+                logger.debug(f"설정 파일 메타데이터: {json_obj['metadata']}")
                 
             # 캐릭터 프롬프트 데이터가 있으면 로드
             if "characterPrompts" in json_obj and hasattr(self, 'character_prompts_container'):
@@ -2360,7 +2448,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
             return True
         except Exception as e:
-            print(e)
+            logger.error(f"Error loading settings from file: {e}")
 
         return False
 
@@ -2858,7 +2946,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             try:
                 result = self.dtagger.tag(target)
             except Exception as e:
-                print(e)
+                logger.error(f"Error tagging image: {e}")
 
         return result
 
@@ -2911,7 +2999,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     self.get_image_info_byimg(img)
 
             except Exception as e:
-                print(e)
+                logger.error(f"Error downloading image: {e}")
                 self.set_statusbar_text("IDLE")
                 QMessageBox.information(self, '경고', "이미지 파일 다운로드에 실패했습니다.")
                 return
@@ -2959,12 +3047,12 @@ class CompletionTagLoadThread(QThread):
     def run(self):
         # 이미 캐시된 태그가 있고, 강제 새로고침이 아니면 재사용
         if CompletionTagLoadThread.cached_tags is not None and not self.force_reload:
-            print("캐시된 태그 사용 (다시 로드하지 않음)")
+            logger.debug("캐시된 태그 사용 (다시 로드하지 않음)")
             self.on_load_completiontag_sucess.emit(CompletionTagLoadThread.cached_tags)
             return
-            
+
         try:
-            print("----- 태그 자동 완성 로딩 시작 -----")
+            logger.info("----- 태그 자동 완성 로딩 시작 -----")
             # 경로 변환 - 리소스 경로 사용
             default_path = self.parent.settings.value("path_tag_completion", DEFAULT_TAGCOMPLETION_PATH)
             logger.error(f"기본 태그 파일 경로: {default_path}")
@@ -2974,7 +3062,7 @@ class CompletionTagLoadThread(QThread):
             
             # 파일이 존재하는지 확인
             if not os.path.exists(tag_path):
-                print("기본 경로에 파일이 없습니다. 대체 경로 시도...")
+                logger.warning("기본 경로에 파일이 없습니다. 대체 경로 시도...")
                 # 대체 경로 시도
                 alt_paths = [
                     resource_path("danbooru_tags_post_count.csv"),
@@ -3046,8 +3134,8 @@ class CompletionTagLoadThread(QThread):
             import traceback
             traceback.print_exc()
             self.on_load_completiontag_sucess.emit([])
-            
-        print("----- 태그 자동 완성 로딩 종료 -----")
+
+        logger.info("----- 태그 자동 완성 로딩 종료 -----")
 
 
 class AutoGenerateThread(QThread):
@@ -3157,8 +3245,17 @@ def _threadfunc_generate_image(thread_self, path):
         # 1: 이미지 생성
         parent = thread_self.parent()
         nai = parent.nai
-        action = NAIAction.generate
-        
+
+        # img2img 여부에 따라 action 결정
+        if nai.parameters.get("image"):
+            action = NAIAction.img2img
+            logger.info("img2img mode detected - using NAIAction.img2img")
+        elif nai.parameters.get("mask"):
+            action = NAIAction.infill
+            logger.info("Mask detected - using NAIAction.infill")
+        else:
+            action = NAIAction.generate
+
         # 액션 타입 로깅
         logger.debug(f"Image generation action: {action}")
         
