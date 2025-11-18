@@ -290,6 +290,150 @@ def create_character_reference_widget(parent, left_widget):
     return widget
 
 
+def create_enhance_widget(parent, left_widget):
+    """Image Enhance UI 생성 (반응형)"""
+    widget = QFrame(parent)
+    widget.setFrameStyle(QFrame.StyledPanel)
+    widget.hide()
+
+    # 반응형 크기 정책 설정
+    widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    layout = QVBoxLayout(widget)
+    layout.setContentsMargins(10, 10, 10, 10)
+    layout.setSpacing(8)
+
+    # 타이틀
+    title_label = QLabel(f"✨ {tr('enhance.title', 'Image Enhance')}")
+    title_label.setStyleSheet("font-size: 14pt; font-weight: bold;")
+    layout.addWidget(title_label)
+
+    # 컨텐츠 영역 (반응형)
+    content_layout = QHBoxLayout()
+    content_layout.setSpacing(10)
+
+    # 왼쪽: 이미지 미리보기
+    parent.enhance_image_label = QLabel()
+    parent.enhance_image_label.setFixedSize(164, 198)
+    parent.enhance_image_label.setAlignment(Qt.AlignCenter)
+    parent.enhance_image_label.setText(tr('enhance.no_image', 'No Image'))
+    parent.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
+    content_layout.addWidget(parent.enhance_image_label)
+
+    # 오른쪽: 컨트롤 영역
+    controls_container = QWidget()
+    controls_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+    controls_layout = QVBoxLayout(controls_container)
+    controls_layout.setContentsMargins(0, 0, 0, 0)
+    controls_layout.setSpacing(8)
+
+    # 버튼 영역 (가로 배치)
+    buttons_layout = QHBoxLayout()
+    buttons_layout.setSpacing(8)
+
+    # 이미지 선택 버튼
+    parent.btn_select_enhance_image = QPushButton(tr('enhance.select_image', 'Select Image'))
+    parent.btn_select_enhance_image.clicked.connect(parent.select_enhance_image)
+    parent.btn_select_enhance_image.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    buttons_layout.addWidget(parent.btn_select_enhance_image)
+
+    # 이미지 제거 버튼
+    parent.btn_remove_enhance_image = QPushButton(tr('enhance.remove_image', 'Remove Image'))
+    parent.btn_remove_enhance_image.clicked.connect(parent.remove_enhance_image)
+    parent.btn_remove_enhance_image.setEnabled(False)
+    parent.btn_remove_enhance_image.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    buttons_layout.addWidget(parent.btn_remove_enhance_image)
+
+    controls_layout.addLayout(buttons_layout)
+
+    # Upscale Ratio 섹션
+    ratio_label = QLabel(tr('enhance.ratio_label', 'Upscale Ratio'))
+    ratio_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    controls_layout.addWidget(ratio_label)
+
+    # 라디오 버튼 그룹
+    ratio_layout = QHBoxLayout()
+    parent.enhance_ratio_group = QButtonGroup(parent)
+
+    parent.enhance_ratio_1x = QRadioButton(tr('enhance.ratio_1x', '1x (Same size)'))
+    parent.enhance_ratio_1_5x = QRadioButton(tr('enhance.ratio_1_5x', '1.5x'))
+    parent.enhance_ratio_1_5x.setChecked(True)  # 기본값 1.5x
+
+    parent.enhance_ratio_group.addButton(parent.enhance_ratio_1x, 0)
+    parent.enhance_ratio_group.addButton(parent.enhance_ratio_1_5x, 1)
+    parent.enhance_ratio_group.buttonClicked[int].connect(parent.on_enhance_ratio_changed)
+
+    ratio_layout.addWidget(parent.enhance_ratio_1x)
+    ratio_layout.addWidget(parent.enhance_ratio_1_5x)
+    ratio_layout.addStretch()
+    controls_layout.addLayout(ratio_layout)
+
+    # Strength 섹션
+    strength_label = QLabel(tr('enhance.strength_label', 'Strength'))
+    strength_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    controls_layout.addWidget(strength_label)
+
+    strength_description = QLabel(tr('enhance.strength_desc', 'Controls enhancement intensity (0.01-0.99)'))
+    strength_description.setStyleSheet("font-size: 9pt; color: #888;")
+    controls_layout.addWidget(strength_description)
+
+    # Strength 슬라이더와 값 입력을 위한 수평 레이아웃
+    strength_layout = QHBoxLayout()
+
+    parent.enhance_strength_slider = QSlider(Qt.Horizontal)
+    parent.enhance_strength_slider.setMinimum(1)  # 0.01
+    parent.enhance_strength_slider.setMaximum(99)  # 0.99
+    parent.enhance_strength_slider.setValue(40)  # 기본값 0.40
+    parent.enhance_strength_slider.setTickPosition(QSlider.NoTicks)  # 눈금 숨김
+    parent.enhance_strength_slider.valueChanged.connect(parent.on_enhance_strength_changed)
+    strength_layout.addWidget(parent.enhance_strength_slider)
+
+    parent.enhance_strength_value_input = QLineEdit("0.40")
+    parent.enhance_strength_value_input.setStyleSheet("font-weight: bold;")
+    parent.enhance_strength_value_input.setFixedWidth(50)
+    parent.enhance_strength_value_input.setAlignment(Qt.AlignCenter)
+    parent.enhance_strength_value_input.editingFinished.connect(parent.on_enhance_strength_input_changed)
+    strength_layout.addWidget(parent.enhance_strength_value_input)
+
+    controls_layout.addLayout(strength_layout)
+
+    # Noise 섹션
+    noise_label = QLabel(tr('enhance.noise_label', 'Noise'))
+    noise_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    controls_layout.addWidget(noise_label)
+
+    noise_description = QLabel(tr('enhance.noise_desc', 'Adds variation to the result (0.00-0.99)'))
+    noise_description.setStyleSheet("font-size: 9pt; color: #888;")
+    controls_layout.addWidget(noise_description)
+
+    # Noise 슬라이더와 값 입력을 위한 수평 레이아웃
+    noise_layout = QHBoxLayout()
+
+    parent.enhance_noise_slider = QSlider(Qt.Horizontal)
+    parent.enhance_noise_slider.setMinimum(0)  # 0.00
+    parent.enhance_noise_slider.setMaximum(99)  # 0.99
+    parent.enhance_noise_slider.setValue(0)  # 기본값 0.00
+    parent.enhance_noise_slider.setTickPosition(QSlider.NoTicks)  # 눈금 숨김
+    parent.enhance_noise_slider.valueChanged.connect(parent.on_enhance_noise_changed)
+    noise_layout.addWidget(parent.enhance_noise_slider)
+
+    parent.enhance_noise_value_input = QLineEdit("0.00")
+    parent.enhance_noise_value_input.setStyleSheet("font-weight: bold;")
+    parent.enhance_noise_value_input.setFixedWidth(50)
+    parent.enhance_noise_value_input.setAlignment(Qt.AlignCenter)
+    parent.enhance_noise_value_input.editingFinished.connect(parent.on_enhance_noise_input_changed)
+    noise_layout.addWidget(parent.enhance_noise_value_input)
+
+    controls_layout.addLayout(noise_layout)
+
+    controls_layout.addStretch()
+
+    content_layout.addWidget(controls_container)
+    layout.addLayout(content_layout)
+
+    return widget
+
+
 def init_main_widget(parent):
     """메인 위젯 초기화 함수"""
     main_widget = QWidget()
@@ -659,6 +803,10 @@ def init_main_widget(parent):
     # Image to Image 위젯 추가
     parent.img2img_widget = create_img2img_widget(parent, left_widget)
     settings_layout.addWidget(parent.img2img_widget)
+
+    # Image Enhance 위젯 추가
+    parent.enhance_widget = create_enhance_widget(parent, left_widget)
+    settings_layout.addWidget(parent.enhance_widget)
 
     # 3. 설정 컨테이너를 메인 수직 스플리터에 추가
     main_vertical_splitter.addWidget(settings_container)

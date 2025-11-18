@@ -578,7 +578,7 @@ class NAIGenerator():
 
             return anlas
         except Exception as e:
-            print(e)
+            logger.error(f"Error getting ANLAS: {e}")
 
         return None
 
@@ -744,7 +744,7 @@ class NAIGenerator():
     
     def _prepare_v4_parameters(self):
         """V4 API에 필요한 파라미터 구조로 변환"""
-        print("=== _prepare_v4_parameters 메서드 호출됨 ===")  # 강제 출력
+        logger.debug("=== _prepare_v4_parameters 메서드 호출됨 ===")
         logger.info("📍 _prepare_v4_parameters 메서드 시작")
         
         # 내부 파라미터 처리 - use_character_coords 값 저장 후 제거

@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (QDialog, QLabel, QPushButton, QVBoxLayout,
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QFont, QColor, QPalette
 
-from consts import DEFAULT_PATH
+from consts import DEFAULT_PATH, DEFAULT_TAGCOMPLETION_PATH
 
 from i18n_manager import tr
 
@@ -430,10 +430,82 @@ class OptionDialog(QDialog):
 
         font_group.setLayout(font_layout)
         main_layout.addWidget(font_group)
-        
+
+        # === 파일명 설정 그룹 추가 ===
+        filename_group = QGroupBox("파일명 설정 (Filename Settings)")
+        filename_layout = QVBoxLayout()
+
+        # 파일명 포맷 설정
+        format_layout = QVBoxLayout()
+        format_label = QLabel("파일명 형식 (Filename Format):")
+        format_layout.addWidget(format_label)
+
+        self.filename_format_input = QLineEdit()
+        default_format = self.parent.settings.value("filename_format", "[datetime]_[prompt]")
+        self.filename_format_input.setText(default_format)
+        format_layout.addWidget(self.filename_format_input)
+
+        # 도움말 텍스트
+        format_help = QLabel(
+            "사용 가능한 플레이스홀더:\n"
+            "[datetime] - 날짜+시간 (251118_11240833)\n"
+            "[date] - 날짜만 (251118)\n"
+            "[time] - 시간만 (11240833)\n"
+            "[prompt] - 프롬프트 텍스트\n"
+            "[character] - 캐릭터 프롬프트 (첫 번째)\n"
+            "[seed] - 시드 값\n"
+            "\n예시: [datetime]_[prompt] → 251118_11240833_1girl dancing.png"
+        )
+        format_help.setWordWrap(True)
+        format_help.setStyleSheet("color: gray; font-size: 10px; padding: 5px;")
+        format_layout.addWidget(format_help)
+
+        filename_layout.addLayout(format_layout)
+
+        # 프롬프트/캐릭터 길이 제한 설정
+        limit_layout = QHBoxLayout()
+
+        limit_layout.addWidget(QLabel("프롬프트 단어 수 제한:"))
+        self.prompt_word_limit_spinbox = QSpinBox()
+        self.prompt_word_limit_spinbox.setRange(5, 200)
+        self.prompt_word_limit_spinbox.setValue(int(self.parent.settings.value("filename_prompt_word_limit", 50)))
+        self.prompt_word_limit_spinbox.setToolTip("파일명에 포함할 프롬프트의 최대 문자 수")
+        limit_layout.addWidget(self.prompt_word_limit_spinbox)
+
+        limit_layout.addWidget(QLabel("캐릭터 단어 수 제한:"))
+        self.character_word_limit_spinbox = QSpinBox()
+        self.character_word_limit_spinbox.setRange(5, 200)
+        self.character_word_limit_spinbox.setValue(int(self.parent.settings.value("filename_character_word_limit", 30)))
+        self.character_word_limit_spinbox.setToolTip("파일명에 포함할 캐릭터 프롬프트의 최대 문자 수")
+        limit_layout.addWidget(self.character_word_limit_spinbox)
+
+        limit_layout.addStretch()
+        filename_layout.addLayout(limit_layout)
+
+        filename_group.setLayout(filename_layout)
+        main_layout.addWidget(filename_group)
+
         # 태그 설정 그룹
         tag_group = QGroupBox("태그 설정")
         tag_layout = QVBoxLayout()
+
+        # 태그 완성 파일 경로
+        tag_file_label = QLabel("태그 자동완성 파일 (Tag Completion File):")
+        self.tag_completion_path = QLineEdit(
+            self.parent.settings.value("path_tag_completion", DEFAULT_TAGCOMPLETION_PATH))
+        tag_file_button = QPushButton("찾아보기")
+        tag_file_button.clicked.connect(self.browse_tag_file)
+        tag_file_layout = QHBoxLayout()
+        tag_file_layout.addWidget(tag_file_label)
+        tag_file_layout.addWidget(self.tag_completion_path)
+        tag_file_layout.addWidget(tag_file_button)
+        tag_layout.addLayout(tag_file_layout)
+
+        # 태그 파일 경로 도움말
+        tag_help = QLabel("※ CSV 파일 형식: tag_name[post_count] (한 줄에 하나씩)")
+        tag_help.setWordWrap(True)
+        tag_help.setStyleSheet("color: gray; font-size: 10px;")
+        tag_layout.addWidget(tag_help)
 
         # 태그 새로고침 버튼
         tag_refresh_button = QPushButton("태그 새로고침")
@@ -508,21 +580,41 @@ class OptionDialog(QDialog):
             "log_folder": self.log_path
             # "path_models": self.models_path  # 주석 처리된 경우 제외
         }
-        
+
         if key not in path_widgets:
             logger.error(f"Error: Unknown path key: {key}")
             return
-            
+
         current_path = path_widgets[key].text()
         folder = QFileDialog.getExistingDirectory(self, "폴더 선택", current_path)
         if folder:
             # 경로 정규화 - Windows에서는 백슬래시 사용
             if os.name == 'nt':  # Windows
                 folder = os.path.normpath(folder)  # 정규화된 경로(백슬래시 사용)
-            
+
             path_widgets[key].setText(folder)
             # 부모 클래스의 경로 변경 메서드 호출
             self.parent.change_path(key, folder)
+
+    def browse_tag_file(self):
+        """태그 자동완성 CSV 파일 선택"""
+        current_path = self.tag_completion_path.text()
+        current_dir = os.path.dirname(current_path) if current_path else os.getcwd()
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "태그 자동완성 파일 선택",
+            current_dir,
+            "CSV 파일 (*.csv);;모든 파일 (*.*)"
+        )
+
+        if file_path:
+            # 경로 정규화 - Windows에서는 백슬래시 사용
+            if os.name == 'nt':  # Windows
+                file_path = os.path.normpath(file_path)
+
+            self.tag_completion_path.setText(file_path)
+            logger.info(f"태그 완성 파일 경로 변경: {file_path}")
     
     def refresh_tags(self):
         """태그 자동 완성 새로고침"""
@@ -643,15 +735,43 @@ class OptionDialog(QDialog):
         self.parent.settings.setValue("nag_font_size", self.font_size_spinbox.value())
         self.parent.apply_theme()
 
-        self.accept()
-        
+        # 파일명 설정 저장
+        self.parent.settings.setValue("filename_format", self.filename_format_input.text())
+        self.parent.settings.setValue("filename_prompt_word_limit", self.prompt_word_limit_spinbox.value())
+        self.parent.settings.setValue("filename_character_word_limit", self.character_word_limit_spinbox.value())
+
         # 연속생성 설정 저장
         self.parent.settings.setValue("quick_gen_count_1", self.quick_gen_5_spinbox.value())
         self.parent.settings.setValue("quick_gen_count_2", self.quick_gen_10_spinbox.value())
         self.parent.settings.setValue("quick_gen_count_3", self.quick_gen_50_spinbox.value())
         self.parent.settings.setValue("quick_gen_count_4", self.quick_gen_100_spinbox.value())
         self.parent.settings.setValue("default_generation_interval", self.default_interval_spinbox.value())
-        
+
+        # 태그 완성 파일 경로 저장
+        old_tag_path = self.parent.settings.value("path_tag_completion", DEFAULT_TAGCOMPLETION_PATH)
+        new_tag_path = self.tag_completion_path.text()
+        self.parent.settings.setValue("path_tag_completion", new_tag_path)
+
+        # 태그 파일 경로가 변경되었다면 캐시 초기화 및 재로드 제안
+        if old_tag_path != new_tag_path:
+            from gui import CompletionTagLoadThread
+            CompletionTagLoadThread.cached_tags = None
+            if hasattr(self.parent, '_tags_loaded'):
+                delattr(self.parent, '_tags_loaded')
+            logger.info(f"태그 완성 파일 경로 변경됨: {old_tag_path} -> {new_tag_path}")
+
+            # 사용자에게 재로드 제안
+            reply = QMessageBox.question(
+                self,
+                "태그 파일 경로 변경",
+                "태그 완성 파일 경로가 변경되었습니다.\n지금 태그를 다시 로드하시겠습니까?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                self.parent.init_completion(force_reload=True)
+                QMessageBox.information(self, "태그 새로고침", "태그가 성공적으로 새로고침 되었습니다.")
+
         self.accept()
         
         

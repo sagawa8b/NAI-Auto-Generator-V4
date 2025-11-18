@@ -37,7 +37,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.15"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.18"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -306,6 +306,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.img2img_path = None
         self.img2img_strength = 0.7  # 기본값 0.7
         self.img2img_noise = 0.0  # 기본값 0.0
+
+        # Image Enhance 관련 변수 추가
+        self.enhance_visible = False
+        self.enhance_image = None
+        self.enhance_path = None
+        self.enhance_strength = 0.4  # 기본값 0.4 (0.01-0.99)
+        self.enhance_noise = 0.0  # 기본값 0.0 (0.00-0.99)
+        self.enhance_ratio = 1.5  # 기본값 1.5x (1.0 or 1.5)
+        self.last_generated_image = None  # 마지막 생성된 이미지 저장
 
         # 변수 및 창 초기화 (settings 초기화)
         self.init_variable()
@@ -810,14 +819,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # 최소 사이즈 설정으로 컨텐츠가 너무 작아지지 않도록 함
         self.main_splitter.setChildrenCollapsible(False)
         self.main_splitter.setHandleWidth(6)  # 구분선 두께 증가
-        
+
         # 좌우 패널 최소 너비 설정
         left_widget = self.main_splitter.widget(0)
         left_widget.setMinimumWidth(350)  # 좌측 패널 최소 너비
-        
+
         right_widget = self.main_splitter.widget(1)
         right_widget.setMinimumWidth(300)  # 우측 패널 최소 너비
-        
+
+        # Main splitter 상태 복원
         saved_state = self.settings.value("splitterSizes")
         if saved_state:
             try:
@@ -826,12 +836,67 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 right_visible = sum(self.main_splitter.sizes()[1:]) > 0
                 self.is_expand = right_visible
             except Exception as e:
-                logger.error(f"Error restoring splitter: {e}")
+                logger.error(f"Error restoring main splitter: {e}")
                 self.set_default_splitter()
         else:
             self.set_default_splitter()
-        
+
+        # 각 개별 스플리터 상태 복원
+        self.restore_individual_splitters()
+
         self.update_expand_button()
+
+    def restore_individual_splitters(self):
+        """모든 개별 스플리터의 저장된 상태를 복원"""
+        # Prompt splitter (Prompt ↔ Negative Prompt) 복원
+        if hasattr(self, 'prompt_splitter'):
+            saved_state = self.settings.value("promptSplitterSizes")
+            if saved_state:
+                try:
+                    self.prompt_splitter.restoreState(saved_state)
+                    logger.info("Prompt splitter state restored")
+                except Exception as e:
+                    logger.error(f"Error restoring prompt splitter: {e}")
+
+        # Prompt-Character splitter 복원
+        if hasattr(self, 'prompt_char_splitter'):
+            saved_state = self.settings.value("promptCharSplitterSizes")
+            if saved_state:
+                try:
+                    self.prompt_char_splitter.restoreState(saved_state)
+                    logger.info("Prompt-Character splitter state restored")
+                except Exception as e:
+                    logger.error(f"Error restoring prompt-character splitter: {e}")
+
+        # Settings splitter 복원
+        if hasattr(self, 'settings_splitter'):
+            saved_state = self.settings.value("settingsSplitterSizes")
+            if saved_state:
+                try:
+                    self.settings_splitter.restoreState(saved_state)
+                    logger.info("Settings splitter state restored")
+                except Exception as e:
+                    logger.error(f"Error restoring settings splitter: {e}")
+
+        # Main vertical splitter 복원
+        if hasattr(self, 'main_vertical_splitter'):
+            saved_state = self.settings.value("mainVerticalSplitterSizes")
+            if saved_state:
+                try:
+                    self.main_vertical_splitter.restoreState(saved_state)
+                    logger.info("Main vertical splitter state restored")
+                except Exception as e:
+                    logger.error(f"Error restoring main vertical splitter: {e}")
+
+        # Right vertical splitter 복원
+        if hasattr(self, 'right_vertical_splitter'):
+            saved_state = self.settings.value("rightVerticalSplitterSizes")
+            if saved_state:
+                try:
+                    self.right_vertical_splitter.restoreState(saved_state)
+                    logger.info("Right vertical splitter state restored")
+                except Exception as e:
+                    logger.error(f"Error restoring right vertical splitter: {e}")
 
     def set_default_splitter(self):
         total = self.main_splitter.width()
@@ -996,10 +1061,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         else:
             # 설정 없으면 기본값 사용
             self.resize(default_size)
-        
-        # 스플리터 크기 정보 초기화
-        self.settings.setValue("splitterSizes", None)
-        
+
         # 드래그 앤 드롭 허용
         self.setAcceptDrops(True)
 
@@ -1022,6 +1084,11 @@ class NAIAutoGeneratorWindow(QMainWindow):
         loadSettingsAction = QAction('설정 불러오기(Load Settings)', self)
         loadSettingsAction.setShortcut('Ctrl+L')
         loadSettingsAction.triggered.connect(self.on_click_load_settings)
+
+        # 태그 자동완성 새로고침 액션 추가
+        reloadTagsAction = QAction(tr('menu.reload_tags', '태그 자동완성 새로고침(Reload Tag Completion)'), self)
+        reloadTagsAction.setShortcut('Ctrl+Shift+R')
+        reloadTagsAction.triggered.connect(self.reload_tag_completion)
 
         loginAction = QAction('로그인(Log in)', self)
         loginAction.setShortcut('Ctrl+I')
@@ -1057,10 +1124,11 @@ class NAIAutoGeneratorWindow(QMainWindow):
         
         
         # 기존 메뉴 추가
-        filemenu_file = menubar.addMenu(tr('menu.file')) 
+        filemenu_file = menubar.addMenu(tr('menu.file'))
         filemenu_file.addAction(openAction)
         filemenu_file.addAction(saveSettingsAction)
         filemenu_file.addAction(loadSettingsAction)
+        filemenu_file.addAction(reloadTagsAction)
         filemenu_file.addSeparator()  # 구분선 추가
         filemenu_file.addAction(loginAction)
         filemenu_file.addAction(optionAction)
@@ -1107,6 +1175,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.action_img2img.triggered.connect(self.toggle_img2img)
         view_menu.addAction(self.action_img2img)
 
+        # Image Enhance 토글 액션 추가
+        self.action_enhance = QAction("Image Enhance", self)
+        self.action_enhance.setCheckable(True)
+        self.action_enhance.setChecked(False)
+        self.action_enhance.triggered.connect(self.toggle_enhance)
+        view_menu.addAction(self.action_enhance)
+
         filemenu_etc = menubar.addMenu(tr('menu.etc'))
         filemenu_etc.addAction(aboutAction)
         
@@ -1133,6 +1208,20 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.img2img_widget.show()
             else:
                 self.img2img_widget.hide()
+
+    def toggle_enhance(self):
+        """Image Enhance 섹션 토글"""
+        self.enhance_visible = not self.enhance_visible
+
+        if hasattr(self, 'enhance_widget'):
+            if self.enhance_visible:
+                self.enhance_widget.show()
+            else:
+                self.enhance_widget.hide()
+
+        # 설정 저장
+        if hasattr(self, 'settings'):
+            self.settings.setValue("enhance_visible", self.enhance_visible)
 
     def select_character_reference_image(self):
         """Character Reference 이미지 선택"""
@@ -1256,6 +1345,144 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.img2img_noise = value / 100.0
         self.img2img_noise_value_label.setText(f"{self.img2img_noise:.2f}")
         logger.debug(f"img2img noise changed: {self.img2img_noise}")
+
+    def select_enhance_image(self):
+        """Image Enhance 이미지 선택"""
+        file_dialog = QFileDialog()
+        file_path, _ = file_dialog.getOpenFileName(
+            self,
+            tr('enhance.select_title', 'Select Image to Enhance'),
+            '',
+            'Image Files (*.png *.jpg *.jpeg *.webp)'
+        )
+
+        if file_path:
+            try:
+                # 이미지 로드
+                self.enhance_image = Image.open(file_path)
+                self.enhance_path = file_path
+
+                # 미리보기 업데이트
+                thumbnail = self.enhance_image.copy()
+                thumbnail.thumbnail((164, 198), Image.LANCZOS)
+
+                # PIL Image를 QPixmap으로 변환
+                img_byte_arr = io.BytesIO()
+                thumbnail.save(img_byte_arr, format='PNG')
+                img_byte_arr.seek(0)
+
+                from PyQt5.QtGui import QPixmap
+                pixmap = QPixmap()
+                pixmap.loadFromData(img_byte_arr.read())
+
+                self.enhance_image_label.setPixmap(pixmap)
+                self.btn_remove_enhance_image.setEnabled(True)
+
+                logger.info(f"Enhance image loaded: {file_path}")
+
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
+                logger.error(f"Failed to load enhance image: {e}")
+
+    def use_current_for_enhance(self):
+        """현재 생성된 이미지를 Enhance용으로 사용"""
+        if self.last_generated_image:
+            try:
+                self.enhance_image = self.last_generated_image.copy()
+                self.enhance_path = "current_generated"
+
+                # 미리보기 업데이트
+                thumbnail = self.enhance_image.copy()
+                thumbnail.thumbnail((164, 198), Image.LANCZOS)
+
+                # PIL Image를 QPixmap으로 변환
+                img_byte_arr = io.BytesIO()
+                thumbnail.save(img_byte_arr, format='PNG')
+                img_byte_arr.seek(0)
+
+                from PyQt5.QtGui import QPixmap
+                pixmap = QPixmap()
+                pixmap.loadFromData(img_byte_arr.read())
+
+                self.enhance_image_label.setPixmap(pixmap)
+                self.btn_remove_enhance_image.setEnabled(True)
+
+                logger.info("Using current generated image for enhance")
+
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to use current image: {str(e)}")
+                logger.error(f"Failed to use current image for enhance: {e}")
+        else:
+            QMessageBox.information(self, "Info", tr('enhance.no_image_available', 'No generated image available. Please generate an image first.'))
+
+    def remove_enhance_image(self):
+        """Image Enhance 이미지 제거"""
+        self.enhance_image = None
+        self.enhance_path = None
+        self.enhance_image_label.clear()
+        self.enhance_image_label.setText(tr('enhance.no_image', 'No Image'))
+        self.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
+        self.btn_remove_enhance_image.setEnabled(False)
+        logger.info("Enhance image removed")
+
+    def on_enhance_strength_changed(self, value):
+        """Enhance Strength 슬라이더 값 변경 이벤트"""
+        # 슬라이더 값(1-99)을 실제 값(0.01-0.99)으로 변환
+        self.enhance_strength = value / 100.0
+        self.enhance_strength_value_input.setText(f"{self.enhance_strength:.2f}")
+        logger.debug(f"Enhance strength changed: {self.enhance_strength}")
+
+    def on_enhance_noise_changed(self, value):
+        """Enhance Noise 슬라이더 값 변경 이벤트"""
+        # 슬라이더 값(0-99)을 실제 값(0.00-0.99)으로 변환
+        self.enhance_noise = value / 100.0
+        self.enhance_noise_value_input.setText(f"{self.enhance_noise:.2f}")
+        logger.debug(f"Enhance noise changed: {self.enhance_noise}")
+
+    def on_enhance_strength_input_changed(self):
+        """Enhance Strength 입력 필드 값 변경 이벤트"""
+        try:
+            value = float(self.enhance_strength_value_input.text())
+            # 값 범위 제한 (0.01-0.99)
+            value = max(0.01, min(0.99, value))
+            self.enhance_strength = value
+            # 슬라이더 업데이트
+            slider_value = int(value * 100)
+            self.enhance_strength_slider.setValue(slider_value)
+            # 입력 필드 포맷팅
+            self.enhance_strength_value_input.setText(f"{value:.2f}")
+            logger.debug(f"Enhance strength input changed: {self.enhance_strength}")
+        except ValueError:
+            # 잘못된 입력값은 현재 값으로 복구
+            self.enhance_strength_value_input.setText(f"{self.enhance_strength:.2f}")
+            logger.warning("Invalid strength input, reverting to current value")
+
+    def on_enhance_noise_input_changed(self):
+        """Enhance Noise 입력 필드 값 변경 이벤트"""
+        try:
+            value = float(self.enhance_noise_value_input.text())
+            # 값 범위 제한 (0.00-0.99)
+            value = max(0.00, min(0.99, value))
+            self.enhance_noise = value
+            # 슬라이더 업데이트
+            slider_value = int(value * 100)
+            self.enhance_noise_slider.setValue(slider_value)
+            # 입력 필드 포맷팅
+            self.enhance_noise_value_input.setText(f"{value:.2f}")
+            logger.debug(f"Enhance noise input changed: {self.enhance_noise}")
+        except ValueError:
+            # 잘못된 입력값은 현재 값으로 복구
+            self.enhance_noise_value_input.setText(f"{self.enhance_noise:.2f}")
+            logger.warning("Invalid noise input, reverting to current value")
+
+    def on_enhance_ratio_changed(self, button_id):
+        """Enhance Ratio 라디오 버튼 변경 이벤트"""
+        if button_id == 0:
+            self.enhance_ratio = 1.0
+            logger.debug("Enhance ratio changed: 1x")
+        else:
+            self.enhance_ratio = 1.5
+            logger.debug("Enhance ratio changed: 1.5x")
 
     def setup_language_menu(self):
         """언어 선택 메뉴 설정"""
@@ -1496,9 +1723,24 @@ class NAIAutoGeneratorWindow(QMainWindow):
             # 메시지 변경 또는 제거 (아래 주석 처리된 줄 사용)
             # print("태그 자동 완성 이미 초기화됨")
             pass  # 로그 메시지 출력하지 않음
-        
+
         # 가중치 하이라이트 설정 적용
         self.apply_emphasis_settings()
+
+    def reload_tag_completion(self):
+        """태그 자동완성 데이터베이스를 새로고침"""
+        logger.info("태그 자동완성 새로고침 시작")
+
+        # 캐시 초기화
+        CompletionTagLoadThread.cached_tags = None
+        self._tags_loaded = False
+
+        # 강제로 다시 로드
+        self.init_completion(force_reload=True)
+
+        # 사용자에게 알림
+        self.statusBar().showMessage(tr('status.tags_reloaded', '태그 자동완성이 새로고침되었습니다.'), 3000)
+        logger.info("태그 자동완성 새로고침 완료")
 
     def save_data(self):
         data_dict = self.get_data()
@@ -1715,8 +1957,68 @@ class NAIAutoGeneratorWindow(QMainWindow):
             data["reference_image"] = None
             data["mask"] = None
 
-            # img2img 설정 (새 위젯 사용)
-            if hasattr(self, 'img2img_image') and self.img2img_image and self.img2img_path:
+            # Image Enhance 설정 (최우선 처리)
+            if hasattr(self, 'enhance_image') and self.enhance_image and self.enhance_path:
+                try:
+                    logger.info("Enhance mode activated")
+                    # 이미지를 업스케일
+                    from danbooru_tagger import convert_src_to_imagedata
+
+                    # 원본 이미지 크기 가져오기
+                    orig_width, orig_height = self.enhance_image.size
+
+                    # 업스케일 비율 적용
+                    new_width = int(orig_width * self.enhance_ratio)
+                    new_height = int(orig_height * self.enhance_ratio)
+
+                    # 이미지 업스케일
+                    upscaled_image = self.enhance_image.resize((new_width, new_height), Image.LANCZOS)
+
+                    # 업스케일된 이미지를 임시 저장하여 base64로 변환
+                    import io
+                    import base64
+                    img_byte_arr = io.BytesIO()
+                    upscaled_image.save(img_byte_arr, format='PNG')
+                    img_byte_arr.seek(0)
+                    imgdata_enhance = base64.b64encode(img_byte_arr.read()).decode('utf-8')
+
+                    if imgdata_enhance:
+                        data["image"] = imgdata_enhance
+                        data['autoSmea'] = False
+
+                        # Strength와 Noise 직접 사용
+                        data["strength"] = self.enhance_strength
+                        data["noise"] = self.enhance_noise
+
+                        # 업스케일된 크기로 width/height 설정
+                        data["width"] = new_width
+                        data["height"] = new_height
+
+                        # extra_noise_seed 설정 (seed - 1)
+                        data["extra_noise_seed"] = data["seed"] - 1
+
+                        # skip_cfg_above_sigma 조정
+                        # 기본값에서 약간 증가 (19 -> 약 29 정도)
+                        base_sigma = data.get("skip_cfg_above_sigma", 19) if data.get("skip_cfg_above_sigma") else 19
+                        data["skip_cfg_above_sigma"] = base_sigma * 1.5
+
+                        # 프롬프트에 업스케일 아티팩트 방지 추가
+                        if data.get("prompt"):
+                            data["prompt"] = data["prompt"] + ", -2::upscaled, blurry::,"
+
+                        # img2img 관련 추가 파라미터
+                        data["legacy"] = False
+                        data["color_correct"] = False
+
+                        logger.info(f"Enhance enabled: ratio={self.enhance_ratio}x, strength={self.enhance_strength}, noise={self.enhance_noise}, size={orig_width}x{orig_height} -> {new_width}x{new_height}")
+                    else:
+                        logger.error("Failed to encode enhance image")
+                        self.remove_enhance_image()
+                except Exception as e:
+                    logger.error(f"Enhance 설정 중 오류: {e}")
+
+            # img2img 설정 (새 위젯 사용) - Enhance가 없을 때만
+            elif hasattr(self, 'img2img_image') and self.img2img_image and self.img2img_path:
                 try:
                     # 이미지를 base64로 인코딩
                     from danbooru_tagger import convert_src_to_imagedata
@@ -2081,16 +2383,24 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     def _on_result_generate(self, error_code, result_str):
         """세션 추적이 포함된 생성 결과 처리"""
-        try:                        
+        try:
             if error_code == 0:
                 # 성공적인 생성 - 이미지 결과 설정
                 self.image_result.set_custom_pixmap(result_str)
                 self.set_statusbar_text("IDLE")
-                
+
+                # 생성된 이미지를 last_generated_image에 저장 (Enhance 기능용)
+                try:
+                    if os.path.isfile(result_str):
+                        self.last_generated_image = Image.open(result_str).copy()
+                        logger.debug("Last generated image saved for enhance feature")
+                except Exception as e:
+                    logger.error(f"Failed to save last generated image: {e}")
+
                 # 세션 모니터링 업데이트
                 if hasattr(self, 'session_manager'):
                     self.session_manager.increment_image_count()
-                
+
                 # Anlas 실시간 업데이트 추가 (서버 업데이트 대기 시간 고려)
                 QTimer.singleShot(1000, self.refresh_anlas)  # 1초 후 Anlas 새로고침   
             
@@ -2232,6 +2542,14 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self._on_refresh_anlas(self.nai.get_anlas() or -1)
 
         self.image_result.set_custom_pixmap(result_str)
+
+        # 생성된 이미지를 last_generated_image에 저장 (Enhance 기능용)
+        try:
+            if os.path.isfile(result_str):
+                self.last_generated_image = Image.open(result_str).copy()
+                logger.debug("Last generated image saved for enhance feature")
+        except Exception as e:
+            logger.error(f"Failed to save last generated image: {e}")
 
         if self.dict_img_batch_target["img2img_foldersrc"]:
             self.proceed_image_batch("img2img")
@@ -2572,10 +2890,19 @@ class NAIAutoGeneratorWindow(QMainWindow):
             # 5. 메인 좌우 스플리터 초기화
             if hasattr(self, 'main_splitter'):
                 self.set_default_splitter()
-            
-            # 6. 저장된 설정 초기화
+
+            # 6. 우측 수직 스플리터 초기화 (Result Image ↔ Result Prompt)
+            if hasattr(self, 'right_vertical_splitter'):
+                self.right_vertical_splitter.setSizes([700, 300])
+
+            # 7. 저장된 모든 스플리터 설정 초기화
             self.settings.remove("splitterSizes")
-            
+            self.settings.remove("promptSplitterSizes")
+            self.settings.remove("promptCharSplitterSizes")
+            self.settings.remove("settingsSplitterSizes")
+            self.settings.remove("mainVerticalSplitterSizes")
+            self.settings.remove("rightVerticalSplitterSizes")
+
             # 사용자에게 알림
             self.set_statusbar_text("IDLE")
             logger.info("레이아웃이 초기 설정으로 리셋되었습니다")
@@ -3013,16 +3340,32 @@ class NAIAutoGeneratorWindow(QMainWindow):
         current_size = self.size()
         self.settings.setValue("size", current_size)
         self.settings.setValue("pos", self.pos())
-        
-        # 스플리터 상태 저장
+
+        # 모든 스플리터 상태 저장
         self.settings.setValue("splitterSizes", self.main_splitter.saveState())
-        
+
+        # 각 개별 스플리터 상태 저장
+        if hasattr(self, 'prompt_splitter'):
+            self.settings.setValue("promptSplitterSizes", self.prompt_splitter.saveState())
+
+        if hasattr(self, 'prompt_char_splitter'):
+            self.settings.setValue("promptCharSplitterSizes", self.prompt_char_splitter.saveState())
+
+        if hasattr(self, 'settings_splitter'):
+            self.settings.setValue("settingsSplitterSizes", self.settings_splitter.saveState())
+
+        if hasattr(self, 'main_vertical_splitter'):
+            self.settings.setValue("mainVerticalSplitterSizes", self.main_vertical_splitter.saveState())
+
+        if hasattr(self, 'right_vertical_splitter'):
+            self.settings.setValue("rightVerticalSplitterSizes", self.right_vertical_splitter.saveState())
+
         # 기타 데이터 저장
         self.save_data()
-        
+
         # 설정 즉시 동기화 (종료 전에 설정이 확실히 저장되도록)
         self.settings.sync()
-        
+
         e.accept()
 
     def quit_app(self):
@@ -3283,21 +3626,84 @@ def _threadfunc_generate_image(thread_self, path):
         
         # 3: 이미지 저장
         create_folder_if_not_exists(path)
-        
+
         # 안전한 파일명 생성
         def sanitize_filename(filename):
             # 윈도우 파일명에 허용되지 않는 문자 제거
             return "".join(c for c in filename if c.isalnum() or c in (' ', '_', '-', '.')).rstrip()
-            
-        # 파일명 생성 로직 개선
-        timename = datetime.datetime.now().strftime("%y%m%d_%H%M%S%f")[:-4]
-        filename = timename
-        
-        # 프롬프트 기반 파일명 생성 (안전하게)
-        if bool(thread_self.parent().settings.value("will_savename_prompt", True)):
-            safe_prompt = sanitize_filename(nai.parameters["prompt"])
-            # 프롬프트 길이 제한 (예: 최대 50자)
-            filename += "_" + safe_prompt[:50]
+
+        # 파일명 형식화 함수
+        def format_filename(format_template, nai_params, parent_window):
+            """
+            파일명 템플릿을 실제 파일명으로 변환
+
+            지원되는 플레이스홀더:
+            [datetime] - 날짜+시간 (251118_11240833)
+            [date] - 날짜만 (251118)
+            [time] - 시간만 (11240833)
+            [prompt] - 프롬프트 텍스트
+            [character] - 캐릭터 프롬프트 (첫 번째)
+            [seed] - 시드 값
+            """
+            now = datetime.datetime.now()
+
+            # 날짜/시간 포맷
+            datetime_str = now.strftime("%y%m%d_%H%M%S%f")[:-4]
+            date_str = now.strftime("%y%m%d")
+            time_str = now.strftime("%H%M%S%f")[:-4]
+
+            # 프롬프트 가져오기 및 길이 제한
+            prompt_limit = int(parent_window.settings.value("filename_prompt_word_limit", 50))
+            prompt_text = sanitize_filename(nai_params.get("prompt", ""))[:prompt_limit]
+
+            # 캐릭터 프롬프트 가져오기
+            character_text = ""
+            try:
+                if hasattr(parent_window, 'character_prompts_container'):
+                    char_data = parent_window.character_prompts_container.get_data()
+                    if char_data and "characters" in char_data and len(char_data["characters"]) > 0:
+                        first_char = char_data["characters"][0]
+                        char_prompt = first_char.get("prompt", "")
+                        if char_prompt:
+                            character_limit = int(parent_window.settings.value("filename_character_word_limit", 30))
+                            character_text = sanitize_filename(char_prompt)[:character_limit]
+            except Exception as e:
+                logger.debug(f"캐릭터 프롬프트 가져오기 실패: {e}")
+
+            # 시드 가져오기
+            seed = nai_params.get("seed", "")
+
+            # 플레이스홀더 치환
+            result = format_template
+            result = result.replace("[datetime]", datetime_str)
+            result = result.replace("[date]", date_str)
+            result = result.replace("[time]", time_str)
+            result = result.replace("[prompt]", prompt_text)
+            result = result.replace("[character]", character_text)
+            result = result.replace("[seed]", str(seed))
+
+            # 빈 플레이스홀더로 인한 연속 구분자 제거 (예: "__" -> "_")
+            while "__" in result:
+                result = result.replace("__", "_")
+            while "  " in result:
+                result = result.replace("  ", " ")
+
+            # 시작/끝의 구분자 제거
+            result = result.strip("_- ")
+
+            return result
+
+        # 파일명 생성 로직
+        # 사용자 정의 포맷 가져오기
+        filename_format = thread_self.parent().settings.value("filename_format", "[datetime]_[prompt]")
+        filename = format_filename(filename_format, nai.parameters, thread_self.parent())
+
+        # 파일명이 비어있거나 너무 짧으면 기본 포맷 사용
+        if not filename or len(filename) < 3:
+            logger.warning("파일명 형식화 결과가 비어있음, 기본 포맷 사용")
+            timename = datetime.datetime.now().strftime("%y%m%d_%H%M%S%f")[:-4]
+            filename = timename
+
         # 파일 확장자 추가
         filename += ".png"
         
