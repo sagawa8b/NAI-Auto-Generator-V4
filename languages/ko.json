@@ -8,6 +8,7 @@
       "open_file": "파일 열기(Open file)",
       "save_settings": "설정 저장(Save Settings)",
       "load_settings": "설정 불러오기(Load Settings)",
+      "reload_tags": "태그 자동완성 새로고침(Reload Tag Completion)",
       "login": "로그인(Log in)",
       "option": "옵션(Option)",
       "exit": "종료(Exit)",
@@ -29,6 +30,9 @@
       "auto_generating_inf": "연속 생성 중",
       "auto_wait": "다음 생성 대기 중... ({}초)",
       "auto_error_wait": "에러 발생. {}초 후 재시도..."
+    },
+    "status": {
+      "tags_reloaded": "태그 자동완성이 새로고침되었습니다."
     },
     "ui": {
 	  "languages": "언어",
@@ -103,6 +107,22 @@
       "results": "생성 결과 폴더",
       "wildcards": "와일드카드 폴더",
       "settings": "세팅 파일 폴더"
+    },
+    "enhance": {
+      "title": "이미지 향상 (Image Enhance)",
+      "select_image": "이미지 선택 (Select Image)",
+      "use_current": "현재 이미지 사용 (Use Current)",
+      "remove_image": "이미지 제거 (Remove Image)",
+      "no_image": "이미지 없음 (No Image)",
+      "ratio_label": "업스케일 비율 (Upscale Ratio)",
+      "ratio_1x": "1x (동일 크기)",
+      "ratio_1_5x": "1.5x",
+      "strength_label": "강도 (Strength)",
+      "strength_desc": "향상 강도 조절 (0.01-0.99)",
+      "noise_label": "노이즈 (Noise)",
+      "noise_desc": "결과에 변화 추가 (0.00-0.99)",
+      "no_image_available": "생성된 이미지가 없습니다. 먼저 이미지를 생성해주세요.",
+      "select_title": "향상할 이미지 선택"
     },
     "result": {
       "image_title": "결과 이미지 (Result Image)",

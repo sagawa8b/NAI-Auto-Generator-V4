@@ -8,12 +8,13 @@
       "open_file": "打开文件(Open file)",
       "save_settings": "保存设置(Save Settings)",
       "load_settings": "加载设置(Load Settings)",
+      "reload_tags": "重新加载标签自动完成(Reload Tag Completion)",
       "login": "登录(Login)",
       "option": "选项(Option)",
       "exit": "退出(Exit)",
       "view": "查看",
       "toggle_panel": "切换结果面板",
-	  "reset_layout": "重置布局", 
+	  "reset_layout": "重置布局",
       "etc": "其他(Etc)",
       "about": "关于(About)"
     },
@@ -29,6 +30,9 @@
       "auto_generating_inf": "连续生成中",
       "auto_wait": "等待下次生成... ({}秒)",
       "auto_error_wait": "发生错误。{}秒后重试..."
+    },
+    "status": {
+      "tags_reloaded": "标签自动完成已重新加载。"
     },
     "ui": {
       "languages": "语言",
@@ -97,6 +101,22 @@
       "results": "生成结果文件夹",
       "wildcards": "通配符文件夹",
       "settings": "设置文件文件夹"
+    },
+    "enhance": {
+      "title": "图像增强 (Image Enhance)",
+      "select_image": "选择图像 (Select Image)",
+      "use_current": "使用当前图像 (Use Current)",
+      "remove_image": "删除图像 (Remove Image)",
+      "no_image": "无图像 (No Image)",
+      "ratio_label": "放大比例 (Upscale Ratio)",
+      "ratio_1x": "1x (相同大小)",
+      "ratio_1_5x": "1.5x",
+      "strength_label": "强度 (Strength)",
+      "strength_desc": "控制增强强度 (0.01-0.99)",
+      "noise_label": "噪声 (Noise)",
+      "noise_desc": "为结果添加变化 (0.00-0.99)",
+      "no_image_available": "没有生成的图像。请先生成图像。",
+      "select_title": "选择要增强的图像"
     },
     "result": {
       "image_title": "结果图像 (Result Image)",

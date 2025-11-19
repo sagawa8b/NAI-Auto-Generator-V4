@@ -1165,6 +1165,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.action_character_reference = QAction("Character Reference", self)
         self.action_character_reference.setCheckable(True)
         self.action_character_reference.setChecked(False)
+        self.action_character_reference.setShortcut('F1')
         self.action_character_reference.triggered.connect(self.toggle_character_reference)
         view_menu.addAction(self.action_character_reference)
 
@@ -1172,6 +1173,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.action_img2img = QAction("Image to Image", self)
         self.action_img2img.setCheckable(True)
         self.action_img2img.setChecked(False)
+        self.action_img2img.setShortcut('F2')
         self.action_img2img.triggered.connect(self.toggle_img2img)
         view_menu.addAction(self.action_img2img)
 
@@ -1179,6 +1181,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.action_enhance = QAction("Image Enhance", self)
         self.action_enhance.setCheckable(True)
         self.action_enhance.setChecked(False)
+        self.action_enhance.setShortcut('F3')
         self.action_enhance.triggered.connect(self.toggle_enhance)
         view_menu.addAction(self.action_enhance)
 

@@ -8,6 +8,7 @@
       "open_file": "ファイルを開く(Open file)",
       "save_settings": "設定を保存(Save Settings)",
       "load_settings": "設定を読み込み(Load Settings)",
+      "reload_tags": "タグ自動補完を再読み込み(Reload Tag Completion)",
       "login": "ログイン(Login)",
       "option": "オプション(Option)",
       "exit": "終了(Exit)",
@@ -29,6 +30,9 @@
       "auto_generating_inf": "連続生成中",
       "auto_wait": "次の生成まで待機中... ({}秒)",
       "auto_error_wait": "エラーが発生しました。{}秒後に再試行..."
+    },
+    "status": {
+      "tags_reloaded": "タグ自動補完が再読み込みされました。"
     },
     "ui": {
       "languages": "言語",
@@ -97,6 +101,22 @@
       "results": "生成結果フォルダ",
       "wildcards": "ワイルドカードフォルダ",
       "settings": "設定ファイルフォルダ"
+    },
+    "enhance": {
+      "title": "画像強化 (Image Enhance)",
+      "select_image": "画像を選択 (Select Image)",
+      "use_current": "現在の画像を使用 (Use Current)",
+      "remove_image": "画像を削除 (Remove Image)",
+      "no_image": "画像なし (No Image)",
+      "ratio_label": "アップスケール比率 (Upscale Ratio)",
+      "ratio_1x": "1x (同じサイズ)",
+      "ratio_1_5x": "1.5x",
+      "strength_label": "強度 (Strength)",
+      "strength_desc": "強化の強さを調整 (0.01-0.99)",
+      "noise_label": "ノイズ (Noise)",
+      "noise_desc": "結果にバリエーションを追加 (0.00-0.99)",
+      "no_image_available": "生成された画像がありません。まず画像を生成してください。",
+      "select_title": "強化する画像を選択"
     },
     "result": {
       "image_title": "結果画像 (Result Image)",

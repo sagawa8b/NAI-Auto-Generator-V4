@@ -8,12 +8,13 @@
       "open_file": "Open file",
       "save_settings": "Save Settings",
       "load_settings": "Load Settings",
+      "reload_tags": "Reload Tag Completion",
       "login": "Log in",
       "option": "Option",
       "exit": "Exit",
       "view": "View",
       "toggle_panel": "Toggle Result Panel",
-	  "reset_layout": "Reset Layout", 
+	  "reset_layout": "Reset Layout",
       "etc": "Etc",
       "about": "About"
     },
@@ -29,6 +30,9 @@
       "auto_generating_inf": "Auto generating",
       "auto_wait": "Waiting for next generation... ({} seconds)",
       "auto_error_wait": "Error occurred. Retrying in {} seconds..."
+    },
+    "status": {
+      "tags_reloaded": "Tag completion reloaded successfully."
     },
     "ui": {
 	  "languages": "Languages",
@@ -103,6 +107,22 @@
       "results": "Results Folder",
       "wildcards": "Wildcards Folder",
       "settings": "Settings Folder"
+    },
+    "enhance": {
+      "title": "Image Enhance",
+      "select_image": "Select Image",
+      "use_current": "Use Current",
+      "remove_image": "Remove Image",
+      "no_image": "No Image",
+      "ratio_label": "Upscale Ratio",
+      "ratio_1x": "1x (Same size)",
+      "ratio_1_5x": "1.5x",
+      "strength_label": "Strength",
+      "strength_desc": "Controls enhancement intensity (0.01-0.99)",
+      "noise_label": "Noise",
+      "noise_desc": "Adds variation to the result (0.00-0.99)",
+      "no_image_available": "No generated image available. Please generate an image first.",
+      "select_title": "Select Image to Enhance"
     },
     "result": {
       "image_title": "Result Image",
