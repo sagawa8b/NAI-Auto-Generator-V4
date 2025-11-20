@@ -14,6 +14,7 @@
       "exit": "Exit",
       "view": "View",
       "toggle_panel": "Toggle Result Panel",
+      "reset_image_size": "Reset Image Window Size",
 	  "reset_layout": "Reset Layout",
       "etc": "Etc",
       "about": "About"
@@ -103,7 +104,7 @@
 	  "ignore_error": "Ignore Generation Errors"
 	},
     "folders": {
-      "title": "Open Folder",
+      "title": "Folders",
       "results": "Results Folder",
       "wildcards": "Wildcards Folder",
       "settings": "Settings Folder"
@@ -144,7 +145,19 @@
       "logout_confirm": "Are you sure you want to logout?",
       "logout_complete": "Logout complete.",
       "login_success": "Login successful.",
-      "login_failed": "Login failed.\\nPlease check your username and password."
+      "login_failed": "Login failed.\\nPlease check your username and password.",
+      "mask_paint_title": "Paint Inpainting Mask",
+      "mask_paint_instruction": "Paint the areas you want to regenerate with the brush. Red areas will be inpainted.",
+      "mask_brush_size": "Brush Size:",
+      "mask_clear": "Clear Mask",
+      "mask_clear_confirm": "Are you sure you want to clear the entire mask?",
+      "mask_empty_warning": "Please paint at least some area for inpainting.",
+      "mask_invert": "Invert Mask",
+      "mask_invert_tooltip": "If checked: painted areas will be KEPT, unpainted areas will be INPAINTED\\nIf unchecked: painted areas will be INPAINTED (default)",
+      "ok": "OK",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "warning": "Warning"
     },
     "errors": {
       "title": "Error",

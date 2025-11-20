@@ -615,6 +615,47 @@ class NAIGenerator():
         self._prepare_v4_parameters()
         logger.info(f"📍 [{request_id}] V4 파라미터 변환 호출 완료")
 
+        # *** Infill 모드일 경우 img2img 파라미터 구조화 ***
+        if action == NAIAction.infill:
+            logger.info(f"📍 [{request_id}] Infill 모드 - img2img 파라미터 구조화")
+
+            # 마스크 존재 확인
+            has_mask = "mask" in self.parameters and self.parameters["mask"] is not None
+            if has_mask:
+                mask_size = len(self.parameters["mask"]) if isinstance(self.parameters["mask"], str) else 0
+                logger.info(f"✓ Mask detected in parameters - size: {mask_size} bytes")
+            else:
+                logger.warning(f"⚠ WARNING: Infill mode but NO MASK in parameters!")
+
+            # Get strength value from slider for img2img and inpaintImg2ImgStrength
+            img2img_strength = self.parameters.get("strength", 0.5)
+
+            # img2img 네스트 객체 생성 (웹 UI 구조와 일치)
+            img2img_params = {
+                "strength": img2img_strength,
+                "color_correct": True
+            }
+
+            # img2img 객체를 parameters에 추가
+            self.parameters["img2img"] = img2img_params
+
+            # 웹 UI와 동일하게 inpaintImg2ImgStrength 추가 (슬라이더 값 사용)
+            self.parameters["inpaintImg2ImgStrength"] = img2img_strength
+
+            # Top-level strength는 웹 UI와 동일하게 ALWAYS 0.7로 설정
+            # 웹 UI 관찰: img2img.strength=0.5, inpaintImg2ImgStrength=0.5, strength=0.7
+            # 세 가지 strength 값이 서로 다른 목적을 가짐
+            self.parameters["strength"] = 0.7  # 항상 0.7 (웹 UI와 동일)
+
+            # noise는 img2img 객체에 포함하지 않음 (웹 UI와 일치)
+            if "noise" in self.parameters:
+                del self.parameters["noise"]
+
+            logger.info(f"📍 [{request_id}] img2img params: {img2img_params}")
+            logger.info(f"📍 [{request_id}] inpaintImg2ImgStrength: {img2img_strength}")
+            logger.info(f"📍 [{request_id}] Top-level strength: {self.parameters.get('strength')} (always 0.7 for infill)")
+            logger.info(f"📍 [{request_id}] Mask still in parameters: {has_mask}")
+
         url = BASE_URL + f"/ai/generate-image"
 
         data = {

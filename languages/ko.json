@@ -14,6 +14,7 @@
       "exit": "종료(Exit)",
       "view": "보기",
       "toggle_panel": "결과 패널 토글",
+      "reset_image_size": "이미지 창 크기 초기화",
 	  "reset_layout": "레이아웃 초기화",
       "etc": "기타(Etc)",
       "about": "만든 이(About)"
@@ -103,7 +104,7 @@
 	  "ignore_error": "생성 오류 무시하기"
 	},
     "folders": {
-      "title": "폴더 열기",
+      "title": "폴더",
       "results": "생성 결과 폴더",
       "wildcards": "와일드카드 폴더",
       "settings": "세팅 파일 폴더"
@@ -144,7 +145,19 @@
       "logout_confirm": "정말 로그아웃 하시겠습니까?",
       "logout_complete": "로그아웃 되었습니다.",
       "login_success": "로그인에 성공했습니다.",
-      "login_failed": "로그인에 실패했습니다.\\n아이디와 비밀번호를 확인해주세요."
+      "login_failed": "로그인에 실패했습니다.\\n아이디와 비밀번호를 확인해주세요.",
+      "mask_paint_title": "인페인팅 마스크 그리기",
+      "mask_paint_instruction": "재생성하려는 영역을 브러시로 칠하세요. 빨간색 영역이 인페인팅됩니다.",
+      "mask_brush_size": "브러시 크기:",
+      "mask_clear": "마스크 지우기",
+      "mask_clear_confirm": "전체 마스크를 지우시겠습니까?",
+      "mask_empty_warning": "인페인팅을 위해 최소한 일부 영역을 칠해주세요.",
+      "mask_invert": "마스크 반전",
+      "mask_invert_tooltip": "체크 시: 칠한 영역은 유지되고, 칠하지 않은 영역이 인페인팅됩니다\\n체크 해제 시: 칠한 영역이 인페인팅됩니다 (기본값)",
+      "ok": "확인",
+      "cancel": "취소",
+      "confirm": "확인",
+      "warning": "경고"
     },
     "errors": {
       "title": "오류",

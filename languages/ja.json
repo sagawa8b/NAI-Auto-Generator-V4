@@ -14,6 +14,7 @@
       "exit": "終了(Exit)",
       "view": "表示",
       "toggle_panel": "結果パネル切替",
+      "reset_image_size": "画像ウィンドウサイズリセット",
 	  "reset_layout": "レイアウトリセット",
       "etc": "その他(Etc)",
       "about": "作成者について(About)"
@@ -97,7 +98,7 @@
 	  "ignore_error": "生成エラーを無視"
 	},
     "folders": {
-      "title": "フォルダを開く",
+      "title": "フォルダ",
       "results": "生成結果フォルダ",
       "wildcards": "ワイルドカードフォルダ",
       "settings": "設定ファイルフォルダ"
@@ -138,7 +139,19 @@
       "logout_confirm": "本当にログアウトしますか？",
       "logout_complete": "ログアウトしました。",
       "login_success": "ログインに成功しました。",
-      "login_failed": "ログインに失敗しました。\\nユーザー名とパスワードを確認してください。"
+      "login_failed": "ログインに失敗しました。\\nユーザー名とパスワードを確認してください。",
+      "mask_paint_title": "インペインティングマスクを描く",
+      "mask_paint_instruction": "ブラシで再生成したい領域を塗ってください。赤い領域がインペインティングされます。",
+      "mask_brush_size": "ブラシサイズ:",
+      "mask_clear": "マスクをクリア",
+      "mask_clear_confirm": "マスク全体をクリアしてもよろしいですか？",
+      "mask_empty_warning": "インペインティングのため、少なくとも一部の領域を塗ってください。",
+      "mask_invert": "マスクを反転",
+      "mask_invert_tooltip": "チェック時：塗った領域は保持され、塗っていない領域がインペインティングされます\\nチェック解除時：塗った領域がインペインティングされます（デフォルト）",
+      "ok": "OK",
+      "cancel": "キャンセル",
+      "confirm": "確認",
+      "warning": "警告"
     },
     "errors": {
       "title": "エラー",

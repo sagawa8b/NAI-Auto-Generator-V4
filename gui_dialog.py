@@ -3,15 +3,18 @@ import sys
 import re
 import webbrowser
 import time
+import io
+from PIL import Image
+import numpy as np
 
 from PyQt5.QtWidgets import (QDialog, QLabel, QPushButton, QVBoxLayout,
                              QHBoxLayout, QGroupBox, QFormLayout, QLineEdit,
                              QFileDialog, QMessageBox, QRadioButton,
                              QButtonGroup, QDialogButtonBox, QWidget, QCheckBox,
                              QComboBox, QSlider, QApplication, QSpinBox, QDoubleSpinBox,
-                             QColorDialog)
-from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QFont, QColor, QPalette
+                             QColorDialog, QScrollArea)
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, QPoint
+from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap, QImage, QPainter, QPen, QCursor
 
 from consts import DEFAULT_PATH, DEFAULT_TAGCOMPLETION_PATH
 
@@ -1039,3 +1042,377 @@ class WorkerThread(QThread):
 
     def run(self):
         self.result = self.function()
+
+
+class MaskCanvas(QLabel):
+    """Canvas widget for painting inpainting masks with 8x8 grid"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent_dialog = parent
+        self.image = None
+        self.mask = None
+        self.drawing = False
+        self.last_grid_pos = None  # Track last grid position (not pixel position)
+        self.brush_size = 1  # Grid cells (not pixels)
+        self.grid_data = None  # 2D array of grid cells
+        self.grid_width = 0
+        self.grid_height = 0
+        self.setMouseTracking(True)
+        self.setCursor(QCursor(Qt.CrossCursor))
+
+    def set_image(self, pil_image):
+        """Set the base image to paint mask on"""
+        self.image = pil_image.copy()
+
+        # Initialize grid data structure (like NAIA2.0's mirror_image)
+        w, h = self.image.size
+        self.grid_width = w // 8
+        self.grid_height = h // 8
+        self.grid_data = [[0 for _ in range(self.grid_height)] for _ in range(self.grid_width)]
+
+        # Create blank GRAYSCALE mask (pure black = 0)
+        # CRITICAL: Use 'L' mode (grayscale), NOT 'RGBA', to avoid color bleeding
+        self.mask = Image.new('L', self.image.size, 0)
+
+        logger.info(f"Initialized grid canvas: {w}×{h} pixels = {self.grid_width}×{self.grid_height} grid cells")
+
+        # Convert PIL image to QPixmap for display
+        self.update_display()
+
+    def update_display(self):
+        """Update the displayed image with mask overlay and grid"""
+        if self.image is None or self.mask is None:
+            return
+
+        # Create composite image with mask overlay
+        display_image = self.image.copy().convert('RGBA')
+
+        # Create red semi-transparent overlay for masked areas
+        # Use grayscale mask values to create overlay
+        mask_array = np.array(self.mask)  # Now pure grayscale
+        overlay = np.zeros((*mask_array.shape, 4), dtype=np.uint8)
+        overlay[mask_array > 0] = [255, 0, 0, 128]  # Red with 50% alpha where mask is white
+
+        overlay_image = Image.fromarray(overlay, 'RGBA')
+        display_image = Image.alpha_composite(display_image, overlay_image)
+
+        # Convert to QPixmap
+        img_byte_array = io.BytesIO()
+        display_image.save(img_byte_array, format='PNG')
+        qimage = QImage.fromData(img_byte_array.getvalue())
+        pixmap = QPixmap.fromImage(qimage)
+
+        # Draw 8×8 grid overlay
+        painter = QPainter(pixmap)
+        painter.setPen(QPen(QColor(0, 255, 0, 80), 1, Qt.SolidLine))  # Semi-transparent green
+
+        # Draw vertical lines
+        for gx in range(self.grid_width + 1):
+            x = gx * 8
+            painter.drawLine(x, 0, x, self.image.size[1])
+
+        # Draw horizontal lines
+        for gy in range(self.grid_height + 1):
+            y = gy * 8
+            painter.drawLine(0, y, self.image.size[0], y)
+
+        painter.end()
+
+        self.setPixmap(pixmap)
+        self.resize(pixmap.size())
+
+    def pixel_to_grid(self, pixel_x, pixel_y):
+        """Convert pixel coordinates to grid coordinates"""
+        gx = pixel_x // 8
+        gy = pixel_y // 8
+        # Clamp to grid boundaries
+        gx = max(0, min(gx, self.grid_width - 1))
+        gy = max(0, min(gy, self.grid_height - 1))
+        return gx, gy
+
+    def fill_grid_cell(self, gx, gy):
+        """Fill grid cells based on brush size (brush_size × brush_size area)"""
+        # Calculate brush area - centered on clicked cell
+        half_brush = self.brush_size // 2
+
+        # Get mask array once for efficiency
+        mask_array = np.array(self.mask)
+        w, h = self.image.size
+
+        # Fill brush_size × brush_size area of grid cells
+        for offset_y in range(-half_brush, half_brush + (self.brush_size % 2)):
+            for offset_x in range(-half_brush, half_brush + (self.brush_size % 2)):
+                target_gx = gx + offset_x
+                target_gy = gy + offset_y
+
+                # Check bounds
+                if target_gx < 0 or target_gx >= self.grid_width or target_gy < 0 or target_gy >= self.grid_height:
+                    continue
+
+                # Mark grid cell as painted
+                self.grid_data[target_gx][target_gy] = 1
+
+                # Fill corresponding 8×8 block in mask
+                y1 = target_gy * 8
+                y2 = min((target_gy + 1) * 8, h)
+                x1 = target_gx * 8
+                x2 = min((target_gx + 1) * 8, w)
+
+                # Fill block in mask (pure grayscale white = 255)
+                mask_array[y1:y2, x1:x2] = 255
+
+        # Update mask image once after all cells filled
+        self.mask = Image.fromarray(mask_array, mode='L')
+
+    def draw_grid_line(self, start_gx, start_gy, end_gx, end_gy):
+        """Draw a line on the grid using Bresenham's algorithm"""
+        # Bresenham's line algorithm for grid cells
+        dx = abs(end_gx - start_gx)
+        dy = abs(end_gy - start_gy)
+        sx = 1 if start_gx < end_gx else -1
+        sy = 1 if start_gy < end_gy else -1
+        err = dx - dy
+
+        gx, gy = start_gx, start_gy
+
+        while True:
+            self.fill_grid_cell(gx, gy)
+
+            if gx == end_gx and gy == end_gy:
+                break
+
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                gx += sx
+            if e2 < dx:
+                err += dx
+                gy += sy
+
+    def mousePressEvent(self, event):
+        """Handle mouse press to start drawing"""
+        if event.button() == Qt.LeftButton and self.mask is not None:
+            self.drawing = True
+            gx, gy = self.pixel_to_grid(event.pos().x(), event.pos().y())
+            self.last_grid_pos = (gx, gy)
+            self.fill_grid_cell(gx, gy)
+            self.update_display()
+
+    def mouseMoveEvent(self, event):
+        """Handle mouse move to draw mask"""
+        if self.drawing and self.mask is not None:
+            gx, gy = self.pixel_to_grid(event.pos().x(), event.pos().y())
+            if self.last_grid_pos and (gx, gy) != self.last_grid_pos:
+                # Draw line from last grid position to current
+                self.draw_grid_line(self.last_grid_pos[0], self.last_grid_pos[1], gx, gy)
+                self.update_display()
+            self.last_grid_pos = (gx, gy)
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release to stop drawing"""
+        if event.button() == Qt.LeftButton:
+            self.drawing = False
+            self.last_grid_pos = None
+
+    def clear_mask(self):
+        """Clear the entire mask"""
+        if self.mask is not None:
+            # Reset grid data
+            self.grid_data = [[0 for _ in range(self.grid_height)] for _ in range(self.grid_width)]
+            # Reset to black grayscale mask (0 = preserve, 255 = inpaint)
+            self.mask = Image.new('L', self.image.size, 0)
+            self.update_display()
+            logger.info("Cleared mask grid")
+
+    def get_mask(self):
+        """Get the current mask as PIL Image"""
+        return self.mask.copy() if self.mask else None
+
+    def set_brush_size(self, size):
+        """Set the brush size for painting (grid cells, not pixels)"""
+        self.brush_size = max(1, size)  # At least 1 grid cell
+
+    def set_mask(self, mask):
+        """Set an existing mask to continue editing"""
+        if mask is not None and self.image is not None:
+            # Ensure mask size matches image size
+            if mask.size != self.image.size:
+                mask = mask.resize(self.image.size, Image.LANCZOS)
+            self.mask = mask.copy()
+
+            # Rebuild grid_data from mask
+            # Check each 8×8 block to see if it's painted
+            mask_array = np.array(self.mask)
+            w, h = self.image.size
+
+            for gx in range(self.grid_width):
+                for gy in range(self.grid_height):
+                    y1 = gy * 8
+                    y2 = min((gy + 1) * 8, h)
+                    x1 = gx * 8
+                    x2 = min((gx + 1) * 8, w)
+
+                    block = mask_array[y1:y2, x1:x2]
+                    # If ANY pixel in block is white (>127), mark grid cell as painted
+                    if mask_array.ndim == 2 and np.any(block > 127):
+                        self.grid_data[gx][gy] = 1
+
+            self.update_display()
+            logger.info("Loaded existing mask into grid canvas")
+
+
+class MaskPaintDialog(QDialog):
+    """Dialog for painting inpainting masks on images"""
+
+    def __init__(self, parent=None, image=None, existing_mask=None):
+        super().__init__(parent)
+        self.image = image
+        self.mask = None
+        self.existing_mask = existing_mask
+        self.setup_ui()
+
+        if self.image:
+            self.canvas.set_image(self.image)
+
+            # Load existing mask if provided
+            if self.existing_mask:
+                self.canvas.set_mask(self.existing_mask)
+
+    def setup_ui(self):
+        """Setup the mask painting UI"""
+        self.setWindowTitle(tr('dialogs.mask_paint_title'))
+        self.resize(900, 700)
+
+        main_layout = QVBoxLayout()
+
+        # Title and instructions
+        title_label = QLabel(tr('dialogs.mask_paint_instruction'))
+        title_label.setStyleSheet("font-size: 12pt; font-weight: bold;")
+        title_label.setWordWrap(True)
+        main_layout.addWidget(title_label)
+
+        # Canvas area with scroll
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(False)
+        scroll_area.setStyleSheet("background-color: #2b2b2b;")
+
+        self.canvas = MaskCanvas(self)
+        scroll_area.setWidget(self.canvas)
+        main_layout.addWidget(scroll_area)
+
+        # Controls
+        controls_layout = QHBoxLayout()
+
+        # Brush size control
+        brush_size_label = QLabel(tr('dialogs.mask_brush_size'))
+        controls_layout.addWidget(brush_size_label)
+
+        self.brush_size_slider = QSlider(Qt.Horizontal)
+        self.brush_size_slider.setMinimum(1)
+        self.brush_size_slider.setMaximum(20)
+        self.brush_size_slider.setValue(3)
+        self.brush_size_slider.valueChanged.connect(self.on_brush_size_changed)
+        self.brush_size_slider.setMaximumWidth(200)
+        controls_layout.addWidget(self.brush_size_slider)
+
+        self.brush_size_value_label = QLabel("3")
+        self.brush_size_value_label.setStyleSheet("font-weight: bold; min-width: 50px;")
+        controls_layout.addWidget(self.brush_size_value_label)
+
+        # Set initial brush size on canvas
+        self.canvas.set_brush_size(3)
+
+        controls_layout.addStretch()
+
+        # Invert mask checkbox
+        self.invert_mask_checkbox = QCheckBox(tr('dialogs.mask_invert'))
+        self.invert_mask_checkbox.setToolTip(tr('dialogs.mask_invert_tooltip'))
+        controls_layout.addWidget(self.invert_mask_checkbox)
+
+        # Clear button
+        clear_button = QPushButton(tr('dialogs.mask_clear'))
+        clear_button.clicked.connect(self.on_clear_clicked)
+        controls_layout.addWidget(clear_button)
+
+        main_layout.addLayout(controls_layout)
+
+        # Dialog buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        cancel_button = QPushButton(tr('dialogs.cancel'))
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(cancel_button)
+
+        ok_button = QPushButton(tr('dialogs.ok'))
+        ok_button.setDefault(True)
+        ok_button.clicked.connect(self.on_ok_clicked)
+        button_layout.addWidget(ok_button)
+
+        main_layout.addLayout(button_layout)
+
+        self.setLayout(main_layout)
+
+    def on_brush_size_changed(self, value):
+        """Handle brush size slider change"""
+        self.canvas.set_brush_size(value)
+        # Value represents grid cells (each cell = 8×8 pixels)
+        self.brush_size_value_label.setText(f"{value}")
+
+    def on_clear_clicked(self):
+        """Handle clear button click"""
+        reply = QMessageBox.question(
+            self,
+            tr('dialogs.confirm'),
+            tr('dialogs.mask_clear_confirm'),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            self.canvas.clear_mask()
+
+    def on_ok_clicked(self):
+        """Handle OK button click"""
+        self.mask = self.canvas.get_mask()
+
+        # Check if mask is empty
+        if self.mask:
+            mask_array = np.array(self.mask)
+
+            # Check if grayscale mask has any painted areas
+            if mask_array.ndim == 2:  # Grayscale 'L' mode
+                if mask_array.max() == 0:
+                    QMessageBox.warning(
+                        self,
+                        tr('dialogs.warning'),
+                        tr('dialogs.mask_empty_warning')
+                    )
+                    return
+
+                # Apply binary threshold (ensure only 0 or 255 values)
+                # 0 = preserve (black), 255 = inpaint (white)
+                mask_binary = np.where(mask_array > 127, 255, 0).astype(np.uint8)
+
+                logger.info("Binary threshold applied to grayscale mask - ensuring clean edges")
+
+                # Apply mask inversion if checkbox is checked
+                if self.invert_mask_checkbox.isChecked():
+                    # Invert grayscale: white becomes black, black becomes white
+                    mask_binary = 255 - mask_binary
+                    logger.info("Mask inverted: painted areas will be KEPT, unpainted areas will be INPAINTED")
+                else:
+                    logger.info("Mask not inverted: painted areas will be INPAINTED")
+
+                self.mask = Image.fromarray(mask_binary, mode='L')
+            else:
+                # Fallback for non-grayscale masks (shouldn't happen)
+                logger.warning(f"Mask is not in grayscale 'L' format, unexpected (shape: {mask_array.shape})")
+                return
+
+        self.accept()
+
+    def get_mask(self):
+        """Get the painted mask"""
+        return self.mask

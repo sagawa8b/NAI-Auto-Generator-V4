@@ -14,6 +14,7 @@
       "exit": "退出(Exit)",
       "view": "查看",
       "toggle_panel": "切换结果面板",
+      "reset_image_size": "重置图像窗口大小",
 	  "reset_layout": "重置布局",
       "etc": "其他(Etc)",
       "about": "关于(About)"
@@ -97,7 +98,7 @@
 	  "ignore_error": "忽略生成错误"
 	},
     "folders": {
-      "title": "打开文件夹",
+      "title": "文件夹",
       "results": "生成结果文件夹",
       "wildcards": "通配符文件夹",
       "settings": "设置文件文件夹"
@@ -138,7 +139,19 @@
       "logout_confirm": "确定要退出登录吗？",
       "logout_complete": "已退出登录。",
       "login_success": "登录成功。",
-      "login_failed": "登录失败。\\n请检查用户名和密码。"
+      "login_failed": "登录失败。\\n请检查用户名和密码。",
+      "mask_paint_title": "绘制修复蒙版",
+      "mask_paint_instruction": "使用画笔绘制要重新生成的区域。红色区域将被修复。",
+      "mask_brush_size": "画笔大小:",
+      "mask_clear": "清除蒙版",
+      "mask_clear_confirm": "确定要清除整个蒙版吗？",
+      "mask_empty_warning": "请至少绘制一些区域以进行修复。",
+      "mask_invert": "反转蒙版",
+      "mask_invert_tooltip": "勾选时：绘制的区域将被保留，未绘制的区域将被修复\\n未勾选时：绘制的区域将被修复（默认）",
+      "ok": "确定",
+      "cancel": "取消",
+      "confirm": "确认",
+      "warning": "警告"
     },
     "errors": {
       "title": "错误",

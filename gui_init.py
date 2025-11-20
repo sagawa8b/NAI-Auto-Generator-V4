@@ -134,22 +134,23 @@ def create_img2img_widget(parent, left_widget):
     strength_description.setWordWrap(True)
     controls_layout.addWidget(strength_description)
 
-    # Strength 슬라이더와 값 표시를 위한 수평 레이아웃
+    # Strength 슬라이더와 입력 필드
     strength_layout = QHBoxLayout()
 
     parent.img2img_strength_slider = QSlider(Qt.Horizontal)
     parent.img2img_strength_slider.setMinimum(0)
     parent.img2img_strength_slider.setMaximum(100)  # 0.00 ~ 1.00, 0.01 단위
-    parent.img2img_strength_slider.setValue(70)  # 기본값 0.7
-    parent.img2img_strength_slider.setTickPosition(QSlider.TicksBelow)
-    parent.img2img_strength_slider.setTickInterval(10)
-    parent.img2img_strength_slider.valueChanged.connect(parent.on_img2img_strength_changed)
+    parent.img2img_strength_slider.setValue(50)  # 기본값 0.5
+    parent.img2img_strength_slider.setTickPosition(QSlider.NoTicks)  # 눈금 제거
+    parent.img2img_strength_slider.valueChanged.connect(parent.on_img2img_strength_slider_changed)
     strength_layout.addWidget(parent.img2img_strength_slider)
 
-    parent.img2img_strength_value_label = QLabel("0.70")
-    parent.img2img_strength_value_label.setStyleSheet("font-weight: bold; min-width: 35px;")
-    parent.img2img_strength_value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-    strength_layout.addWidget(parent.img2img_strength_value_label)
+    parent.img2img_strength_input = QLineEdit("0.50")
+    parent.img2img_strength_input.setStyleSheet("font-weight: bold;")
+    parent.img2img_strength_input.setFixedWidth(60)
+    parent.img2img_strength_input.setAlignment(Qt.AlignCenter)
+    parent.img2img_strength_input.editingFinished.connect(parent.on_img2img_strength_input_changed)
+    strength_layout.addWidget(parent.img2img_strength_input)
 
     controls_layout.addLayout(strength_layout)
 
@@ -163,24 +164,56 @@ def create_img2img_widget(parent, left_widget):
     noise_description.setWordWrap(True)
     controls_layout.addWidget(noise_description)
 
-    # Noise 슬라이더와 값 표시를 위한 수평 레이아웃
+    # Noise 슬라이더와 입력 필드
     noise_layout = QHBoxLayout()
 
     parent.img2img_noise_slider = QSlider(Qt.Horizontal)
     parent.img2img_noise_slider.setMinimum(0)
     parent.img2img_noise_slider.setMaximum(100)  # 0.00 ~ 1.00, 0.01 단위
     parent.img2img_noise_slider.setValue(0)  # 기본값 0.0
-    parent.img2img_noise_slider.setTickPosition(QSlider.TicksBelow)
-    parent.img2img_noise_slider.setTickInterval(10)
-    parent.img2img_noise_slider.valueChanged.connect(parent.on_img2img_noise_changed)
+    parent.img2img_noise_slider.setTickPosition(QSlider.NoTicks)  # 눈금 제거
+    parent.img2img_noise_slider.valueChanged.connect(parent.on_img2img_noise_slider_changed)
     noise_layout.addWidget(parent.img2img_noise_slider)
 
-    parent.img2img_noise_value_label = QLabel("0.00")
-    parent.img2img_noise_value_label.setStyleSheet("font-weight: bold; min-width: 35px;")
-    parent.img2img_noise_value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-    noise_layout.addWidget(parent.img2img_noise_value_label)
+    parent.img2img_noise_input = QLineEdit("0.00")
+    parent.img2img_noise_input.setStyleSheet("font-weight: bold;")
+    parent.img2img_noise_input.setFixedWidth(60)
+    parent.img2img_noise_input.setAlignment(Qt.AlignCenter)
+    parent.img2img_noise_input.editingFinished.connect(parent.on_img2img_noise_input_changed)
+    noise_layout.addWidget(parent.img2img_noise_input)
 
     controls_layout.addLayout(noise_layout)
+
+    # Inpainting section (separator line first)
+    separator_line = QFrame()
+    separator_line.setFrameShape(QFrame.HLine)
+    separator_line.setFrameShadow(QFrame.Sunken)
+    separator_line.setStyleSheet("color: #555;")
+    controls_layout.addWidget(separator_line)
+
+    # Inpainting checkbox
+    parent.inpaint_checkbox = QCheckBox("Inpainting Mode")
+    parent.inpaint_checkbox.setStyleSheet("font-size: 12pt; font-weight: bold;")
+    parent.inpaint_checkbox.stateChanged.connect(parent.on_inpaint_mode_changed)
+    controls_layout.addWidget(parent.inpaint_checkbox)
+
+    inpaint_description = QLabel("Select areas to regenerate (requires mask)")
+    inpaint_description.setStyleSheet("font-size: 9pt; color: #888;")
+    inpaint_description.setWordWrap(True)
+    controls_layout.addWidget(inpaint_description)
+
+    # Paint mask button
+    parent.btn_paint_mask = QPushButton("🖌️ Paint Mask")
+    parent.btn_paint_mask.clicked.connect(parent.open_mask_paint_dialog)
+    parent.btn_paint_mask.setEnabled(False)
+    parent.btn_paint_mask.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    controls_layout.addWidget(parent.btn_paint_mask)
+
+    # Mask status label
+    parent.mask_status_label = QLabel("No mask painted")
+    parent.mask_status_label.setStyleSheet("font-size: 9pt; color: #888; font-style: italic;")
+    parent.mask_status_label.setAlignment(Qt.AlignCenter)
+    controls_layout.addWidget(parent.mask_status_label)
 
     controls_layout.addStretch()
 
@@ -687,52 +720,6 @@ def init_main_widget(parent):
     generate_layout.addWidget(parent.button_generate_auto)
     
     # 작은 구분선 추가
-    separator = QFrame()
-    separator.setFrameShape(QFrame.HLine)
-    separator.setFrameShadow(QFrame.Sunken)
-    generate_layout.addWidget(separator)
-
-    # 토글 버튼 추가
-    parent.button_expand = QPushButton("◀▶" if parent.is_expand else "▶◀")
-    parent.button_expand.setToolTip("결과 패널 확장/축소")
-    parent.button_expand.clicked.connect(parent.on_click_expand)
-    parent.button_expand.setStyleSheet("""
-        QPushButton {
-            background-color: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            padding: 4px;
-            font-weight: bold;
-        }
-        QPushButton:hover {
-            background-color: #e0e0e0;
-        }
-        QPushButton:pressed {
-            background-color: #d0d0d0;
-        }
-    """)
-    generate_layout.addWidget(parent.button_expand)
-
-    # 이미지 크기 리셋 버튼 추가
-    parent.button_reset_size = QPushButton(tr('ui.reset_image_size'))
-    parent.button_reset_size.setToolTip(tr('ui.reset_image_size_tooltip'))
-    parent.button_reset_size.clicked.connect(lambda: parent.image_result.reset_to_default_size())
-    parent.button_reset_size.setStyleSheet("""
-        QPushButton {
-            background-color: #f0f0f0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            padding: 4px;
-        }
-        QPushButton:hover {
-            background-color: #e0e0e0;
-        }
-        QPushButton:pressed {
-            background-color: #d0d0d0;
-        }
-    """)
-    generate_layout.addWidget(parent.button_reset_size)
-
     # 공백 추가 (버튼 아래 여백)
     generate_layout.addStretch(1)
 
@@ -745,47 +732,18 @@ def init_main_widget(parent):
     advanced_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
     generate_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
-    # 폴더 열기 그룹 생성
-    folder_group = QGroupBox("Folder Open")
-    folder_layout = QVBoxLayout()
-    folder_group.setLayout(folder_layout)
-    folder_layout.setContentsMargins(5, 5, 5, 5)
-    folder_layout.setSpacing(3)
-
-    # 결과 폴더 버튼
-    results_folder_btn = QPushButton(tr('folders.results'))
-    results_folder_btn.clicked.connect(lambda: parent.on_click_open_folder("path_results"))
-    folder_layout.addWidget(results_folder_btn)
-
-    # 와일드카드 폴더 버튼
-    wildcards_folder_btn = QPushButton(tr('folders.wildcards'))
-    wildcards_folder_btn.clicked.connect(lambda: parent.on_click_open_folder("path_wildcards"))
-    folder_layout.addWidget(wildcards_folder_btn)
-
-    # 세팅 파일 폴더 버튼
-    settings_folder_btn = QPushButton(tr('folders.settings'))
-    settings_folder_btn.clicked.connect(lambda: parent.on_click_open_folder("path_settings"))
-    folder_layout.addWidget(settings_folder_btn)
-
-    # 여백 추가
-    folder_layout.addStretch(1)
-
-    # 폴더 그룹 크기 정책 설정
-    folder_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-    
     # 위젯들을 수평 스플리터에 추가
     horizontal_container.addWidget(img_option_group)     # Image Options
     horizontal_container.addWidget(advanced_group)       # Advanced Settings
-    horizontal_container.addWidget(folder_group)         # Folder Open
     horizontal_container.addWidget(generate_group)       # Generate
-    
+
     # 스플리터 핸들 설정
     horizontal_container.setHandleWidth(8)
     horizontal_container.setChildrenCollapsible(False)  # 영역이 완전히 접히지 않도록
     horizontal_container.setStyleSheet("QSplitter::handle { background-color: #cccccc; }")
 
-    # 초기 크기 비율 설정 (4:4:2:3 비율로)
-    horizontal_container.setSizes([400, 400, 200, 300])
+    # 초기 크기 비율 설정 (4:4:3 비율로, Folder Open 그룹 제거됨)
+    horizontal_container.setSizes([400, 400, 300])
 
     # 스플리터 참조 저장
     parent.settings_splitter = horizontal_container

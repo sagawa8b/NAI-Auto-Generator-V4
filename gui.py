@@ -8,7 +8,8 @@ import datetime
 import random
 import base64
 import requests
-import logging 
+import logging
+import numpy as np
 from io import BytesIO
 from PIL import Image
 from urllib import request
@@ -37,7 +38,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.18"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.21"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -304,8 +305,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.img2img_visible = False
         self.img2img_image = None
         self.img2img_path = None
-        self.img2img_strength = 0.7  # 기본값 0.7
+        self.img2img_strength = 0.5  # 기본값 0.5
         self.img2img_noise = 0.0  # 기본값 0.0
+
+        # Inpainting 관련 변수 추가
+        self.inpaint_mode = False  # Inpainting 모드 활성화 여부
+        self.inpaint_mask = None   # 페인트된 마스크 이미지
 
         # Image Enhance 관련 변수 추가
         self.enhance_visible = False
@@ -844,8 +849,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # 각 개별 스플리터 상태 복원
         self.restore_individual_splitters()
 
-        self.update_expand_button()
-
     def restore_individual_splitters(self):
         """모든 개별 스플리터의 저장된 상태를 복원"""
         # Prompt splitter (Prompt ↔ Negative Prompt) 복원
@@ -1114,15 +1117,33 @@ class NAIAutoGeneratorWindow(QMainWindow):
         taggerAction.triggered.connect(self.on_click_tagger)
         
         # 결과 패널 토글 액션
-        togglePanelAction = QAction('결과 패널 토글', self)
+        togglePanelAction = QAction(tr('menu.toggle_panel', 'Toggle Result Panel'), self)
         togglePanelAction.setShortcut('F11')
         togglePanelAction.triggered.connect(self.on_click_expand)
-        
+
+        # 이미지 크기 리셋 액션
+        resetImageSizeAction = QAction(tr('menu.reset_image_size', 'Reset Image Window Size'), self)
+        resetImageSizeAction.setShortcut('Ctrl+Shift+I')
+        resetImageSizeAction.triggered.connect(lambda: self.image_result.reset_to_default_size())
+
+        # 폴더 열기 액션들
+        openResultsFolderAction = QAction(tr('folders.results', 'Results Folder'), self)
+        openResultsFolderAction.setShortcut('F5')
+        openResultsFolderAction.triggered.connect(lambda: self.on_click_open_folder("path_results"))
+
+        openWildcardsFolderAction = QAction(tr('folders.wildcards', 'Wildcards Folder'), self)
+        openWildcardsFolderAction.setShortcut('F6')
+        openWildcardsFolderAction.triggered.connect(lambda: self.on_click_open_folder("path_wildcards"))
+
+        openSettingsFolderAction = QAction(tr('folders.settings', 'Settings Folder'), self)
+        openSettingsFolderAction.setShortcut('F7')
+        openSettingsFolderAction.triggered.connect(lambda: self.on_click_open_folder("path_settings"))
+
         # 메뉴 생성
         menubar = self.menuBar()
         menubar.setNativeMenuBar(False)
-        
-        
+
+
         # 기존 메뉴 추가
         filemenu_file = menubar.addMenu(tr('menu.file'))
         filemenu_file.addAction(openAction)
@@ -1133,15 +1154,16 @@ class NAIAutoGeneratorWindow(QMainWindow):
         filemenu_file.addAction(loginAction)
         filemenu_file.addAction(optionAction)
         filemenu_file.addAction(exitAction)
-        
+
         #filemenu_tool = menubar.addMenu(tr('menu.tools'))
         #filemenu_tool.addAction(getterAction)
         #filemenu_tool.addAction(taggerAction)
-        
+
         # 보기 메뉴 추가
         viewMenu = menubar.addMenu(tr('menu.view'))
         viewMenu.addAction(togglePanelAction)
-        
+        viewMenu.addAction(resetImageSizeAction)
+
         # 구분선 추가
         viewMenu.addSeparator()
 
@@ -1150,7 +1172,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         resetLayoutAction.setShortcut('Ctrl+R')
         resetLayoutAction.triggered.connect(self.reset_layout)
         viewMenu.addAction(resetLayoutAction)
-        
+
         # View 메뉴 찾기 또는 생성
         view_menu = None
         for action in self.menuBar().actions():
@@ -1184,6 +1206,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.action_enhance.setShortcut('F3')
         self.action_enhance.triggered.connect(self.toggle_enhance)
         view_menu.addAction(self.action_enhance)
+
+        # 폴더 메뉴 추가 (View와 Etc 사이)
+        foldersMenu = menubar.addMenu(tr('folders.title', 'Folders'))
+        foldersMenu.addAction(openResultsFolderAction)
+        foldersMenu.addAction(openWildcardsFolderAction)
+        foldersMenu.addAction(openSettingsFolderAction)
 
         filemenu_etc = menubar.addMenu(tr('menu.etc'))
         filemenu_etc.addAction(aboutAction)
@@ -1319,6 +1347,10 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.img2img_image_label.setPixmap(pixmap)
                 self.btn_remove_img2img_image.setEnabled(True)
 
+                # Paint Mask 버튼 활성화 (inpaint 모드가 활성화된 경우)
+                if self.inpaint_mode:
+                    self.btn_paint_mask.setEnabled(True)
+
                 logger.info(f"Image to Image source loaded: {file_path}")
 
             except Exception as e:
@@ -1333,21 +1365,108 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.img2img_image_label.setText("No Image")
         self.img2img_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
         self.btn_remove_img2img_image.setEnabled(False)
+
+        # Paint Mask 버튼 비활성화 및 마스크 초기화
+        self.btn_paint_mask.setEnabled(False)
+        self.inpaint_mask = None
+        self.mask_status_label.setText("No mask painted")
+        self.mask_status_label.setStyleSheet("font-size: 9pt; color: #888; font-style: italic;")
+
         logger.info("Image to Image source removed")
 
-    def on_img2img_strength_changed(self, value):
+    def on_img2img_strength_slider_changed(self, value):
         """Image to Image Strength 슬라이더 값 변경 이벤트"""
         # 슬라이더 값(0-100)을 실제 값(0.00-1.00)으로 변환
         self.img2img_strength = value / 100.0
-        self.img2img_strength_value_label.setText(f"{self.img2img_strength:.2f}")
-        logger.debug(f"img2img strength changed: {self.img2img_strength}")
+        # 입력 필드도 업데이트
+        self.img2img_strength_input.setText(f"{self.img2img_strength:.2f}")
+        logger.debug(f"img2img strength changed (slider): {self.img2img_strength}")
 
-    def on_img2img_noise_changed(self, value):
+    def on_img2img_strength_input_changed(self):
+        """Image to Image Strength 입력 필드 값 변경 이벤트"""
+        try:
+            value = float(self.img2img_strength_input.text())
+            # 0.0~1.0 범위로 제한
+            value = max(0.0, min(1.0, value))
+            self.img2img_strength = value
+            self.img2img_strength_input.setText(f"{value:.2f}")
+            # 슬라이더도 업데이트
+            self.img2img_strength_slider.setValue(int(value * 100))
+            logger.debug(f"img2img strength changed (input): {self.img2img_strength}")
+        except ValueError:
+            # 잘못된 입력일 경우 기본값으로 복원
+            self.img2img_strength_input.setText(f"{self.img2img_strength:.2f}")
+            logger.warning("Invalid img2img strength input")
+
+    def on_img2img_noise_slider_changed(self, value):
         """Image to Image Noise 슬라이더 값 변경 이벤트"""
         # 슬라이더 값(0-100)을 실제 값(0.00-1.00)으로 변환
         self.img2img_noise = value / 100.0
-        self.img2img_noise_value_label.setText(f"{self.img2img_noise:.2f}")
-        logger.debug(f"img2img noise changed: {self.img2img_noise}")
+        # 입력 필드도 업데이트
+        self.img2img_noise_input.setText(f"{self.img2img_noise:.2f}")
+        logger.debug(f"img2img noise changed (slider): {self.img2img_noise}")
+
+    def on_img2img_noise_input_changed(self):
+        """Image to Image Noise 입력 필드 값 변경 이벤트"""
+        try:
+            value = float(self.img2img_noise_input.text())
+            # 0.0~1.0 범위로 제한
+            value = max(0.0, min(1.0, value))
+            self.img2img_noise = value
+            self.img2img_noise_input.setText(f"{value:.2f}")
+            # 슬라이더도 업데이트
+            self.img2img_noise_slider.setValue(int(value * 100))
+            logger.debug(f"img2img noise changed (input): {self.img2img_noise}")
+        except ValueError:
+            # 잘못된 입력일 경우 기본값으로 복원
+            self.img2img_noise_input.setText(f"{self.img2img_noise:.2f}")
+            logger.warning("Invalid img2img noise input")
+
+    def on_inpaint_mode_changed(self, state):
+        """Inpainting 모드 체크박스 변경 이벤트"""
+        self.inpaint_mode = (state == Qt.Checked)
+
+        # Paint Mask 버튼 활성화/비활성화
+        if self.inpaint_mode and self.img2img_image is not None:
+            self.btn_paint_mask.setEnabled(True)
+        else:
+            self.btn_paint_mask.setEnabled(False)
+
+        # 모드 변경 시 마스크 초기화 여부 확인
+        if not self.inpaint_mode and self.inpaint_mask is not None:
+            self.inpaint_mask = None
+            self.mask_status_label.setText("No mask painted")
+            self.mask_status_label.setStyleSheet("font-size: 9pt; color: #888; font-style: italic;")
+
+        logger.info(f"Inpainting mode: {self.inpaint_mode}")
+
+    def open_mask_paint_dialog(self):
+        """마스크 페인팅 다이얼로그 열기"""
+        if self.img2img_image is None:
+            QMessageBox.warning(
+                self,
+                tr('dialogs.warning'),
+                "Please select an image first before painting mask."
+            )
+            return
+
+        from gui_dialog import MaskPaintDialog
+
+        # 다이얼로그 열기 (기존 마스크가 있으면 전달)
+        dialog = MaskPaintDialog(self, self.img2img_image, existing_mask=self.inpaint_mask)
+        if dialog.exec_() == QDialog.Accepted:
+            # 마스크 가져오기
+            self.inpaint_mask = dialog.get_mask()
+
+            if self.inpaint_mask:
+                # 마스크 상태 업데이트
+                self.mask_status_label.setText("✓ Mask painted successfully")
+                self.mask_status_label.setStyleSheet("font-size: 9pt; color: #559977; font-weight: bold;")
+                logger.info("Inpainting mask painted successfully")
+            else:
+                self.mask_status_label.setText("No mask painted")
+                self.mask_status_label.setStyleSheet("font-size: 9pt; color: #888; font-style: italic;")
+                logger.warning("Mask painting cancelled or empty")
 
     def select_enhance_image(self):
         """Image Enhance 이미지 선택"""
@@ -2035,7 +2154,72 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         data["strength"] = self.img2img_strength
                         data["noise"] = self.img2img_noise
 
-                        logger.info(f"img2img enabled: strength={self.img2img_strength}, noise={self.img2img_noise}")
+                        # Inpainting 마스크 설정
+                        if self.inpaint_mode and self.inpaint_mask:
+                            try:
+                                # Grayscale 마스크 처리 (inpaint dialog에서 이미 grayscale 'L' mode로 생성됨)
+                                # NovelAI API는 grayscale mask를 기대: white=inpaint, black=preserve
+                                import base64
+
+                                # Handle grayscale 'L' mode mask (primary case)
+                                if self.inpaint_mask.mode == 'L':
+                                    # Mask is already grayscale, just ensure it's binary
+                                    mask_array = np.array(self.inpaint_mask)
+
+                                    # Check for non-binary values BEFORE thresholding
+                                    unique_values_before = np.unique(mask_array)
+                                    logger.info(f"🔍 Mask unique values BEFORE threshold: {unique_values_before[:10]}... (total: {len(unique_values_before)})")
+
+                                    # Apply strict binary threshold (should already be binary from grid painting)
+                                    mask_binary = np.where(mask_array > 127, 255, 0).astype(np.uint8)
+
+                                    # Verify mask is now perfectly binary
+                                    unique_values_after = np.unique(mask_binary)
+                                    logger.info(f"🔍 Mask unique values AFTER threshold: {unique_values_after}")
+
+                                    if len(unique_values_after) > 2 or not all(v in [0, 255] for v in unique_values_after):
+                                        logger.error(f"⚠️ WARNING: Mask is not perfectly binary! Values: {unique_values_after}")
+                                    else:
+                                        logger.info("✓ Mask is perfectly binary (only 0 and 255)")
+
+                                    # Convert to grayscale image (already 'L' mode, just ensure clean)
+                                    mask_grayscale = Image.fromarray(mask_binary).convert('L')
+                                    logger.info("✓ Processed grayscale mask to binary (grid-based painting)")
+                                else:
+                                    # Fallback: convert any other format to grayscale and threshold
+                                    mask_array = np.array(self.inpaint_mask.convert('L'))
+                                    mask_binary = np.where(mask_array > 127, 255, 0).astype(np.uint8)
+                                    mask_grayscale = Image.fromarray(mask_binary).convert('L')
+                                    logger.warning(f"⚠ Mask in unexpected format ({self.inpaint_mask.mode}), converting to binary grayscale")
+
+                                # Mask is now guaranteed to be pure binary (0 or 255 only)
+                                logger.info("✓ Pure binary mask ready for API (0=preserve, 255=inpaint)")
+
+                                # Send mask at FULL RESOLUTION (matching DCP-arca implementation)
+                                # Note: Grid-based painting already ensures perfect 8×8 grid alignment
+                                # No downsampling needed - DCP-arca's working implementation sends full-res masks
+                                mask_final = mask_grayscale
+                                logger.info(f"✓ Mask at full resolution: {mask_final.size}, mode: {mask_final.mode}")
+
+                                # Encode mask to base64 PNG
+                                mask_byte_arr = BytesIO()
+                                mask_final.save(mask_byte_arr, format='PNG')
+                                mask_byte_arr.seek(0)
+                                mask_base64 = base64.b64encode(mask_byte_arr.read()).decode('utf-8')
+
+                                data["mask"] = mask_base64
+                                logger.info(f"✓ Inpainting mask enabled - mask size: {len(mask_base64)} bytes")
+                                logger.info(f"✓ Mask dimensions: {mask_final.size}, mode: {mask_final.mode}")
+                            except Exception as e:
+                                logger.error(f"✗ Failed to encode mask: {e}")
+                                import traceback
+                                traceback.print_exc()
+                        elif self.inpaint_mode and not self.inpaint_mask:
+                            logger.warning("⚠ Inpaint mode is ON but no mask painted!")
+                        elif not self.inpaint_mode and self.inpaint_mask:
+                            logger.info("ℹ Mask exists but inpaint mode is OFF - ignoring mask")
+
+                        logger.info(f"img2img enabled: strength={self.img2img_strength}, noise={self.img2img_noise}, inpaint={self.inpaint_mode}")
                     else:
                         logger.error("Failed to encode img2img image")
                         self.remove_img2img_image()
@@ -2400,6 +2584,34 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 except Exception as e:
                     logger.error(f"Failed to save last generated image: {e}")
 
+                # 실제 PNG 메타데이터를 읽어서 결과 프롬프트 업데이트
+                try:
+                    import naiinfo_getter
+                    actual_metadata, errcode = naiinfo_getter.get_naidict_from_file(result_str)
+                    if errcode == 3 and actual_metadata:
+                        # 성공적으로 메타데이터를 읽었을 경우
+                        # naidict 형식을 flat dict로 변환
+                        flat_metadata = {
+                            "prompt": actual_metadata.get("prompt", ""),
+                            "negative_prompt": actual_metadata.get("negative_prompt", "")
+                        }
+
+                        # option dict의 내용을 flat_metadata에 병합
+                        if "option" in actual_metadata and isinstance(actual_metadata["option"], dict):
+                            flat_metadata.update(actual_metadata["option"])
+
+                        # etc dict의 내용도 병합
+                        if "etc" in actual_metadata and isinstance(actual_metadata["etc"], dict):
+                            flat_metadata.update(actual_metadata["etc"])
+
+                        # 결과 프롬프트 업데이트
+                        self.set_result_text(flat_metadata)
+                        logger.info("Result prompt updated with actual PNG metadata")
+                    else:
+                        logger.warning(f"Could not read PNG metadata (error code: {errcode}), using local parameters")
+                except Exception as e:
+                    logger.error(f"Failed to read PNG metadata: {e}")
+
                 # 세션 모니터링 업데이트
                 if hasattr(self, 'session_manager'):
                     self.session_manager.increment_image_count()
@@ -2553,6 +2765,34 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 logger.debug("Last generated image saved for enhance feature")
         except Exception as e:
             logger.error(f"Failed to save last generated image: {e}")
+
+        # 실제 PNG 메타데이터를 읽어서 결과 프롬프트 업데이트
+        try:
+            import naiinfo_getter
+            actual_metadata, errcode = naiinfo_getter.get_naidict_from_file(result_str)
+            if errcode == 3 and actual_metadata:
+                # 성공적으로 메타데이터를 읽었을 경우
+                # naidict 형식을 flat dict로 변환
+                flat_metadata = {
+                    "prompt": actual_metadata.get("prompt", ""),
+                    "negative_prompt": actual_metadata.get("negative_prompt", "")
+                }
+
+                # option dict의 내용을 flat_metadata에 병합
+                if "option" in actual_metadata and isinstance(actual_metadata["option"], dict):
+                    flat_metadata.update(actual_metadata["option"])
+
+                # etc dict의 내용도 병합
+                if "etc" in actual_metadata and isinstance(actual_metadata["etc"], dict):
+                    flat_metadata.update(actual_metadata["etc"])
+
+                # 결과 프롬프트 업데이트
+                self.set_result_text(flat_metadata)
+                logger.info("Auto-generate result prompt updated with actual PNG metadata")
+            else:
+                logger.warning(f"Could not read PNG metadata (error code: {errcode}), using local parameters")
+        except Exception as e:
+            logger.error(f"Failed to read PNG metadata: {e}")
 
         if self.dict_img_batch_target["img2img_foldersrc"]:
             self.proceed_image_batch("img2img")
@@ -2866,8 +3106,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             self.main_splitter.setSizes([self.main_splitter.width(), 0])
             self.main_splitter.handle(1).setEnabled(False)
             self.main_splitter.widget(1).hide()
-        
-        self.update_expand_button()
+
         QTimer.singleShot(50, self.image_result.refresh_size)
 
 
@@ -2913,10 +3152,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         except Exception as e:
             logger.error(f"레이아웃 초기화 중 오류 발생: {e}")
 
-
-    def update_expand_button(self):
-        self.button_expand.setText("◀▶" if self.is_expand else "▶◀")
-        self.button_expand.setToolTip("Collapse right panel" if self.is_expand else "Expand right panel")
 
     def update_ui_after_expand(self):
         # UI 갱신 및 이미지 크기 조정
@@ -3592,13 +3827,13 @@ def _threadfunc_generate_image(thread_self, path):
         parent = thread_self.parent()
         nai = parent.nai
 
-        # img2img 여부에 따라 action 결정
-        if nai.parameters.get("image"):
+        # action 결정 (순서 중요: mask 체크를 먼저!)
+        if nai.parameters.get("mask"):
+            action = NAIAction.infill
+            logger.info("✓ Mask detected - using NAIAction.infill")
+        elif nai.parameters.get("image"):
             action = NAIAction.img2img
             logger.info("img2img mode detected - using NAIAction.img2img")
-        elif nai.parameters.get("mask"):
-            action = NAIAction.infill
-            logger.info("Mask detected - using NAIAction.infill")
         else:
             action = NAIAction.generate
 
