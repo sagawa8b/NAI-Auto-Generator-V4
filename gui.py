@@ -38,7 +38,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.21"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.23"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -2079,6 +2079,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
             data["reference_image"] = None
             data["mask"] = None
 
+            # Character Reference 파라미터 초기화 (stale parameter 방지)
+            data["reference_image_multiple"] = None
+            data["reference_information_extracted_multiple"] = None
+            data["reference_strength_multiple"] = None
+            data["reference_fidelity_multiple"] = None
+
             # Image Enhance 설정 (최우선 처리)
             if hasattr(self, 'enhance_image') and self.enhance_image and self.enhance_path:
                 try:
@@ -2097,8 +2103,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     upscaled_image = self.enhance_image.resize((new_width, new_height), Image.LANCZOS)
 
                     # 업스케일된 이미지를 임시 저장하여 base64로 변환
-                    import io
-                    import base64
                     img_byte_arr = io.BytesIO()
                     upscaled_image.save(img_byte_arr, format='PNG')
                     img_byte_arr.seek(0)
@@ -2159,7 +2163,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
                             try:
                                 # Grayscale 마스크 처리 (inpaint dialog에서 이미 grayscale 'L' mode로 생성됨)
                                 # NovelAI API는 grayscale mask를 기대: white=inpaint, black=preserve
-                                import base64
 
                                 # Handle grayscale 'L' mode mask (primary case)
                                 if self.inpaint_mask.mode == 'L':
@@ -2376,12 +2379,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 logger.debug(f"Character Reference added - Style Aware: {self.character_reference_style_aware}, Fidelity: {self.character_reference_fidelity}")
                 logger.debug(f"Processed image size: {processed_image.size}")
             else:
-                # Character Reference 이미지가 없을 때 관련 파라미터 명시적으로 제거
-                data.pop("reference_image_multiple", None)
-                data.pop("reference_information_extracted_multiple", None)
-                data.pop("reference_strength_multiple", None)
-                data.pop("reference_fidelity_multiple", None)
-                logger.debug("Character Reference not applied - all reference parameters removed")
+                # Character Reference 이미지가 없을 때는 초기화된 None 값 유지
+                # (이미 lines 2083-2086에서 None으로 초기화됨)
+                logger.debug("Character Reference not applied - parameters remain None")
 
             logger.debug("_get_data_for_generate 완료")
             return data
