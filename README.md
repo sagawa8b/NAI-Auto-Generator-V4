@@ -1,4 +1,4 @@
-# NAI-Auto-Generator V4
+# NAI-Auto-Generator V4.5
 Novel AI의 이미지 생성을 자동으로 생성 할 수 있도록 하게 구현한 윈도우 어플리케이션.
 * 이 프로젝트는 (https://github.com/DCP-arca/NAI-Auto-Generator)에서 포크되었으며, 개인적인 커스텀 버전으로 업데이트 하고 있습니다.
 
