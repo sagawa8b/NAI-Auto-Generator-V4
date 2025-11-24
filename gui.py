@@ -38,7 +38,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.23"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.24"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -316,6 +316,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.enhance_visible = False
         self.enhance_image = None
         self.enhance_path = None
+        self.enhance_metadata = None  # Enhancement 이미지의 메타데이터 저장
         self.enhance_strength = 0.4  # 기본값 0.4 (0.01-0.99)
         self.enhance_noise = 0.0  # 기본값 0.0 (0.00-0.99)
         self.enhance_ratio = 1.5  # 기본값 1.5x (1.0 or 1.5)
@@ -1468,6 +1469,42 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.mask_status_label.setStyleSheet("font-size: 9pt; color: #888; font-style: italic;")
                 logger.warning("Mask painting cancelled or empty")
 
+    def _get_enhanced_resolution(self, orig_width, orig_height):
+        """
+        NovelAI Enhancement용 해상도 매핑
+        원본 해상도에 따라 고정된 향상 해상도를 반환
+
+        Args:
+            orig_width (int): 원본 이미지 너비
+            orig_height (int): 원본 이미지 높이
+
+        Returns:
+            tuple: (enhanced_width, enhanced_height)
+        """
+        # NovelAI Enhancement 해상도 매핑 테이블
+        enhancement_map = {
+            # Square resolutions
+            (1024, 1024): (1536, 1536),
+
+            # Portrait resolutions
+            (832, 1216): (1280, 1856),
+
+            # Landscape resolutions
+            (1216, 832): (1856, 1280),
+        }
+
+        # 정확히 일치하는 해상도가 있으면 사용
+        if (orig_width, orig_height) in enhancement_map:
+            enhanced_width, enhanced_height = enhancement_map[(orig_width, orig_height)]
+            logger.info(f"Enhancement resolution mapping: {orig_width}x{orig_height} -> {enhanced_width}x{enhanced_height}")
+            return enhanced_width, enhanced_height
+
+        # 일치하는 해상도가 없으면 1.5x 폴백 (경고 출력)
+        logger.warning(f"No exact enhancement resolution mapping for {orig_width}x{orig_height}, using 1.5x fallback")
+        enhanced_width = int(orig_width * 1.5)
+        enhanced_height = int(orig_height * 1.5)
+        return enhanced_width, enhanced_height
+
     def select_enhance_image(self):
         """Image Enhance 이미지 선택"""
         file_dialog = QFileDialog()
@@ -1483,6 +1520,91 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 # 이미지 로드
                 self.enhance_image = Image.open(file_path)
                 self.enhance_path = file_path
+
+                # 메타데이터 읽기 (Enhancement용)
+                try:
+                    nai_dict, error_code = naiinfo_getter.get_naidict_from_file(file_path)
+
+                    if error_code == 3 and nai_dict:
+                        # 메타데이터 저장
+                        self.enhance_metadata = {
+                            "prompt": nai_dict.get("prompt", ""),
+                            "negative_prompt": nai_dict.get("negative_prompt", "")
+                        }
+                        self.enhance_metadata.update(nai_dict.get("option", {}))
+                        self.enhance_metadata.update(nai_dict.get("etc", {}))
+
+                        # v4_prompt에서 캐릭터 정보 추출
+                        if "v4_prompt" in nai_dict.get("etc", {}) and "caption" in nai_dict["etc"]["v4_prompt"]:
+                            char_captions = nai_dict["etc"]["v4_prompt"]["caption"].get("char_captions", [])
+                            v4_neg_prompt = nai_dict["etc"].get("v4_negative_prompt", {})
+                            neg_char_captions = []
+
+                            if "caption" in v4_neg_prompt:
+                                neg_char_captions = v4_neg_prompt["caption"].get("char_captions", [])
+
+                            # characterPrompts 배열 생성
+                            character_prompts = []
+
+                            for i, char in enumerate(char_captions):
+                                char_prompt = {
+                                    "prompt": char.get("char_caption", ""),
+                                    "negative_prompt": "",
+                                    "position": None
+                                }
+
+                                # 위치 정보 추가 (있을 경우)
+                                if "centers" in char and len(char["centers"]) > 0:
+                                    center = char["centers"][0]
+                                    char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
+
+                                # 네거티브 프롬프트 추가 (존재하는 경우)
+                                if i < len(neg_char_captions):
+                                    char_prompt["negative_prompt"] = neg_char_captions[i].get("char_caption", "")
+
+                                character_prompts.append(char_prompt)
+
+                            if character_prompts:
+                                self.enhance_metadata["characterPrompts"] = character_prompts
+
+                                # use_character_coords 정보 저장
+                                use_character_coords = self.enhance_metadata.get("use_character_coords", None)
+                                if use_character_coords is None and "v4_prompt" in nai_dict["etc"]:
+                                    v4_use_coords = nai_dict["etc"]["v4_prompt"].get("use_coords", None)
+                                    if v4_use_coords is not None:
+                                        self.enhance_metadata["use_character_coords"] = v4_use_coords
+
+                        logger.info(f"Enhance image metadata loaded successfully")
+                        logger.debug(f"Metadata contains {len(self.enhance_metadata.get('characterPrompts', []))} character prompts")
+                    else:
+                        # 메타데이터가 없거나 읽기 실패 - 경고 및 차단
+                        self.enhance_metadata = None
+                        self.enhance_image = None
+                        self.enhance_path = None
+                        logger.warning(f"No valid NAI metadata found in enhancement image (error_code: {error_code})")
+
+                        # 사용자에게 경고 표시
+                        QMessageBox.warning(
+                            self,
+                            tr('enhance.no_metadata_title', 'No NovelAI Metadata'),
+                            tr('enhance.no_metadata_message',
+                               'The selected image does not contain valid NovelAI metadata.\n\n'
+                               'Enhancement requires metadata from the original generation to work correctly.\n\n'
+                               'Please select an image generated by NovelAI with embedded metadata.')
+                        )
+                        return  # 메타데이터 없으면 Enhancement 이미지 로드 중단
+                except Exception as e:
+                    logger.error(f"Error reading enhancement image metadata: {e}")
+                    self.enhance_metadata = None
+                    self.enhance_image = None
+                    self.enhance_path = None
+
+                    QMessageBox.critical(
+                        self,
+                        tr('error', 'Error'),
+                        f"Failed to read image metadata: {str(e)}"
+                    )
+                    return
 
                 # 미리보기 업데이트
                 thumbnail = self.enhance_image.copy()
@@ -1513,6 +1635,69 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.enhance_image = self.last_generated_image.copy()
                 self.enhance_path = "current_generated"
 
+                # 메타데이터 읽기 (현재 이미지에서)
+                try:
+                    nai_dict, error_code = naiinfo_getter.get_naidict_from_img(self.last_generated_image)
+                except Exception as e:
+                    logger.error(f"Error reading current image metadata: {e}")
+                    nai_dict = None
+                    error_code = 0
+
+                if error_code == 3 and nai_dict:
+                    # 메타데이터 저장
+                    self.enhance_metadata = {
+                        "prompt": nai_dict.get("prompt", ""),
+                        "negative_prompt": nai_dict.get("negative_prompt", "")
+                    }
+                    self.enhance_metadata.update(nai_dict.get("option", {}))
+                    self.enhance_metadata.update(nai_dict.get("etc", {}))
+
+                    # v4_prompt에서 캐릭터 정보 추출
+                    if "v4_prompt" in nai_dict.get("etc", {}) and "caption" in nai_dict["etc"]["v4_prompt"]:
+                        char_captions = nai_dict["etc"]["v4_prompt"]["caption"].get("char_captions", [])
+                        v4_neg_prompt = nai_dict["etc"].get("v4_negative_prompt", {})
+                        neg_char_captions = []
+
+                        if "caption" in v4_neg_prompt:
+                            neg_char_captions = v4_neg_prompt["caption"].get("char_captions", [])
+
+                        # characterPrompts 배열 생성
+                        character_prompts = []
+
+                        for i, char in enumerate(char_captions):
+                            char_prompt = {
+                                "prompt": char.get("char_caption", ""),
+                                "negative_prompt": "",
+                                "position": None
+                            }
+
+                            # 위치 정보 추가 (있을 경우)
+                            if "centers" in char and len(char["centers"]) > 0:
+                                center = char["centers"][0]
+                                char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
+
+                            # 네거티브 프롬프트 추가 (존재하는 경우)
+                            if i < len(neg_char_captions):
+                                char_prompt["negative_prompt"] = neg_char_captions[i].get("char_caption", "")
+
+                            character_prompts.append(char_prompt)
+
+                        if character_prompts:
+                            self.enhance_metadata["characterPrompts"] = character_prompts
+
+                            # use_character_coords 정보 저장
+                            use_character_coords = self.enhance_metadata.get("use_character_coords", None)
+                            if use_character_coords is None and "v4_prompt" in nai_dict["etc"]:
+                                v4_use_coords = nai_dict["etc"]["v4_prompt"].get("use_coords", None)
+                                if v4_use_coords is not None:
+                                    self.enhance_metadata["use_character_coords"] = v4_use_coords
+
+                    logger.info("Current image metadata loaded successfully")
+                else:
+                    # 메타데이터가 없거나 읽기 실패
+                    self.enhance_metadata = None
+                    logger.warning(f"No valid metadata found in current image (error_code: {error_code})")
+
                 # 미리보기 업데이트
                 thumbnail = self.enhance_image.copy()
                 thumbnail.thumbnail((164, 198), Image.LANCZOS)
@@ -1541,11 +1726,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         """Image Enhance 이미지 제거"""
         self.enhance_image = None
         self.enhance_path = None
+        self.enhance_metadata = None  # 메타데이터도 함께 제거
         self.enhance_image_label.clear()
         self.enhance_image_label.setText(tr('enhance.no_image', 'No Image'))
         self.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
         self.btn_remove_enhance_image.setEnabled(False)
-        logger.info("Enhance image removed")
+        logger.info("Enhance image and metadata removed")
 
     def on_enhance_strength_changed(self, value):
         """Enhance Strength 슬라이더 값 변경 이벤트"""
@@ -2089,15 +2275,40 @@ class NAIAutoGeneratorWindow(QMainWindow):
             if hasattr(self, 'enhance_image') and self.enhance_image and self.enhance_path:
                 try:
                     logger.info("Enhance mode activated")
+
+                    # Enhancement는 반드시 메타데이터가 있어야 함
+                    if not hasattr(self, 'enhance_metadata') or not self.enhance_metadata:
+                        logger.error("Enhancement mode requires metadata but none found - aborting")
+                        raise ValueError("Enhancement image metadata is required but not available")
+
+                    # Enhancement 이미지 메타데이터 설정 사용
+                    if self.enhance_metadata:
+                        logger.info("Applying settings from enhancement image metadata")
+
+                        # 프롬프트 설정 (메타데이터에서)
+                        if "prompt" in self.enhance_metadata:
+                            data["prompt"] = self.enhance_metadata["prompt"]
+                            logger.debug(f"Using metadata prompt: {data['prompt'][:100]}...")
+
+                        if "negative_prompt" in self.enhance_metadata:
+                            data["negative_prompt"] = self.enhance_metadata["negative_prompt"]
+                            logger.debug(f"Using metadata negative_prompt: {data['negative_prompt'][:100]}...")
+
+                        # 기타 설정 (메타데이터에서)
+                        metadata_params = ["scale", "sampler", "steps", "sm", "sm_dyn"]
+                        for param in metadata_params:
+                            if param in self.enhance_metadata:
+                                data[param] = self.enhance_metadata[param]
+                                logger.debug(f"Using metadata {param}: {data[param]}")
+
                     # 이미지를 업스케일
                     from danbooru_tagger import convert_src_to_imagedata
 
                     # 원본 이미지 크기 가져오기
                     orig_width, orig_height = self.enhance_image.size
 
-                    # 업스케일 비율 적용
-                    new_width = int(orig_width * self.enhance_ratio)
-                    new_height = int(orig_height * self.enhance_ratio)
+                    # NovelAI Enhancement 해상도 매핑 사용 (ratio 무시)
+                    new_width, new_height = self._get_enhanced_resolution(orig_width, orig_height)
 
                     # 이미지 업스케일
                     upscaled_image = self.enhance_image.resize((new_width, new_height), Image.LANCZOS)
@@ -2112,7 +2323,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         data["image"] = imgdata_enhance
                         data['autoSmea'] = False
 
-                        # Strength와 Noise 직접 사용
+                        # Strength와 Noise 직접 사용 (GUI 설정 사용)
                         data["strength"] = self.enhance_strength
                         data["noise"] = self.enhance_noise
 
@@ -2136,7 +2347,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         data["legacy"] = False
                         data["color_correct"] = False
 
-                        logger.info(f"Enhance enabled: ratio={self.enhance_ratio}x, strength={self.enhance_strength}, noise={self.enhance_noise}, size={orig_width}x{orig_height} -> {new_width}x{new_height}")
+                        logger.info(f"Enhance enabled: strength={self.enhance_strength}, noise={self.enhance_noise}, size={orig_width}x{orig_height} -> {new_width}x{new_height}")
                     else:
                         logger.error("Failed to encode enhance image")
                         self.remove_enhance_image()
@@ -2285,10 +2496,11 @@ class NAIAutoGeneratorWindow(QMainWindow):
             
             if "noise_schedule" not in data and hasattr(self, 'dict_ui_settings') and 'noise_schedule' in self.dict_ui_settings:
                 data["noise_schedule"] = self.dict_ui_settings["noise_schedule"].currentText()
-            
+
             # 웹 UI에서 보이지 않는 옵션들의 기본값 설정
             data["prefer_brownian"] = True
-            data["deliberate_euler_ancestral_bug"] = True
+            data["deliberate_euler_ancestral_bug"] = False  # WebUI uses corrected sampler (changed from True)
+            data["controlnet_strength"] = 1  # WebUI default for img2img
             data["dynamic_thresholding"] = False
             data["sm_dyn"] = False
             data["quality_toggle"] = True
@@ -2300,49 +2512,78 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 data['autoSmea'] = bool(self.dict_ui_settings["autoSmea"].isChecked())
                         
             # 캐릭터 프롬프트 데이터 가져오기
-            if hasattr(self, 'character_prompts_container'):
+            # Enhancement 모드일 때는 Enhancement 이미지의 메타데이터 사용
+            if hasattr(self, 'enhance_image') and self.enhance_image and hasattr(self, 'enhance_metadata') and self.enhance_metadata:
+                try:
+                    # Enhancement 이미지의 메타데이터에서 캐릭터 프롬프트 가져오기
+                    if "characterPrompts" in self.enhance_metadata:
+                        logger.info("Using character prompts from enhancement image metadata")
+                        data["characterPrompts"] = self.enhance_metadata["characterPrompts"]
+
+                        # use_character_coords도 메타데이터에서 가져오기
+                        if "use_character_coords" in self.enhance_metadata:
+                            data["use_character_coords"] = self.enhance_metadata["use_character_coords"]
+                            logger.debug(f"🔍 Enhancement metadata use_character_coords: {data['use_character_coords']}")
+                        else:
+                            # 메타데이터에 없으면 위치 정보가 있는지 확인
+                            has_positions = any(
+                                char.get("position") is not None
+                                for char in data["characterPrompts"]
+                            )
+                            data["use_character_coords"] = has_positions
+                            logger.debug(f"🔍 Inferred use_character_coords from positions: {has_positions}")
+                    else:
+                        # 캐릭터 프롬프트가 없으면 빈 배열
+                        data["characterPrompts"] = []
+                        data["use_character_coords"] = False
+                        logger.info("No character prompts in enhancement image metadata")
+                except Exception as e:
+                    logger.error(f"Enhancement 메타데이터 캐릭터 프롬프트 처리 중 오류: {e}")
+                    data["characterPrompts"] = []
+            # 일반 모드일 때는 GUI에서 가져오기
+            elif hasattr(self, 'character_prompts_container'):
                 if hasattr(self, 'wcapplier'):
                     self.wcapplier.create_index_snapshot()
                 try:
                     char_data = self.character_prompts_container.get_data()
                     logger.debug(f"🔍 캐릭터 컨테이너 원본 데이터: {char_data}")
-                    
+
                     data["characterPrompts"] = []
-                    
+
                     # use_character_coords 설정
                     use_ai_positions = char_data.get("use_ai_positions", True)
                     data["use_character_coords"] = not use_ai_positions
-                    
+
                     logger.debug(f"🔍 use_ai_positions: {use_ai_positions}")
                     logger.debug(f"🔍 use_character_coords: {data['use_character_coords']}")
-                    
+
                     if "characters" in char_data:
                         for i, char in enumerate(char_data["characters"]):
                             # 프롬프트 전처리
                             raw_prompt = char.get("prompt", "")
                             raw_negative_prompt = char.get("negative_prompt", "") if char.get("negative_prompt") else ""
-                            
+
                             prompt = self._preprocess_character_prompt(raw_prompt)
                             negative_prompt = self._preprocess_character_prompt(raw_negative_prompt)
-                            
+
                             char_prompt = {
                                 "prompt": prompt,
                                 "negative_prompt": negative_prompt
                             }
-                            
+
                             # 위치 정보 처리 (한 번만)
                             if not use_ai_positions and char.get("position") and isinstance(char["position"], (list, tuple)) and len(char["position"]) == 2:
                                 char_prompt["position"] = [float(char["position"][0]), float(char["position"][1])]
                                 logger.debug(f"캐릭터 {i+1} 커스텀 위치: {char_prompt['position']}")
                             else:
                                 logger.debug(f"캐릭터 {i+1}: AI's choice 모드 - 위치 정보 미포함")
-                            
+
                             data["characterPrompts"].append(char_prompt)
-                    
+
                     # 인덱스 진행
                     if hasattr(self, 'wcapplier'):
                         self.wcapplier.advance_loopcard_indices()
-                except Exception as e:                
+                except Exception as e:
                     logger.error(f"캐릭터 프롬프트 처리 중 오류: {e}")
 
                     
@@ -2404,7 +2645,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 "legacy": False,
                 "noise_schedule": "karras",
                 "prefer_brownian": True,
-                "deliberate_euler_ancestral_bug": True,
+                "deliberate_euler_ancestral_bug": False,  # Match WebUI behavior
+                "controlnet_strength": 1,  # Match WebUI default
                 "quality_toggle": True
             }
         

@@ -546,9 +546,10 @@ class NAIGenerator():
 
     def set_param_dict(self, param_dict):
         # V4 API에서만 사용하는 특별한 파라미터들
-        special_params = ["legacy_v3_extend", "noise_schedule", "params_version", 
-                          "characterPrompts", "v4_prompt", "v4_negative_prompt", "model"]  # model 추가
-        
+        special_params = ["legacy_v3_extend", "noise_schedule", "params_version",
+                          "characterPrompts", "v4_prompt", "v4_negative_prompt", "model",
+                          "deliberate_euler_ancestral_bug", "controlnet_strength"]  # WebUI 호환성을 위한 파라미터 추가
+
         for k, v in param_dict.items():
             if k:
                 if k in special_params:
@@ -559,7 +560,7 @@ class NAIGenerator():
                     # use_character_coords는 별도 처리
                     self.parameters[k] = v
                     continue
-                    
+
                 try:
                     param_key = NAIParam[k]
                     self.set_param(param_key, v)
