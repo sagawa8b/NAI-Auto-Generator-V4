@@ -916,6 +916,17 @@ def init_main_widget(parent):
     result_prompt_group.setLayout(result_prompt_layout)
 
     parent.prompt_result = QTextBrowser()
+    # 더 나은 가독성을 위한 폰트 및 스타일 설정
+    parent.prompt_result.setStyleSheet("""
+        QTextBrowser {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 10pt;
+            line-height: 1.4;
+            padding: 8px;
+            background-color: #ffffff;
+            color: #000000;
+        }
+    """)
     result_prompt_layout.addWidget(parent.prompt_result)
 
     # 2.3: 오른쪽 패널을 위한 수직 스플리터 생성 (결과 이미지와 결과 프롬프트 사이 조정 가능)

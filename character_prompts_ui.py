@@ -241,13 +241,15 @@ class CharacterPromptWidget(QFrame):
         prompt_label = QLabel(tr('ui.character_prompt'))
         prompt_label.setStyleSheet("color: black; font-weight: bold;")
         self.layout.addWidget(prompt_label)
-        
+
         # QPlainTextEdit 대신 CompletionTextEdit 사용
-        self.prompt_edit = CompletionTextEdit()
+        # 캐릭터 프롬프트에서는 이미지 드래그&드롭 비활성화 (크래시 방지)
+        self.prompt_edit = CompletionTextEdit(enable_image_drop=False)
         self.prompt_edit.setPlaceholderText("이 캐릭터에 대한 프롬프트 입력...")
-        self.prompt_edit.setMinimumHeight(100)  # 높이 증가
+        self.prompt_edit.setMinimumHeight(60)  # 최소 높이 감소 (반응형)
+        self.prompt_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 반응형 크기 정책
         self.prompt_edit.setStyleSheet("background-color: white; color: black; border: 1px solid #bbbbbb;")
-        self.layout.addWidget(self.prompt_edit)
+        self.layout.addWidget(self.prompt_edit, 1)  # stretch factor 추가
         
         # 네거티브 프롬프트 체크박스
         neg_checkbox_layout = QHBoxLayout()
@@ -269,13 +271,15 @@ class CharacterPromptWidget(QFrame):
         neg_prompt_label = QLabel("캐릭터 네거티브 프롬프트:")
         neg_prompt_label.setStyleSheet("color: black; font-weight: bold;")
         neg_container_layout.addWidget(neg_prompt_label)
-        
+
         # 네거티브 프롬프트 입력에도 CompletionTextEdit 사용
-        self.neg_prompt_edit = CompletionTextEdit()
+        # 캐릭터 프롬프트에서는 이미지 드래그&드롭 비활성화 (크래시 방지)
+        self.neg_prompt_edit = CompletionTextEdit(enable_image_drop=False)
         self.neg_prompt_edit.setPlaceholderText("이 캐릭터에 대한 네거티브 프롬프트 입력...")
-        self.neg_prompt_edit.setMinimumHeight(80)  # 높이 증가
+        self.neg_prompt_edit.setMinimumHeight(50)  # 최소 높이 감소 (반응형)
+        self.neg_prompt_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 반응형 크기 정책
         self.neg_prompt_edit.setStyleSheet("background-color: white; color: black; border: 1px solid #bbbbbb;")
-        neg_container_layout.addWidget(self.neg_prompt_edit)
+        neg_container_layout.addWidget(self.neg_prompt_edit, 1)  # stretch factor 추가
         
         self.layout.addWidget(self.neg_container)
         self.neg_container.setVisible(False)  # 처음에는 숨김
@@ -416,17 +420,15 @@ class CharacterPromptsContainer(QWidget):
         self.characters_layout.addStretch()  # 오른쪽 끝에 빈 공간 추가
         
         self.scroll_area.setWidget(self.characters_container)
-        
-        # 스크롤 영역을 직접 메인 레이아웃에 추가하고 높이 설정
-        self.scroll_area.setMinimumHeight(250)  # 최소 높이 증가
-        self.main_layout.addWidget(self.scroll_area)
-        
-        # 이전에 저장된 스크롤 영역 높이 불러오기
-        saved_height = self.settings.value("character_scroll_height", 250, type=int)
-        self.scroll_area.setMinimumHeight(saved_height)
-        
-        # splitter 설정 (스크롤 영역 높이 조절 용)
-        self.splitter = QSplitter(Qt.Vertical)
+
+        # 스크롤 영역을 직접 메인 레이아웃에 추가하고 반응형 크기 정책 설정
+        self.scroll_area.setMinimumHeight(150)  # 최소 높이 감소 (반응형)
+        self.scroll_area.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 반응형 크기 정책
+        self.main_layout.addWidget(self.scroll_area, 1)  # stretch factor 추가하여 공간 확장
+
+        # 이전에 저장된 스크롤 영역 높이는 참고용으로만 사용 (반응형 동작 유지)
+        # saved_height = self.settings.value("character_scroll_height", 250, type=int)
+        # self.scroll_area.setMinimumHeight(saved_height)  # 제거: 고정 높이 설정 방지
         
         # 마우스 휠 이벤트를 가로 스크롤로 변환하는 이벤트 필터 설치
         self.scroll_area.viewport().installEventFilter(self)
@@ -643,7 +645,7 @@ class CharacterPromptsContainer(QWidget):
     def resizeEvent(self, event):
         """창 크기 변경 시 처리"""
         super().resizeEvent(event)
-        
-        # 스크롤 영역 높이 저장
-        if self.scroll_area.height() > 0:
-            self.settings.setValue("character_scroll_height", self.scroll_area.height())
+
+        # 반응형 동작: 높이 저장 제거 (자동으로 창 크기에 맞춰 조절됨)
+        # if self.scroll_area.height() > 0:
+        #     self.settings.setValue("character_scroll_height", self.scroll_area.height())

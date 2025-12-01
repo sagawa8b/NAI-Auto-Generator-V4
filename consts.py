@@ -25,90 +25,148 @@ DEFAULT_TAGCOMPLETION_PATH = "./danbooru_tags_post_count.csv"  # 상대 경로�
 def prettify_naidict(d, additional_dict=None):
     """NovelAI 이미지 메타데이터를 보기 좋게 정렬하여 표시"""
     try:
-        # 간략 정보 (Simplified) - NovelAI inspect 페이지와 유사하게
-        result = (
-            "Simplified\n\n"
-            f"Prompt: {d.get('prompt', '')}\n"
-            f"Undesired Content: {d.get('negative_prompt', '')}\n"
-            f"Resolution: {d.get('width', 0)}x{d.get('height', 0)}\n"
-            f"Seed: {d.get('seed', 0)}\n"
-            f"Steps: {d.get('steps', 0)}\n"
-            f"Sampler: {d.get('sampler', '')} ({d.get('noise_schedule', 'karras')})\n"
-            f"Prompt Guidance: {d.get('scale', 0)}\n"
-            f"Prompt Guidance Rescale: {d.get('cfg_rescale', 0)}\n"
-            f"Undesired Content Strength: {d.get('uncond_scale', 0)}\n"
-        )
-        
-        # 모델 정보 결정
-        model_id = d.get('model', 'nai-diffusion-4-5-curated')
-        model_display_name = "NAI Diffusion V4 Full"
-        
-        if model_id == "nai-diffusion-4-5-curated":
-            model_display_name = "NAI Diffusion V4.5 Curated"
-        elif model_id == "nai-diffusion-4-full":
-            model_display_name = "NAI Diffusion V4 Full"
-        
-        # 기본 정보
-        result += (
-            "\nGeneration Information\n\n"
-            f"Software: NovelAI\n"
-            f"Source: {model_display_name}\n"
-            f"Request Type: {'Image to Image' if d.get('image') else 'Text to Image'}\n"
-            f"Model Preset: {d.get('v4_model_preset', 'Artistic')}\n"
-            f"Legacy Mode: {'Enabled' if d.get('legacy', False) else 'Disabled'}\n"
-        )
-        
-        # 고급 설정 - 웹 UI에서 제공되는 설정
-        result += (
-            "\nWeb UI Settings\n"
-            f"Noise Schedule: {d.get('noise_schedule', 'karras')}\n"
-        )
-        
-        # 내부 설정 - API 전용 설정 (웹 UI에 없음)
-        result += (
-            "\nInternal API Settings\n"
-            f"(※ 웹 UI에 표시되지 않는 설정으로, 실제 효과는 제한될 수 있습니다.)\n"
-            f"Auto SMEA: {'On' if d.get('autoSmea', False) or d.get('sm', False) else 'Off'} (※)\n"
-            f"Dynamic SMEA: {'On' if d.get('sm_dyn', False) else 'Off'} (※)\n"
-            f"Dynamic Thresholding: {'On' if d.get('dynamic_thresholding', False) else 'Off'} (※)\n"
-            f"Quality Toggle: {'On' if d.get('quality_toggle', True) else 'Off'} (※)\n"
-            f"Prefer Brownian Motion: {'On' if d.get('prefer_brownian', True) else 'Off'} (※)\n"
-            f"Euler Ancestral Bug: {'On' if d.get('deliberate_euler_ancestral_bug', True) else 'Off'} (※)\n"
-            
-        )
-        
+        # noise_schedule는 실제 값이 있으면 표시, 없으면 표시하지 않음
+        sampler_display = d.get('sampler', '')
+        if 'noise_schedule' in d:
+            sampler_display = f"{sampler_display} ({d['noise_schedule']})"
+
+        separator = "="*60
+        subseparator = "-"*60
+
+        result = f"""{separator}
+GENERATION RESULT
+{separator}
+
+Prompt:
+{d.get('prompt', '')}
+
+Undesired Content:
+{d.get('negative_prompt', '')}
+"""
+
         # 캐릭터 프롬프트가 있는 경우 추가 정보
         if 'characterPrompts' in d and d['characterPrompts']:
-            result += "\nCharacter Prompts\n\n"
+            result += f"""
+{subseparator}
+Character Prompts (V4)
+{subseparator}
+
+"""
             for i, char in enumerate(d['characterPrompts']):
                 if isinstance(char, dict):
-                    result += f"Character {i+1}: {char.get('prompt', 'No information')}\n"
+                    result += f"[Character {i+1}]\n"
+                    result += f"  Prompt: {char.get('prompt', 'No information')}\n"
                     if 'negative_prompt' in char and char['negative_prompt'].strip():
                         result += f"  Negative: {char['negative_prompt']}\n"
-                    
-                    # v4_prompt에서 실제 사용된 위치 정보 가져오기
-                    if 'v4_prompt' in d and 'caption' in d['v4_prompt']:
-                        char_captions = d['v4_prompt']['caption'].get('char_captions', [])
-                        if i < len(char_captions) and 'centers' in char_captions[i]:
-                            centers = char_captions[i]['centers'][0]
-                            result += f"  Position: ({centers['x']:.2f}, {centers['y']:.2f})\n"
+
+                    # 위치 정보 표시 (수동 설정 또는 AI 자동)
+                    if 'position' in char and isinstance(char['position'], (list, tuple)) and len(char['position']) == 2:
+                        result += f"  Position: ({char['position'][0]:.2f}, {char['position'][1]:.2f}) [Manual]\n"
+                    else:
+                        # v4_prompt에서 실제 사용된 위치 정보 가져오기
+                        if 'v4_prompt' in d and 'caption' in d['v4_prompt']:
+                            char_captions = d['v4_prompt']['caption'].get('char_captions', [])
+                            if i < len(char_captions) and 'centers' in char_captions[i]:
+                                centers = char_captions[i]['centers'][0]
+                                result += f"  Position: ({centers['x']:.2f}, {centers['y']:.2f}) [AI's choice]\n"
+                            else:
+                                result += f"  Position: AI's choice\n"
+                        else:
+                            result += f"  Position: AI's choice\n"
+                    result += "\n"
+
+        # 모델 정보 결정 - 실제 모델 ID에서 가져오기
+        model_id = d.get('model', '')
+        if model_id == "nai-diffusion-4-5-curated":
+            model_display_name = "NAI Diffusion V4.5 Curated"
+        elif model_id == "nai-diffusion-4-5-full":
+            model_display_name = "NAI Diffusion V4.5 Full"
+        elif model_id == "nai-diffusion-4-full":
+            model_display_name = "NAI Diffusion V4 Full"
+        elif model_id:
+            model_display_name = model_id  # 알 수 없는 모델은 ID 그대로 표시
+        else:
+            model_display_name = "Unknown"
+
+        # 기본 정보 - 모든 정보를 하나의 섹션으로 통합
+        result += f"""
+{subseparator}
+Generation Information
+{subseparator}
+Resolution: {d.get('width', 0)}x{d.get('height', 0)}
+Seed: {d.get('seed', 0)}
+Steps: {d.get('steps', 0)}
+Sampler: {sampler_display}
+Prompt Guidance: {d.get('scale', 0)}
+Prompt Guidance Rescale: {d.get('cfg_rescale', 0)}
+Undesired Content Strength: {d.get('uncond_scale', 0)}
+
+Software: NovelAI
+Source: {model_display_name}
+Request Type: {'Image to Image' if d.get('image') else 'Text to Image'}
+Model Preset: {d.get('v4_model_preset', 'Artistic')}
+Legacy Mode: {'Enabled' if d.get('legacy', False) else 'Disabled'}
+"""
+
+        # 고급 설정 - 웹 UI에서 제공되는 설정
+        if 'noise_schedule' in d:
+            result += f"""Noise Schedule: {d['noise_schedule']}
+"""
+
+        # 내부 설정 - API 전용 설정 (웹 UI에 없음)
+        # 실제 메타데이터에 있는 값만 표시
+        has_internal_settings = any(key in d for key in ['sm', 'autoSmea', 'sm_dyn', 'dynamic_thresholding', 'quality_toggle', 'prefer_brownian', 'deliberate_euler_ancestral_bug'])
+        if has_internal_settings:
+            result += f"""
+{subseparator}
+Internal API Settings
+{subseparator}
+(※ Settings not displayed in the web UI may have limited actual effects.)
+"""
+
+        # 각 설정 값이 실제로 메타데이터에 있을 때만 표시
+        if 'sm' in d or 'autoSmea' in d:
+            auto_smea = d.get('autoSmea', d.get('sm', False))
+            result += f"Auto SMEA: {'On' if auto_smea else 'Off'} (※)\n"
+        if 'sm_dyn' in d:
+            result += f"Dynamic SMEA: {'On' if d['sm_dyn'] else 'Off'} (※)\n"
+        if 'dynamic_thresholding' in d:
+            result += f"Dynamic Thresholding: {'On' if d['dynamic_thresholding'] else 'Off'} (※)\n"
+        if 'quality_toggle' in d:
+            result += f"Quality Toggle: {'On' if d['quality_toggle'] else 'Off'} (※)\n"
+        if 'prefer_brownian' in d:
+            result += f"Prefer Brownian Motion: {'On' if d['prefer_brownian'] else 'Off'} (※)\n"
+        if 'deliberate_euler_ancestral_bug' in d:
+            result += f"Euler Ancestral Bug: {'On' if d['deliberate_euler_ancestral_bug'] else 'Off'} (※)\n"
         
         # 이미지/레퍼런스 이미지가 있는 경우 추가 정보
         if 'image' in d and d['image']:
-            result += "\nImage to Image Settings\n\n"
-            result += f"Image Path: {additional_dict.get('image_src', 'Unknown') if additional_dict else 'Unknown'}\n"
-            result += f"Strength: {d.get('strength', 0.7)}\n"
-            result += f"Noise: {d.get('noise', 0.0)}\n"
-            if additional_dict and 'image_tag' in additional_dict:
-                result += f"Image Tags: {additional_dict['image_tag']}\n"
+            img_src = additional_dict.get('image_src', 'Unknown') if additional_dict else 'Unknown'
+            img_tags = additional_dict.get('image_tag', '') if additional_dict else ''
+            result += f"""
+{separator}
+Image to Image Settings
+{separator}
+Image Path: {img_src}
+Strength: {d.get('strength', 0.7)}
+Noise: {d.get('noise', 0.0)}
+"""
+            if img_tags:
+                result += f"Image Tags: {img_tags}\n"
 
         if 'reference_image' in d and d['reference_image']:
-            result += "\nReference Image Settings\n\n"
-            result += f"Reference Path: {additional_dict.get('reference_image_src', 'Unknown') if additional_dict else 'Unknown'}\n"
-            result += f"Strength: {d.get('reference_strength', 0.6)}\n"
-            result += f"Information Extracted: {d.get('reference_information_extracted', 1.0)}\n"
-            if additional_dict and 'reference_image_tag' in additional_dict:
-                result += f"Reference Tags: {additional_dict['reference_image_tag']}\n"
+            ref_src = additional_dict.get('reference_image_src', 'Unknown') if additional_dict else 'Unknown'
+            ref_tags = additional_dict.get('reference_image_tag', '') if additional_dict else ''
+            result += f"""
+{separator}
+Reference Image Settings
+{separator}
+Reference Path: {ref_src}
+Strength: {d.get('reference_strength', 0.6)}
+Information Extracted: {d.get('reference_information_extracted', 1.0)}
+"""
+            if ref_tags:
+                result += f"Reference Tags: {ref_tags}\n"
         
     except Exception as e:
         result = f"Error processing metadata: {e}"

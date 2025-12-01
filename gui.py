@@ -38,7 +38,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.11.24"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.12.01"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -2846,6 +2846,44 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         if "etc" in actual_metadata and isinstance(actual_metadata["etc"], dict):
                             flat_metadata.update(actual_metadata["etc"])
 
+                        # v4_prompt에서 characterPrompts 재구성 (표시용)
+                        if "v4_prompt" in flat_metadata and "caption" in flat_metadata["v4_prompt"]:
+                            if "characterPrompts" not in flat_metadata:  # characterPrompts가 없을 때만
+                                try:
+                                    char_captions = flat_metadata["v4_prompt"]["caption"].get("char_captions", [])
+                                    v4_neg_prompt = flat_metadata.get("v4_negative_prompt", {})
+                                    neg_char_captions = []
+
+                                    if "caption" in v4_neg_prompt:
+                                        neg_char_captions = v4_neg_prompt["caption"].get("char_captions", [])
+
+                                    # characterPrompts 배열 생성
+                                    character_prompts = []
+
+                                    for i, char in enumerate(char_captions):
+                                        char_prompt = {
+                                            "prompt": char.get("char_caption", ""),
+                                            "negative_prompt": "",
+                                            "position": None
+                                        }
+
+                                        # 위치 정보 추가 (있을 경우)
+                                        if "centers" in char and len(char["centers"]) > 0:
+                                            center = char["centers"][0]
+                                            char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
+
+                                        # 네거티브 프롬프트 추가 (존재하는 경우)
+                                        if i < len(neg_char_captions):
+                                            char_prompt["negative_prompt"] = neg_char_captions[i].get("char_caption", "")
+
+                                        character_prompts.append(char_prompt)
+
+                                    if character_prompts:
+                                        flat_metadata["characterPrompts"] = character_prompts
+                                        logger.debug(f"Reconstructed {len(character_prompts)} character prompts from v4_prompt for display")
+                                except Exception as e:
+                                    logger.error(f"Failed to reconstruct characterPrompts from v4_prompt: {e}")
+
                         # 결과 프롬프트 업데이트
                         self.set_result_text(flat_metadata)
                         logger.info("Result prompt updated with actual PNG metadata")
@@ -3027,6 +3065,44 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 # etc dict의 내용도 병합
                 if "etc" in actual_metadata and isinstance(actual_metadata["etc"], dict):
                     flat_metadata.update(actual_metadata["etc"])
+
+                # v4_prompt에서 characterPrompts 재구성 (표시용)
+                if "v4_prompt" in flat_metadata and "caption" in flat_metadata["v4_prompt"]:
+                    if "characterPrompts" not in flat_metadata:  # characterPrompts가 없을 때만
+                        try:
+                            char_captions = flat_metadata["v4_prompt"]["caption"].get("char_captions", [])
+                            v4_neg_prompt = flat_metadata.get("v4_negative_prompt", {})
+                            neg_char_captions = []
+
+                            if "caption" in v4_neg_prompt:
+                                neg_char_captions = v4_neg_prompt["caption"].get("char_captions", [])
+
+                            # characterPrompts 배열 생성
+                            character_prompts = []
+
+                            for i, char in enumerate(char_captions):
+                                char_prompt = {
+                                    "prompt": char.get("char_caption", ""),
+                                    "negative_prompt": "",
+                                    "position": None
+                                }
+
+                                # 위치 정보 추가 (있을 경우)
+                                if "centers" in char and len(char["centers"]) > 0:
+                                    center = char["centers"][0]
+                                    char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
+
+                                # 네거티브 프롬프트 추가 (존재하는 경우)
+                                if i < len(neg_char_captions):
+                                    char_prompt["negative_prompt"] = neg_char_captions[i].get("char_caption", "")
+
+                                character_prompts.append(char_prompt)
+
+                            if character_prompts:
+                                flat_metadata["characterPrompts"] = character_prompts
+                                logger.debug(f"Reconstructed {len(character_prompts)} character prompts from v4_prompt for display")
+                        except Exception as e:
+                            logger.error(f"Failed to reconstruct characterPrompts from v4_prompt: {e}")
 
                 # 결과 프롬프트 업데이트
                 self.set_result_text(flat_metadata)
@@ -3580,10 +3656,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
             additional_dict["image_tag"] = self.dict_img_batch_target["i2i_last_dst"]
         if self.dict_img_batch_target["vibe_last_dst"]:
             additional_dict["reference_image_tag"] = self.dict_img_batch_target["vibe_last_dst"]
-        
-        # 캐릭터 프롬프트도 처리된 형태로 표시
-        if 'characterPrompts' in nai_dict and nai_dict['characterPrompts']:
-            additional_dict["processed_characters"] = nai_dict['characterPrompts']
+
+        # 디버그: 캐릭터 프롬프트 확인
+        if 'characterPrompts' in nai_dict:
+            char_count = len(nai_dict['characterPrompts']) if nai_dict['characterPrompts'] else 0
+            logger.debug(f"Result prompt - Character prompts count: {char_count}")
+            if char_count > 0:
+                logger.debug(f"Character prompts data: {nai_dict['characterPrompts']}")
 
         content = prettify_naidict(nai_dict, additional_dict)
 

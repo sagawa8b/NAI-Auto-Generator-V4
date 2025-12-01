@@ -33,10 +33,9 @@ class CustomCompleter(QCompleter):
         prefix_lower = self.prefix.lower()
         filtered_words = []
         contains_matches = []
-        
-        # 제한된 개수만 검색 (성능 향상)
-        words_count = min(3000, len(self.words))
-        for i in range(words_count):
+
+        # 전체 태그 검색 (조기 중단 최적화로 성능 보장)
+        for i in range(len(self.words)):
             word = self.words[i]
             word_lower = word.lower()
             if word_lower.startswith(prefix_lower):
@@ -61,13 +60,13 @@ class CustomCompleter(QCompleter):
 
 
 class CompletionTextEdit(QTextEdit):
-    def __init__(self):
-        print("CompletionTextEdit 초기화")
+    def __init__(self, enable_image_drop=True):
+        logger.debug("CompletionTextEdit 초기화")
         super().__init__()
         self.completer = None
         # 중요: textChanged 시그널이 highlightSyntax에 연결되어야 함 (highlightBrackets 대신)
         self.textChanged.connect(self.highlightSyntax)
-        
+
         # 가중치 하이라이트 설정
         self.highlight_emphasis = True
         self.emphasis_colors = {
@@ -76,7 +75,66 @@ class CompletionTextEdit(QTextEdit):
             "low": QColor(169, 169, 169),   # 약화(<1.0) - 회색
             "bracket_unmatched": QColor(255, 0, 0)  # 매치되지 않은 괄호 - 빨간색
         }
-    
+
+        # 이미지 드래그 앤 드롭 설정
+        self.enable_image_drop = enable_image_drop
+        # 이미지 드롭이 비활성화된 경우 드래그 앤 드롭 비활성화
+        self.setAcceptDrops(enable_image_drop)
+
+    def dragEnterEvent(self, event):
+        """드래그 진입 이벤트 - 이미지 파일을 수락"""
+        # 이미지 드롭이 비활성화된 경우 기본 동작만 수행
+        if not self.enable_image_drop:
+            super().dragEnterEvent(event)
+            return
+
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if len(urls) == 1:
+                file_path = urls[0].toLocalFile()
+                # NovelAI 이미지 파일만 수락 (PNG, WebP)
+                if file_path.lower().endswith(('.png', '.webp')):
+                    event.acceptProposedAction()
+                    logger.debug(f"Drag enter accepted for: {file_path}")
+                    return
+        # 이미지가 아니면 기본 텍스트 드래그 앤 드롭 처리
+        super().dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        """드롭 이벤트 - NovelAI 이미지의 메타데이터를 읽어서 적용"""
+        # 이미지 드롭이 비활성화된 경우 기본 동작만 수행
+        if not self.enable_image_drop:
+            super().dropEvent(event)
+            return
+
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if len(urls) == 1:
+                file_path = urls[0].toLocalFile()
+                # NovelAI 이미지 파일 처리
+                if file_path.lower().endswith(('.png', '.webp')):
+                    logger.info(f"Image dropped on prompt input: {file_path}")
+                    # 상위 윈도우 찾기 (NAIAutoGeneratorWindow)
+                    parent = self.parent()
+                    while parent is not None:
+                        # NAIAutoGeneratorWindow를 찾을 때까지 상위로 올라감
+                        if hasattr(parent, 'get_image_info_bysrc'):
+                            logger.debug("Found parent window with get_image_info_bysrc method")
+                            parent.get_image_info_bysrc(file_path)
+                            event.acceptProposedAction()
+                            return
+                        parent = parent.parent()
+
+                    logger.warning("Could not find parent window to load image metadata")
+                    # 상위 윈도우를 찾지 못한 경우 파일 경로만 삽입
+                    cursor = self.textCursor()
+                    cursor.insertText(file_path)
+                    event.acceptProposedAction()
+                    return
+
+        # 이미지가 아니면 기본 텍스트 드래그 앤 드롭 처리
+        super().dropEvent(event)
+
     def insertFromMimeData(self, source):
         """클립보드에서 붙여넣기할 때 서식 없는 텍스트만 삽입"""
         if source.hasText():
@@ -148,15 +206,22 @@ class CompletionTextEdit(QTextEdit):
     def findNumericEmphasisHighlights(self, text):
         """가중치 구문 강조를 위한 ExtraSelection 목록 반환 - 개선된 버전"""
         selections = []
-        
-        # 1. 숫자 다음에 ::가 오는 패턴: "1.5::텍스트::"
-        number_pattern = r"(\d+(?:\.\d+)?)::([^:]*)(?:::?)?"
-        
-        # 2. ::로 시작하는 패턴: "::텍스트::"
-        prefix_pattern = r"::([^:]*)(?:::?)?"
-        
+
+        # 1. 숫자 다음에 ::가 오는 패턴: "1.5::텍스트::" or "-2::텍스트::" (artist:name 같은 단일 콜론 포함)
+        # (?:[^:]|:(?!:))* = 단일 콜론은 허용하지만 이중 콜론에서는 중단
+        number_pattern = r"(-?\d+(?:\.\d+)?)::((?:[^:]|:(?!:))*)(?:::)?"
+
+        # 2. ::로 시작하는 패턴: "::텍스트::" (artist:name 같은 단일 콜론 포함)
+        prefix_pattern = r"::((?:[^:]|:(?!:))*)(?:::)?"
+
+        # Track positions covered by number patterns to avoid duplicate highlighting
+        covered_positions = set()
+
         # 숫자+:: 패턴 처리
         for match in re.finditer(number_pattern, text):
+            # Mark all positions in this match as covered
+            for pos in range(match.start(), match.end()):
+                covered_positions.add(pos)
             # 가중치 값과 강조 텍스트 가져오기
             weight_str = match.group(1)
             emphasized_text = match.group(2)
@@ -214,15 +279,14 @@ class CompletionTextEdit(QTextEdit):
         # ::로 시작하는 패턴 처리 (기본값 1.0으로 간주)
         for match in re.finditer(prefix_pattern, text):
             # 시작 위치가 숫자+:: 패턴의 일부인지 확인 (중복 방지)
-            is_part_of_num_pattern = False
             emphasis_text = match.group(1)
             start_pos = match.start()
-            
-            # 숫자+:: 패턴의 일부인지 확인
-            if start_pos > 0 and text[start_pos-1].isdigit():
-                is_part_of_num_pattern = True
-                
-            if not is_part_of_num_pattern and emphasis_text:
+
+            # Check if this match overlaps with any number pattern match
+            if start_pos in covered_positions:
+                continue  # Skip this match as it's part of a number pattern
+
+            if emphasis_text:
                 # 기본 강조 서식 (가중치 1.0으로 처리)
                 format = QTextCharFormat()
                 format.setForeground(self.emphasis_colors["high"])  # 강조 색상 사용
@@ -256,15 +320,15 @@ class CompletionTextEdit(QTextEdit):
     
     # 아래는 기존 자동 완성 기능 메서드들
     def start_complete_mode(self, tag_list):
-        logger.error(f"start_complete_mode 호출: {len(tag_list)}개 태그")
+        logger.debug(f"start_complete_mode 호출: {len(tag_list)}개 태그")
         if not tag_list:
-            print("태그 목록이 비어 있어 자동 완성을 설정하지 않습니다.")
+            logger.warning("태그 목록이 비어 있어 자동 완성을 설정하지 않습니다.")
             return
-            
+
         try:
             completer = CustomCompleter(tag_list)
             self.setCompleter(completer)
-            print("자동 완성 설정 완료")
+            logger.info("자동 완성 설정 완료")
         except Exception as e:
             logger.error(f"자동 완성 설정 중 오류 발생: {str(e)}")
             import traceback
@@ -285,7 +349,7 @@ class CompletionTextEdit(QTextEdit):
         try:
             self.completer.activated.connect(self.insertCompletion)
         except:
-            print("자동완성 신호 연결 실패")
+            logger.error("자동완성 신호 연결 실패")
 
     def insertCompletion(self, completion):
         # CSV 형식 처리 (태그[숫자] => 태그)
