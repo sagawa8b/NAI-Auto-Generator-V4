@@ -1,10 +1,10 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, 
-                             QLabel, QLineEdit, QPushButton, QPlainTextEdit, 
-                             QTextBrowser, QComboBox, QSplitter, QCheckBox, 
-                             QRadioButton, QButtonGroup, QSizePolicy, QMessageBox, 
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
+                             QLabel, QLineEdit, QPushButton, QPlainTextEdit,
+                             QTextBrowser, QComboBox, QSplitter, QCheckBox,
+                             QRadioButton, QButtonGroup, QSizePolicy, QMessageBox,
                              QFileDialog, QApplication, QCompleter, QFrame, QSlider)
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QSize
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QMouseEvent, QBrush, QPalette
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QMouseEvent, QBrush, QPalette, QDrag
 from consts import RESOLUTION_FAMILIY
 from completer import CompletionTextEdit
 from character_prompts_ui import CharacterPromptsContainer
@@ -15,6 +15,48 @@ from logger import get_logger
 from i18n_manager import tr
 
 logger = get_logger()
+
+
+class DragDropImageLabel(QLabel):
+    """Drag-and-drop enabled QLabel for image import"""
+
+    imageDropped = pyqtSignal(str)  # Signal emitted with file path when image is dropped
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        """Handle drag enter event"""
+        if event.mimeData().hasUrls():
+            # Check if at least one URL is an image file
+            for url in event.mimeData().urls():
+                file_path = url.toLocalFile()
+                if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                    event.acceptProposedAction()
+                    logger.debug(f"Drag enter accepted: {file_path}")
+                    return
+        event.ignore()
+
+    def dragMoveEvent(self, event):
+        """Handle drag move event"""
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        """Handle drop event"""
+        if event.mimeData().hasUrls():
+            # Get the first image file from dropped URLs
+            for url in event.mimeData().urls():
+                file_path = url.toLocalFile()
+                if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                    logger.info(f"Image dropped: {file_path}")
+                    self.imageDropped.emit(file_path)
+                    event.acceptProposedAction()
+                    return
+        event.ignore()
 
 def init_advanced_prompt_group(parent):
     """고급 반응형 프롬프트 그룹 초기화"""
@@ -90,12 +132,13 @@ def create_img2img_widget(parent, left_widget):
     content_layout = QHBoxLayout()
     content_layout.setSpacing(10)
 
-    # 왼쪽: 이미지 미리보기
-    parent.img2img_image_label = QLabel()
+    # 왼쪽: 이미지 미리보기 (드래그 앤 드롭 지원)
+    parent.img2img_image_label = DragDropImageLabel()
     parent.img2img_image_label.setFixedSize(164, 198)
     parent.img2img_image_label.setAlignment(Qt.AlignCenter)
-    parent.img2img_image_label.setText("No Image")
-    parent.img2img_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
+    parent.img2img_image_label.setText("No Image\n(Drag & Drop)")
+    parent.img2img_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; border: 2px dashed #666;")
+    parent.img2img_image_label.imageDropped.connect(parent.load_img2img_image_from_path)
     content_layout.addWidget(parent.img2img_image_label)
 
     # 오른쪽: 컨트롤 영역
@@ -345,12 +388,13 @@ def create_enhance_widget(parent, left_widget):
     content_layout = QHBoxLayout()
     content_layout.setSpacing(10)
 
-    # 왼쪽: 이미지 미리보기
-    parent.enhance_image_label = QLabel()
+    # 왼쪽: 이미지 미리보기 (드래그 앤 드롭 지원)
+    parent.enhance_image_label = DragDropImageLabel()
     parent.enhance_image_label.setFixedSize(164, 198)
     parent.enhance_image_label.setAlignment(Qt.AlignCenter)
-    parent.enhance_image_label.setText(tr('enhance.no_image', 'No Image'))
-    parent.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
+    parent.enhance_image_label.setText(tr('enhance.no_image', 'No Image') + "\n(Drag & Drop)")
+    parent.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; border: 2px dashed #666;")
+    parent.enhance_image_label.imageDropped.connect(parent.load_enhance_image_from_path)
     content_layout.addWidget(parent.enhance_image_label)
 
     # 오른쪽: 컨트롤 영역

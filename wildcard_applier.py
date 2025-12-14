@@ -2,6 +2,10 @@ import os
 import random
 from enum import Enum
 
+from logger import get_logger
+
+logger = get_logger()
+
 MAX_TRY_AMOUNT = 10
 
 
@@ -28,7 +32,7 @@ class WildcardApplier():
         
         # 와일드카드 폴더가 존재하는지 확인
         if not os.path.exists(self.src_wildcards_folder):
-            print(f"Warning: Wildcards folder not found: {self.src_wildcards_folder}")
+            logger.warning(f"Wildcards folder not found: {self.src_wildcards_folder}")
             return
         
         wildcard_count = 0
@@ -63,12 +67,12 @@ class WildcardApplier():
                                         self._wildcards_dict[key.lower()] = valid_lines
                                         wildcard_count += 1
                         except Exception as e:
-                            print(f"Error loading wildcard file {src}: {e}")
-            
-            print(f"Loaded {wildcard_count} wildcards from {self.src_wildcards_folder}")
-            
+                            logger.error(f"Error loading wildcard file {src}: {e}")
+
+            logger.info(f"Loaded {wildcard_count} wildcards from {self.src_wildcards_folder}")
+
         except Exception as e:
-            print(f"Error loading wildcards: {e}")
+            logger.error(f"Error loading wildcards: {e}")
 
     def create_index_snapshot(self):
         """현재 루프카드 인덱스의 스냅샷 생성"""
@@ -103,15 +107,46 @@ class WildcardApplier():
         return result
    
     def advance_loopcard_indices(self):
-        """사용된 루프카드 인덱스만 다음으로 진행"""
-        for key in self._used_keys:  # 실제 사용된 키만
+        """사용된 루프카드 인덱스만 다음으로 진행 (반복 카운터 고려)"""
+        for key_data in list(self._used_keys):  # 실제 사용된 키만
+            # key_data는 "wildcard_name" 또는 "wildcard_name*repeat_count" 형식
+            key = key_data
+            repeat_count = 1  # 기본값
+
+            # *숫자 패턴 확인 (사용된 키에서)
+            if '*' in key_data:
+                parts = key_data.split('*')
+                if len(parts) == 2:
+                    key = parts[0]
+                    try:
+                        repeat_count = int(parts[1])
+                    except ValueError:
+                        repeat_count = 1
+
             if key in self._wildcards_dict:
                 wc_list = self._wildcards_dict[key]
                 if wc_list:
                     if key not in self._loopcard_indices:
                         self._loopcard_indices[key] = 0
-                    self._loopcard_indices[key] = (self._loopcard_indices[key] + 1) % len(wc_list)
-        
+
+                    # 반복 카운터 키 생성
+                    counter_key = f"{key}*{repeat_count}"
+
+                    # 반복 카운터 초기화
+                    if counter_key not in self._repeat_counters:
+                        self._repeat_counters[counter_key] = {'current': 0, 'target': repeat_count}
+
+                    # 반복 카운터 증가
+                    self._repeat_counters[counter_key]['current'] += 1
+
+                    # 목표 반복 횟수에 도달하면 다음 캐릭터로 이동
+                    if self._repeat_counters[counter_key]['current'] >= repeat_count:
+                        self._loopcard_indices[key] = (self._loopcard_indices[key] + 1) % len(wc_list)
+                        self._repeat_counters[counter_key]['current'] = 0  # 카운터 리셋
+                        logger.debug(f"Advanced '{key}' to index {self._loopcard_indices[key]} after {repeat_count} repeats")
+                    else:
+                        logger.debug(f"Repeat counter for '{key}': {self._repeat_counters[counter_key]['current']}/{repeat_count}")
+
         # 사용된 키 리셋
         self._used_keys.clear()
 
@@ -129,7 +164,7 @@ class WildcardApplier():
 
             p_right = result.find("__", p_left + 2)  # +2로 두 번째 __ 찾기
             if p_right == -1:
-                print("Warning: A single __ exists")
+                logger.warning("A single __ exists in wildcard syntax")
                 break
 
             str_left = result[0:p_left]
@@ -142,10 +177,10 @@ class WildcardApplier():
                     str_center = wc_list[random.randrange(0, len(wc_list))].strip()
                     applied_wildcard_list.append(str_center)
                 else:
-                    print(f"Warning: Wildcard '{str_center}' has no entries")
+                    logger.warning(f"Wildcard '{str_center}' has no entries")
                     str_center = "__" + str_center + "__"
             else:
-                print(f"Warning: Unknown wildcard '{str_center}'")
+                logger.warning(f"Unknown wildcard '{str_center}'")
                 str_center = "__" + str_center + "__"
 
             result_left = str_left + str_center
@@ -238,7 +273,7 @@ class WildcardApplier():
         result = target_str
         applied_loopcard_list = []
         prev_point = 0
-        
+
         while "##" in result:
             p_left = result.find("##", prev_point)
             if p_left == -1:
@@ -254,7 +289,8 @@ class WildcardApplier():
             # 순차 반복 와일드카드 패턴 확인: wildcard_name*repeat_count
             repeat_count = 1  # 기본값
             wildcard_name = str_center
-            
+            original_pattern = str_center  # 전체 패턴 저장 (wildcard_name*repeat_count)
+
             # *숫자 패턴 확인
             if '*' in str_center:
                 parts = str_center.split('*')
@@ -275,16 +311,18 @@ class WildcardApplier():
             if wildcard_name in self._wildcards_dict and not (wildcard_name in except_list):
                 wc_list = self._wildcards_dict[wildcard_name]
                 if wc_list:
-                    # 키 사용 기록
-                    self._used_keys.add(wildcard_name)
-                    
+                    # 키 사용 기록 - 반복 카운트 포함한 전체 패턴 사용
+                    self._used_keys.add(original_pattern)
+
                     # 스냅샷에서 인덱스 가져오기
                     idx = self._current_snapshot.get(wildcard_name, 0)
                     selected_line = wc_list[idx].strip()
-                    
+
                     # 단일 캐릭터만 사용 (스냅샷에서는 반복 없이)
                     str_center = selected_line
                     applied_loopcard_list.append(str_center)
+
+                    logger.debug(f"Applied wildcard '{original_pattern}' at index {idx}: {str_center[:50]}...")
                 else:
                     str_center = "##" + str_center + "##"
             else:
@@ -314,7 +352,7 @@ class WildcardApplier():
                 
             index += 1
             if index > MAX_TRY_AMOUNT:
-                print("Warning: Too much recursion in loopcards")
+                logger.warning("Too much recursion in loopcards")
                 break
         
         # 2. 와일드카드(랜덤) 적용
@@ -329,7 +367,7 @@ class WildcardApplier():
                 
             index += 1
             if index > MAX_TRY_AMOUNT:
-                print("Warning: Too much recursion in wildcards")
+                logger.warning("Too much recursion in wildcards")
                 break
                 
         return result

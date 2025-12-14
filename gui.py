@@ -38,7 +38,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.12.01"
+TITLE_NAME = "NAI Auto Generator V4.5_2.5.12.14"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -1315,8 +1315,46 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.character_fidelity_value_label.setText(f"{self.character_reference_fidelity:.2f}")
         logger.debug(f"Fidelity changed: {self.character_reference_fidelity}")
 
+    def load_img2img_image_from_path(self, file_path):
+        """Image to Image 이미지를 경로에서 로드 (드래그 앤 드롭 및 버튼 클릭 모두 지원)"""
+        if not file_path:
+            return
+
+        try:
+            # 이미지 로드
+            from PIL import Image
+            self.img2img_image = Image.open(file_path)
+            self.img2img_path = file_path
+
+            # 미리보기 업데이트
+            thumbnail = self.img2img_image.copy()
+            thumbnail.thumbnail((164, 198), Image.LANCZOS)
+
+            # PIL Image를 QPixmap으로 변환
+            img_byte_arr = io.BytesIO()
+            thumbnail.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+
+            from PyQt5.QtGui import QPixmap
+            pixmap = QPixmap()
+            pixmap.loadFromData(img_byte_arr.read())
+
+            self.img2img_image_label.setPixmap(pixmap)
+            self.img2img_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); border: 2px solid #559977;")
+            self.btn_remove_img2img_image.setEnabled(True)
+
+            # Paint Mask 버튼 활성화 (inpaint 모드가 활성화된 경우)
+            if self.inpaint_mode:
+                self.btn_paint_mask.setEnabled(True)
+
+            logger.info(f"Image to Image source loaded: {file_path}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
+            logger.error(f"Failed to load img2img image: {e}")
+
     def select_img2img_image(self):
-        """Image to Image 이미지 선택"""
+        """Image to Image 이미지 선택 (파일 다이얼로그)"""
         file_dialog = QFileDialog()
         file_path, _ = file_dialog.getOpenFileName(
             self,
@@ -1326,45 +1364,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
         )
 
         if file_path:
-            try:
-                # 이미지 로드
-                from PIL import Image
-                self.img2img_image = Image.open(file_path)
-                self.img2img_path = file_path
-
-                # 미리보기 업데이트
-                thumbnail = self.img2img_image.copy()
-                thumbnail.thumbnail((164, 198), Image.LANCZOS)
-
-                # PIL Image를 QPixmap으로 변환
-                img_byte_arr = io.BytesIO()
-                thumbnail.save(img_byte_arr, format='PNG')
-                img_byte_arr.seek(0)
-
-                from PyQt5.QtGui import QPixmap
-                pixmap = QPixmap()
-                pixmap.loadFromData(img_byte_arr.read())
-
-                self.img2img_image_label.setPixmap(pixmap)
-                self.btn_remove_img2img_image.setEnabled(True)
-
-                # Paint Mask 버튼 활성화 (inpaint 모드가 활성화된 경우)
-                if self.inpaint_mode:
-                    self.btn_paint_mask.setEnabled(True)
-
-                logger.info(f"Image to Image source loaded: {file_path}")
-
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
-                logger.error(f"Failed to load img2img image: {e}")
+            self.load_img2img_image_from_path(file_path)
 
     def remove_img2img_image(self):
         """Image to Image 이미지 제거"""
         self.img2img_image = None
         self.img2img_path = None
         self.img2img_image_label.clear()
-        self.img2img_image_label.setText("No Image")
-        self.img2img_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
+        self.img2img_image_label.setText("No Image\n(Drag & Drop)")
+        self.img2img_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; border: 2px dashed #666;")
         self.btn_remove_img2img_image.setEnabled(False)
 
         # Paint Mask 버튼 비활성화 및 마스크 초기화
@@ -1505,8 +1513,160 @@ class NAIAutoGeneratorWindow(QMainWindow):
         enhanced_height = int(orig_height * 1.5)
         return enhanced_width, enhanced_height
 
+    def load_enhance_image_from_path(self, file_path):
+        """Image Enhance 이미지를 경로에서 로드 (드래그 앤 드롭 및 버튼 클릭 모두 지원)"""
+        if not file_path:
+            return
+
+        try:
+            # 이미지 로드
+            self.enhance_image = Image.open(file_path)
+            self.enhance_path = file_path
+
+            # 메타데이터 읽기 (Enhancement용)
+            try:
+                nai_dict, error_code = naiinfo_getter.get_naidict_from_file(file_path)
+
+                if error_code == 3 and nai_dict:
+                    # 메타데이터 저장
+                    self.enhance_metadata = {
+                        "prompt": nai_dict.get("prompt", ""),
+                        "negative_prompt": nai_dict.get("negative_prompt", "")
+                    }
+                    self.enhance_metadata.update(nai_dict.get("option", {}))
+                    self.enhance_metadata.update(nai_dict.get("etc", {}))
+
+                    # v4_prompt에서 캐릭터 정보 추출
+                    if "v4_prompt" in nai_dict.get("etc", {}) and "caption" in nai_dict["etc"]["v4_prompt"]:
+                        char_captions = nai_dict["etc"]["v4_prompt"]["caption"].get("char_captions", [])
+                        v4_neg_prompt = nai_dict["etc"].get("v4_negative_prompt", {})
+                        neg_char_captions = []
+
+                        if "caption" in v4_neg_prompt:
+                            neg_char_captions = v4_neg_prompt["caption"].get("char_captions", [])
+
+                        # characterPrompts 배열 생성
+                        character_prompts = []
+
+                        for i, char in enumerate(char_captions):
+                            char_prompt = {
+                                "prompt": char.get("char_caption", ""),
+                                "negative_prompt": "",
+                                "position": None
+                            }
+
+                            # 위치 정보 추가 (있을 경우)
+                            if "centers" in char and len(char["centers"]) > 0:
+                                center = char["centers"][0]
+                                char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
+
+                            # 네거티브 프롬프트 추가 (존재하는 경우)
+                            if i < len(neg_char_captions):
+                                char_prompt["negative_prompt"] = neg_char_captions[i].get("char_caption", "")
+
+                            character_prompts.append(char_prompt)
+
+                        if character_prompts:
+                            self.enhance_metadata["characterPrompts"] = character_prompts
+
+                            # use_character_coords 정보 저장
+                            use_character_coords = self.enhance_metadata.get("use_character_coords", None)
+                            if use_character_coords is None and "v4_prompt" in nai_dict["etc"]:
+                                v4_use_coords = nai_dict["etc"]["v4_prompt"].get("use_coords", None)
+                                if v4_use_coords is not None:
+                                    self.enhance_metadata["use_character_coords"] = v4_use_coords
+
+                    logger.info(f"Enhance image metadata loaded successfully")
+                    logger.debug(f"Metadata contains {len(self.enhance_metadata.get('characterPrompts', []))} character prompts")
+                else:
+                    # 메타데이터가 없거나 읽기 실패 - 경고 및 차단
+                    self.enhance_metadata = None
+                    self.enhance_image = None
+                    self.enhance_path = None
+                    logger.warning(f"No valid NAI metadata found in enhancement image (error_code: {error_code})")
+
+                    # 사용자에게 경고 표시
+                    QMessageBox.warning(
+                        self,
+                        tr('enhance.no_metadata_title', 'No NovelAI Metadata'),
+                        tr('enhance.no_metadata_message',
+                           'The selected image does not contain valid NovelAI metadata.\n\n'
+                           'Enhancement requires metadata from the original generation to work correctly.\n\n'
+                           'Please select an image generated by NovelAI with embedded metadata.')
+                    )
+                    return  # 메타데이터 없으면 Enhancement 이미지 로드 중단
+            except Exception as e:
+                logger.error(f"Error reading enhancement image metadata: {e}")
+                self.enhance_metadata = None
+                self.enhance_image = None
+                self.enhance_path = None
+
+                QMessageBox.critical(
+                    self,
+                    tr('error', 'Error'),
+                    f"Failed to read image metadata: {str(e)}"
+                )
+                return
+
+            # 해상도 검증 (Enhancement는 Normal 해상도만 지원)
+            img_width, img_height = self.enhance_image.size
+            supported_resolutions = [
+                (1024, 1024),  # Square Normal
+                (832, 1216),   # Portrait Normal
+                (1216, 832),   # Landscape Normal
+            ]
+
+            if (img_width, img_height) not in supported_resolutions:
+                # 지원하지 않는 해상도 - 경고 및 차단
+                self.enhance_metadata = None
+                self.enhance_image = None
+                self.enhance_path = None
+
+                # 지원되는 해상도 목록 문자열 생성
+                supported_list = "\n".join([f"  • {w}x{h}" for w, h in supported_resolutions])
+
+                logger.warning(f"Unsupported resolution for enhancement: {img_width}x{img_height}")
+
+                # 사용자에게 경고 표시
+                message = tr('enhance.invalid_resolution_message',
+                           'The selected image has a resolution of {width}x{height}, which is not supported for enhancement.\n\n'
+                           'NovelAI Enhancement only supports Normal resolution images:\n'
+                           '{supported_list}\n\n'
+                           'Please select an image with one of the supported resolutions.')
+                message = message.format(width=img_width, height=img_height, supported_list=supported_list)
+
+                QMessageBox.warning(
+                    self,
+                    tr('enhance.invalid_resolution_title', 'Unsupported Resolution'),
+                    message
+                )
+                return  # 지원하지 않는 해상도면 Enhancement 이미지 로드 중단
+
+            # 미리보기 업데이트
+            thumbnail = self.enhance_image.copy()
+            thumbnail.thumbnail((164, 198), Image.LANCZOS)
+
+            # PIL Image를 QPixmap으로 변환
+            img_byte_arr = io.BytesIO()
+            thumbnail.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+
+            from PyQt5.QtGui import QPixmap
+            pixmap = QPixmap()
+            pixmap.loadFromData(img_byte_arr.read())
+
+            self.enhance_image_label.setPixmap(pixmap)
+            self.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); border: 2px solid #559977;")
+            self.btn_remove_enhance_image.setEnabled(True)
+
+            logger.info(f"Enhance image loaded: {file_path}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
+            logger.error(f"Failed to load enhance image: {e}")
+
     def select_enhance_image(self):
-        """Image Enhance 이미지 선택"""
+        """Image Enhance 이미지 선택 (파일 다이얼로그)"""
         file_dialog = QFileDialog()
         file_path, _ = file_dialog.getOpenFileName(
             self,
@@ -1516,117 +1676,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         )
 
         if file_path:
-            try:
-                # 이미지 로드
-                self.enhance_image = Image.open(file_path)
-                self.enhance_path = file_path
-
-                # 메타데이터 읽기 (Enhancement용)
-                try:
-                    nai_dict, error_code = naiinfo_getter.get_naidict_from_file(file_path)
-
-                    if error_code == 3 and nai_dict:
-                        # 메타데이터 저장
-                        self.enhance_metadata = {
-                            "prompt": nai_dict.get("prompt", ""),
-                            "negative_prompt": nai_dict.get("negative_prompt", "")
-                        }
-                        self.enhance_metadata.update(nai_dict.get("option", {}))
-                        self.enhance_metadata.update(nai_dict.get("etc", {}))
-
-                        # v4_prompt에서 캐릭터 정보 추출
-                        if "v4_prompt" in nai_dict.get("etc", {}) and "caption" in nai_dict["etc"]["v4_prompt"]:
-                            char_captions = nai_dict["etc"]["v4_prompt"]["caption"].get("char_captions", [])
-                            v4_neg_prompt = nai_dict["etc"].get("v4_negative_prompt", {})
-                            neg_char_captions = []
-
-                            if "caption" in v4_neg_prompt:
-                                neg_char_captions = v4_neg_prompt["caption"].get("char_captions", [])
-
-                            # characterPrompts 배열 생성
-                            character_prompts = []
-
-                            for i, char in enumerate(char_captions):
-                                char_prompt = {
-                                    "prompt": char.get("char_caption", ""),
-                                    "negative_prompt": "",
-                                    "position": None
-                                }
-
-                                # 위치 정보 추가 (있을 경우)
-                                if "centers" in char and len(char["centers"]) > 0:
-                                    center = char["centers"][0]
-                                    char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
-
-                                # 네거티브 프롬프트 추가 (존재하는 경우)
-                                if i < len(neg_char_captions):
-                                    char_prompt["negative_prompt"] = neg_char_captions[i].get("char_caption", "")
-
-                                character_prompts.append(char_prompt)
-
-                            if character_prompts:
-                                self.enhance_metadata["characterPrompts"] = character_prompts
-
-                                # use_character_coords 정보 저장
-                                use_character_coords = self.enhance_metadata.get("use_character_coords", None)
-                                if use_character_coords is None and "v4_prompt" in nai_dict["etc"]:
-                                    v4_use_coords = nai_dict["etc"]["v4_prompt"].get("use_coords", None)
-                                    if v4_use_coords is not None:
-                                        self.enhance_metadata["use_character_coords"] = v4_use_coords
-
-                        logger.info(f"Enhance image metadata loaded successfully")
-                        logger.debug(f"Metadata contains {len(self.enhance_metadata.get('characterPrompts', []))} character prompts")
-                    else:
-                        # 메타데이터가 없거나 읽기 실패 - 경고 및 차단
-                        self.enhance_metadata = None
-                        self.enhance_image = None
-                        self.enhance_path = None
-                        logger.warning(f"No valid NAI metadata found in enhancement image (error_code: {error_code})")
-
-                        # 사용자에게 경고 표시
-                        QMessageBox.warning(
-                            self,
-                            tr('enhance.no_metadata_title', 'No NovelAI Metadata'),
-                            tr('enhance.no_metadata_message',
-                               'The selected image does not contain valid NovelAI metadata.\n\n'
-                               'Enhancement requires metadata from the original generation to work correctly.\n\n'
-                               'Please select an image generated by NovelAI with embedded metadata.')
-                        )
-                        return  # 메타데이터 없으면 Enhancement 이미지 로드 중단
-                except Exception as e:
-                    logger.error(f"Error reading enhancement image metadata: {e}")
-                    self.enhance_metadata = None
-                    self.enhance_image = None
-                    self.enhance_path = None
-
-                    QMessageBox.critical(
-                        self,
-                        tr('error', 'Error'),
-                        f"Failed to read image metadata: {str(e)}"
-                    )
-                    return
-
-                # 미리보기 업데이트
-                thumbnail = self.enhance_image.copy()
-                thumbnail.thumbnail((164, 198), Image.LANCZOS)
-
-                # PIL Image를 QPixmap으로 변환
-                img_byte_arr = io.BytesIO()
-                thumbnail.save(img_byte_arr, format='PNG')
-                img_byte_arr.seek(0)
-
-                from PyQt5.QtGui import QPixmap
-                pixmap = QPixmap()
-                pixmap.loadFromData(img_byte_arr.read())
-
-                self.enhance_image_label.setPixmap(pixmap)
-                self.btn_remove_enhance_image.setEnabled(True)
-
-                logger.info(f"Enhance image loaded: {file_path}")
-
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
-                logger.error(f"Failed to load enhance image: {e}")
+            self.load_enhance_image_from_path(file_path)
 
     def use_current_for_enhance(self):
         """현재 생성된 이미지를 Enhance용으로 사용"""
@@ -1728,8 +1778,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.enhance_path = None
         self.enhance_metadata = None  # 메타데이터도 함께 제거
         self.enhance_image_label.clear()
-        self.enhance_image_label.setText(tr('enhance.no_image', 'No Image'))
-        self.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white;")
+        self.enhance_image_label.setText(tr('enhance.no_image', 'No Image') + "\n(Drag & Drop)")
+        self.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; border: 2px dashed #666;")
         self.btn_remove_enhance_image.setEnabled(False)
         logger.info("Enhance image and metadata removed")
 
