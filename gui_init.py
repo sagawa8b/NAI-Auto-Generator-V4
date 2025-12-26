@@ -1483,19 +1483,36 @@ class ImageToImageWidget(QGroupBox):
 
 def set_sampler_by_api_value(parent, api_value):
     """API 값으로 샘플러 콤보박스 설정"""
-    # API 값에서 UI 이름으로 역매핑
-    ui_name = None
-    for name, value in parent.sampler_mapping.items():
-        if value == api_value:
-            ui_name = name
-            break
-    
-    # 매핑된 UI 이름이 있으면 선택, 없으면 기본값(첫 번째 항목) 선택
-    if ui_name and ui_name in parent.sampler_mapping:
-        parent.dict_ui_settings["sampler"].setCurrentText(ui_name)
-    else:
-        # 기본값 선택
-        parent.dict_ui_settings["sampler"].setCurrentIndex(0)
+    try:
+        # sampler_mapping이 초기화되었는지 확인
+        if not hasattr(parent, 'sampler_mapping') or not parent.sampler_mapping:
+            logger.warning(f"sampler_mapping이 초기화되지 않았습니다. 기본값을 사용합니다.")
+            if hasattr(parent, 'dict_ui_settings') and "sampler" in parent.dict_ui_settings:
+                parent.dict_ui_settings["sampler"].setCurrentIndex(0)
+            return
+
+        # API 값에서 UI 이름으로 역매핑
+        ui_name = None
+        for name, value in parent.sampler_mapping.items():
+            if value == api_value:
+                ui_name = name
+                break
+
+        # 매핑된 UI 이름이 있으면 선택, 없으면 기본값(첫 번째 항목) 선택
+        if ui_name and ui_name in parent.sampler_mapping:
+            parent.dict_ui_settings["sampler"].setCurrentText(ui_name)
+        else:
+            logger.warning(f"API 값 '{api_value}'에 대한 UI 매핑을 찾을 수 없습니다. 기본값을 사용합니다.")
+            # 기본값 선택
+            parent.dict_ui_settings["sampler"].setCurrentIndex(0)
+    except Exception as e:
+        logger.error(f"set_sampler_by_api_value 오류: {e}")
+        # 오류 발생 시에도 기본값으로 설정
+        try:
+            if hasattr(parent, 'dict_ui_settings') and "sampler" in parent.dict_ui_settings:
+                parent.dict_ui_settings["sampler"].setCurrentIndex(0)
+        except:
+            pass
     
 
 class ResizableImageWidget(QFrame):

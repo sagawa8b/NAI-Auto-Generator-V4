@@ -195,62 +195,69 @@ class CharacterPromptWidget(QFrame):
         self.layout.setContentsMargins(4, 4, 4, 4)  # 여백 축소
         self.layout.setSpacing(2)  # 간격 축소
         self.setLayout(self.layout)
-        
+
         # 헤더 (타이틀 + 컨트롤 버튼)
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 0)  # 여백 제거
         header_layout.setSpacing(2)  # 간격 축소
-        
+
         title_label = QLabel(tr('ui.character_n', self.index + 1))
         title_label.setStyleSheet("font-weight: bold; color: black;")
         header_layout.addWidget(title_label)
-        
+
         header_layout.addStretch()
-        
+
         # 캐릭터 순서 이동 버튼 - 크기 축소
         move_up_btn = QPushButton("▲")
         move_up_btn.setFixedSize(24, 22)  # 크기 축소
         move_up_btn.setStyleSheet("padding: 0px;")  # 패딩 제거
         move_up_btn.clicked.connect(lambda: self.moved.emit(self, -1))
-        
+
         move_down_btn = QPushButton("▼")
         move_down_btn.setFixedSize(24, 22)  # 크기 축소
         move_down_btn.setStyleSheet("padding: 0px;")  # 패딩 제거
         move_down_btn.clicked.connect(lambda: self.moved.emit(self, 1))
-        
+
         # 위치 설정 버튼 - 크기 축소
         self.position_btn = QPushButton(tr('ui.position'))
         self.position_btn.setFixedWidth(40)  # 크기 축소
         self.position_btn.setStyleSheet("background-color: #f0f0f0; color: black; padding: 2px;")
         self.position_btn.clicked.connect(self.show_position_dialog)
-        
+
         # 삭제 버튼 - 크기 축소
         delete_btn = QPushButton("✕")
         delete_btn.setFixedSize(24, 22)  # 크기 축소
         delete_btn.setStyleSheet("padding: 0px;")  # 패딩 제거
         delete_btn.clicked.connect(lambda: self.deleted.emit(self))
-        
+
         header_layout.addWidget(move_up_btn)
         header_layout.addWidget(move_down_btn)
         header_layout.addWidget(self.position_btn)
         header_layout.addWidget(delete_btn)
-        
+
         self.layout.addLayout(header_layout)
-        
-        # 캐릭터 프롬프트 입력
+
+        # 메인 프롬프트 컨테이너
+        main_prompt_container = QWidget()
+        main_prompt_layout = QVBoxLayout()
+        main_prompt_layout.setContentsMargins(0, 0, 0, 0)
+        main_prompt_layout.setSpacing(2)
+        main_prompt_container.setLayout(main_prompt_layout)
+
+        # 캐릭터 프롬프트 라벨
         prompt_label = QLabel(tr('ui.character_prompt'))
         prompt_label.setStyleSheet("color: black; font-weight: bold;")
-        self.layout.addWidget(prompt_label)
+        main_prompt_layout.addWidget(prompt_label)
 
         # QPlainTextEdit 대신 CompletionTextEdit 사용
         # 캐릭터 프롬프트에서는 이미지 드래그&드롭 비활성화 (크래시 방지)
         self.prompt_edit = CompletionTextEdit(enable_image_drop=False)
         self.prompt_edit.setPlaceholderText("이 캐릭터에 대한 프롬프트 입력...")
-        self.prompt_edit.setMinimumHeight(60)  # 최소 높이 감소 (반응형)
+        self.prompt_edit.setMinimumHeight(60)  # 최소 높이
         self.prompt_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 반응형 크기 정책
         self.prompt_edit.setStyleSheet("background-color: white; color: black; border: 1px solid #bbbbbb;")
-        self.layout.addWidget(self.prompt_edit, 1)  # stretch factor 추가
-        
+        main_prompt_layout.addWidget(self.prompt_edit, 1)  # stretch factor 추가
+
         # 네거티브 프롬프트 체크박스
         neg_checkbox_layout = QHBoxLayout()
         neg_checkbox_layout.setContentsMargins(0, 0, 0, 0)  # 여백 제거
@@ -260,14 +267,14 @@ class CharacterPromptWidget(QFrame):
         neg_checkbox_layout.addWidget(self.neg_checkbox)
         neg_checkbox_layout.addStretch()
         self.layout.addLayout(neg_checkbox_layout)
-        
+
         # 네거티브 프롬프트 컨테이너 (처음에는 숨김)
         self.neg_container = QWidget()
         neg_container_layout = QVBoxLayout()
         neg_container_layout.setContentsMargins(0, 0, 0, 0)
         neg_container_layout.setSpacing(2)  # 간격 축소
         self.neg_container.setLayout(neg_container_layout)
-        
+
         neg_prompt_label = QLabel("캐릭터 네거티브 프롬프트:")
         neg_prompt_label.setStyleSheet("color: black; font-weight: bold;")
         neg_container_layout.addWidget(neg_prompt_label)
@@ -276,18 +283,56 @@ class CharacterPromptWidget(QFrame):
         # 캐릭터 프롬프트에서는 이미지 드래그&드롭 비활성화 (크래시 방지)
         self.neg_prompt_edit = CompletionTextEdit(enable_image_drop=False)
         self.neg_prompt_edit.setPlaceholderText("이 캐릭터에 대한 네거티브 프롬프트 입력...")
-        self.neg_prompt_edit.setMinimumHeight(50)  # 최소 높이 감소 (반응형)
+        self.neg_prompt_edit.setMinimumHeight(60)  # 최소 높이
         self.neg_prompt_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # 반응형 크기 정책
         self.neg_prompt_edit.setStyleSheet("background-color: white; color: black; border: 1px solid #bbbbbb;")
         neg_container_layout.addWidget(self.neg_prompt_edit, 1)  # stretch factor 추가
-        
-        self.layout.addWidget(self.neg_container)
+
+        # QSplitter로 메인 프롬프트와 네거티브 프롬프트 연결 (수동 크기 조절 가능)
+        self.prompt_splitter = QSplitter(Qt.Vertical)
+        self.prompt_splitter.addWidget(main_prompt_container)
+        self.prompt_splitter.addWidget(self.neg_container)
+        self.prompt_splitter.setStretchFactor(0, 1)  # 메인 프롬프트
+        self.prompt_splitter.setStretchFactor(1, 1)  # 네거티브 프롬프트
+        self.prompt_splitter.setHandleWidth(4)  # 스플리터 핸들 너비
+        self.prompt_splitter.setStyleSheet("QSplitter::handle { background-color: #cccccc; }")
+
+        # 스플리터 크기 변경 시 자동 저장
+        self.prompt_splitter.splitterMoved.connect(self.save_splitter_sizes)
+
+        self.layout.addWidget(self.prompt_splitter, 1)  # stretch factor 추가
         self.neg_container.setVisible(False)  # 처음에는 숨김
+
+        # 스플리터 크기 복원
+        self.load_splitter_sizes()
     
+    def load_splitter_sizes(self):
+        """저장된 스플리터 크기 불러오기"""
+        saved_sizes = self.settings.value(f"character_widget_{self.index}_splitter_sizes")
+        if saved_sizes:
+            try:
+                # QSettings에서 불러온 값을 정수 리스트로 변환
+                sizes = [int(s) for s in saved_sizes]
+                self.prompt_splitter.setSizes(sizes)
+            except (ValueError, TypeError) as e:
+                logger.debug(f"스플리터 크기 복원 실패: {e}")
+
+    def save_splitter_sizes(self):
+        """스플리터 크기 저장"""
+        sizes = self.prompt_splitter.sizes()
+        self.settings.setValue(f"character_widget_{self.index}_splitter_sizes", sizes)
+
     def toggle_negative_prompt(self, state):
         """네거티브 프롬프트 표시/숨김 전환"""
         self.show_negative = state == Qt.Checked
         self.neg_container.setVisible(self.show_negative)
+
+        # 네거티브 프롬프트가 표시될 때 스플리터 크기 복원
+        if self.show_negative:
+            self.load_splitter_sizes()
+        else:
+            # 숨길 때 현재 크기 저장
+            self.save_splitter_sizes()
     
     def show_position_dialog(self):
         """캐릭터 위치 선택 다이얼로그 표시"""
