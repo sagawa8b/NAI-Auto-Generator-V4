@@ -2,6 +2,9 @@ from PIL import Image
 import json
 
 from stealth_pnginfo import read_info_from_image_stealth
+from logger import get_logger
+
+logger = get_logger()
 
 TARGETKEY_NAIDICT_OPTION = ("steps", "height", "width",
                             "scale", "seed", "sampler", "n_samples", "sm", "sm_dyn")
@@ -16,13 +19,13 @@ def _get_infostr_from_img(img):
         try:
             exif = json.dumps(img.info)
         except Exception as e:
-            print(e)
+            logger.error(f"Error reading image exif: {e}")
 
     # stealth pnginfo
     try:
         pnginfo = read_info_from_image_stealth(img)
     except Exception as e:
-        print(e)
+        logger.error(f"Error reading stealth pnginfo: {e}")
 
     return exif, pnginfo
 
@@ -33,7 +36,7 @@ def _get_exifdict_from_infostr(info_str):
         exif_dict = json.loads(comment_str)
         return exif_dict
     except Exception as e:
-        print(e)
+        logger.error(f"Error extracting exif dict from info string: {e}")
 
     return None
 
@@ -58,7 +61,7 @@ def _get_naidict_from_exifdict(exif_dict):
         nai_dict["etc"] = etc_dict
         return nai_dict
     except Exception as e:
-        print(e)
+        logger.error(f"Error extracting NAI dict from exif dict: {e}")
 
     return None
 
@@ -68,7 +71,7 @@ def get_naidict_from_file(src):
         img = Image.open(src)
         img.load()
     except Exception as e:
-        print(e)
+        logger.error(f"Error loading image from file {src}: {e}")
         return None
 
     return get_naidict_from_img(img)
@@ -80,7 +83,7 @@ def get_naidict_from_txt(src):
             info_str = f.read()
         ed = json.loads(info_str)
     except Exception as e:
-        print(e)
+        logger.error(f"Error reading NAI dict from txt file {src}: {e}")
         return info_str or "", 0
 
     nd = _get_naidict_from_exifdict(ed)
@@ -116,7 +119,7 @@ if __name__ == "__main__":
     src = "settings/aris_noimage.txt"
 
     nd = get_naidict_from_txt(src)
-    print(nd)
+    logger.info(f"NAI dict from txt: {nd}")
     # exif_dict = get_exifdict_from_infostr(info_str)
     # nai_dict = get_naidict_from_exifdict(exif_dict)
 

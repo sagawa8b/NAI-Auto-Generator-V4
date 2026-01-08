@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
                              QFileDialog, QApplication, QCompleter, QFrame, QSlider)
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QSize
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QMouseEvent, QBrush, QPalette, QDrag
-from consts import RESOLUTION_FAMILIY
+from consts import RESOLUTION_FAMILIY, COLOR
 from completer import CompletionTextEdit
 from character_prompts_ui import CharacterPromptsContainer
 import random
@@ -422,6 +422,32 @@ def create_enhance_widget(parent, left_widget):
     buttons_layout.addWidget(parent.btn_remove_enhance_image)
 
     controls_layout.addLayout(buttons_layout)
+
+    # 폴더 선택 및 벌크 처리 버튼
+    bulk_buttons_layout = QHBoxLayout()
+    bulk_buttons_layout.setSpacing(8)
+
+    # 폴더 선택 버튼
+    parent.btn_select_enhance_folder = QPushButton(tr('enhance.select_folder', 'Select Folder'))
+    parent.btn_select_enhance_folder.clicked.connect(parent.select_enhance_folder)
+    parent.btn_select_enhance_folder.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    bulk_buttons_layout.addWidget(parent.btn_select_enhance_folder)
+
+    # 전용 Enhance 버튼 (단일/벌크 처리 모두 사용)
+    parent.btn_enhance_create = QPushButton(tr('enhance.create_button', 'Enhance'))
+    parent.btn_enhance_create.clicked.connect(parent.start_enhance_process)
+    parent.btn_enhance_create.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    parent.btn_enhance_create.setStyleSheet(f"background-color: {COLOR.BUTTON_CUSTOM}; color: white; font-weight: bold;")
+    parent.btn_enhance_create.setEnabled(False)
+    bulk_buttons_layout.addWidget(parent.btn_enhance_create)
+
+    controls_layout.addLayout(bulk_buttons_layout)
+
+    # 진행 상황 표시 레이블
+    parent.enhance_progress_label = QLabel("")
+    parent.enhance_progress_label.setStyleSheet("font-size: 10pt; color: #888;")
+    parent.enhance_progress_label.setAlignment(Qt.AlignCenter)
+    controls_layout.addWidget(parent.enhance_progress_label)
 
     # Upscale Ratio 섹션
     ratio_label = QLabel(tr('enhance.ratio_label', 'Upscale Ratio'))

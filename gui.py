@@ -38,7 +38,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.5.12.26.1"
+TITLE_NAME = "NAI Auto Generator V4.5_2.6.01.08"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -320,6 +320,14 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.enhance_strength = 0.4  # 기본값 0.4 (0.01-0.99)
         self.enhance_noise = 0.0  # 기본값 0.0 (0.00-0.99)
         self.enhance_ratio = 1.5  # 기본값 1.5x (1.0 or 1.5)
+
+        # Bulk Enhancement 관련 변수 추가
+        self.enhance_folder_path = None  # 선택된 폴더 경로
+        self.enhance_image_list = []  # 처리할 이미지 파일 목록
+        self.enhance_current_index = 0  # 현재 처리 중인 이미지 인덱스
+        self.enhance_bulk_mode = False  # 벌크 모드 활성화 여부
+        self.enhance_bulk_thread = None  # 벌크 처리 스레드
+
         self.last_generated_image = None  # 마지막 생성된 이미지 저장
 
         # 변수 및 창 초기화 (settings 초기화)
@@ -1658,6 +1666,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             self.enhance_image_label.setPixmap(pixmap)
             self.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); border: 2px solid #559977;")
             self.btn_remove_enhance_image.setEnabled(True)
+            self.update_enhance_button_state()  # Enhance 버튼 상태 업데이트
 
             logger.info(f"Enhance image loaded: {file_path}")
 
@@ -1781,6 +1790,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.enhance_image_label.setText(tr('enhance.no_image', 'No Image') + "\n(Drag & Drop)")
         self.enhance_image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128); color: white; border: 2px dashed #666;")
         self.btn_remove_enhance_image.setEnabled(False)
+        self.update_enhance_button_state()  # Enhance 버튼 상태 업데이트
         logger.info("Enhance image and metadata removed")
 
     def on_enhance_strength_changed(self, value):
@@ -1841,6 +1851,142 @@ class NAIAutoGeneratorWindow(QMainWindow):
         else:
             self.enhance_ratio = 1.5
             logger.debug("Enhance ratio changed: 1.5x")
+
+    def select_enhance_folder(self):
+        """Bulk Enhancement를 위한 폴더 선택"""
+        folder_path = QFileDialog.getExistingDirectory(
+            self,
+            tr('enhance.select_folder_title', 'Select Folder for Bulk Enhancement'),
+            ''
+        )
+
+        if folder_path:
+            logger.info(f"Selected folder for bulk enhancement: {folder_path}")
+            self.enhance_folder_path = folder_path
+
+            # 폴더 내 NAI 이미지 스캔
+            valid_images = []
+            supported_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+
+            try:
+                for filename in os.listdir(folder_path):
+                    file_path = os.path.join(folder_path, filename)
+                    if os.path.isfile(file_path):
+                        # 확장자 확인
+                        _, ext = os.path.splitext(filename)
+                        if ext.lower() in supported_extensions:
+                            # NAI 메타데이터 확인
+                            try:
+                                nai_dict, error_code = naiinfo_getter.get_naidict_from_file(file_path)
+                                if error_code == 3 and nai_dict:
+                                    valid_images.append(file_path)
+                                    logger.debug(f"Valid NAI image found: {filename}")
+                            except Exception as e:
+                                logger.debug(f"Skipping {filename}: {e}")
+
+                if valid_images:
+                    self.enhance_image_list = valid_images
+                    self.enhance_current_index = 0
+                    self.enhance_bulk_mode = True
+
+                    # 진행 상황 레이블 업데이트
+                    self.enhance_progress_label.setText(
+                        tr('enhance.images_found').format(len(valid_images))
+                    )
+
+                    # Enhance 버튼 활성화
+                    self.btn_enhance_create.setEnabled(True)
+
+                    logger.info(f"Found {len(valid_images)} valid NAI images for bulk enhancement")
+                    QMessageBox.information(
+                        self,
+                        tr('enhance.folder_selected'),
+                        tr('enhance.images_found_msg').format(len(valid_images))
+                    )
+                else:
+                    self.enhance_bulk_mode = False
+                    self.enhance_progress_label.setText(
+                        tr('enhance.no_images_found')
+                    )
+                    QMessageBox.warning(
+                        self,
+                        tr('enhance.no_images'),
+                        tr('enhance.no_images_msg')
+                    )
+                    logger.warning("No valid NAI images found in selected folder")
+
+            except Exception as e:
+                logger.error(f"Error scanning folder: {e}")
+                QMessageBox.critical(
+                    self,
+                    tr('error'),
+                    tr('enhance.folder_scan_error').format(str(e))
+                )
+
+    def start_enhance_process(self):
+        """Enhancement 프로세스 시작 (단일 또는 벌크)"""
+        if self.enhance_bulk_mode and self.enhance_image_list:
+            # 벌크 모드: 첫 번째 이미지부터 시작
+            self.enhance_current_index = 0
+            self.process_next_enhance_image()
+        elif self.enhance_image:
+            # 단일 모드: 현재 로드된 이미지 처리
+            logger.info("Starting single enhance process")
+            self.on_click_generate_once()
+        else:
+            QMessageBox.warning(
+                self,
+                tr('enhance.no_image'),
+                tr('enhance.no_image_loaded')
+            )
+
+    def process_next_enhance_image(self):
+        """벌크 Enhancement에서 다음 이미지 처리"""
+        if not self.enhance_bulk_mode or not self.enhance_image_list:
+            return
+
+        if self.enhance_current_index < len(self.enhance_image_list):
+            # 현재 이미지 로드
+            current_path = self.enhance_image_list[self.enhance_current_index]
+            logger.info(f"Processing image {self.enhance_current_index + 1}/{len(self.enhance_image_list)}: {current_path}")
+
+            # 진행 상황 업데이트
+            self.enhance_progress_label.setText(
+                tr('enhance.processing').format(
+                    self.enhance_current_index + 1, len(self.enhance_image_list)
+                )
+            )
+
+            # 이미지 로드
+            self.load_enhance_image_from_path(current_path)
+
+            # 잠시 대기 후 생성 시작 (UI 업데이트를 위해)
+            QTimer.singleShot(100, self.on_click_generate_once)
+
+        else:
+            # 모든 이미지 처리 완료
+            logger.info("Bulk enhancement completed")
+            self.enhance_progress_label.setText(
+                tr('enhance.completed').format(len(self.enhance_image_list))
+            )
+            QMessageBox.information(
+                self,
+                tr('enhance.bulk_complete'),
+                tr('enhance.bulk_complete_msg').format(len(self.enhance_image_list))
+            )
+
+            # 벌크 모드 초기화
+            self.enhance_bulk_mode = False
+            self.enhance_image_list = []
+            self.enhance_current_index = 0
+
+    def update_enhance_button_state(self):
+        """Enhance 버튼 상태 업데이트"""
+        # 단일 이미지가 로드되었거나 벌크 모드가 활성화된 경우 버튼 활성화
+        if self.enhance_image or (self.enhance_bulk_mode and self.enhance_image_list):
+            self.btn_enhance_create.setEnabled(True)
+        else:
+            self.btn_enhance_create.setEnabled(False)
 
     def setup_language_menu(self):
         """언어 선택 메뉴 설정"""
@@ -2947,8 +3093,24 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     self.session_manager.increment_image_count()
 
                 # Anlas 실시간 업데이트 추가 (서버 업데이트 대기 시간 고려)
-                QTimer.singleShot(1000, self.refresh_anlas)  # 1초 후 Anlas 새로고침   
-            
+                QTimer.singleShot(1000, self.refresh_anlas)  # 1초 후 Anlas 새로고침
+
+                # 벌크 Enhancement 모드인 경우 다음 이미지 처리
+                if self.enhance_bulk_mode and self.enhance_image_list:
+                    self.enhance_current_index += 1
+                    logger.info(f"Bulk enhancement: moving to next image (index {self.enhance_current_index}) after 3s delay")
+
+                    # API 스로틀링 방지를 위한 대기 메시지 표시
+                    if self.enhance_current_index < len(self.enhance_image_list):
+                        self.enhance_progress_label.setText(
+                            tr('enhance.waiting_next').format(
+                                self.enhance_current_index + 1, len(self.enhance_image_list)
+                            )
+                        )
+
+                    # 다음 이미지 처리 (3초 딜레이로 API 스로틀링 방지)
+                    QTimer.singleShot(3000, self.process_next_enhance_image)
+
             else:
                 # 오류 케이스 - 인증 문제인지 확인
                 if error_code == 401 or "authentication" in result_str.lower():
