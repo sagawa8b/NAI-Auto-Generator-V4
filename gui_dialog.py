@@ -200,15 +200,24 @@ class OptionDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
-        self.resize(800, 600)
+        self.resize(1000, 600)
 
-        # 메인 레이아웃
+        # 메인 레이아웃 (세로)
         main_layout = QVBoxLayout()
-       
+
+        # 컨텐츠를 담을 가로 레이아웃 (2-column layout)
+        content_layout = QHBoxLayout()
+
+        # 왼쪽 컬럼
+        left_column = QVBoxLayout()
+
+        # 오른쪽 컬럼
+        right_column = QVBoxLayout()
+
         # 폴더 경로 설정 그룹
         path_group = QGroupBox("폴더 경로 설정")
         path_layout = QVBoxLayout()
-        
+
         # 로깅 설정 그룹
         log_group = QGroupBox("로그 설정")
         log_layout = QVBoxLayout()
@@ -307,11 +316,12 @@ class OptionDialog(QDialog):
         log_layout.addLayout(open_log_layout)
 
         log_group.setLayout(log_layout)
-        main_layout.addWidget(log_group)
-
 
         path_group.setLayout(path_layout)
-        main_layout.addWidget(path_group)
+
+        # 왼쪽 컬럼에 추가
+        left_column.addWidget(path_group)
+        left_column.addWidget(log_group)
 
         # === 연속생성 설정 그룹 추가 ===
         generation_group = QGroupBox("연속생성 설정 (Generation Settings)")
@@ -357,11 +367,12 @@ class OptionDialog(QDialog):
         interval_layout.addWidget(self.default_interval_spinbox)
         interval_layout.addStretch()
         generation_layout.addLayout(interval_layout)
-        
-        generation_group.setLayout(generation_layout)
-        main_layout.addWidget(generation_group)
 
-        
+        generation_group.setLayout(generation_layout)
+
+        # 왼쪽 컬럼에 추가
+        left_column.addWidget(generation_group)
+
         # === Theme Settings Group ===
         theme_group = QGroupBox("테마 설정 (Theme Settings)")
         theme_layout = QVBoxLayout()
@@ -381,9 +392,8 @@ class OptionDialog(QDialog):
         self.accent_color_btn = QPushButton("액센트 색상 변경")
         self.accent_color_btn.clicked.connect(self.pick_accent_color)
         theme_layout.addWidget(self.accent_color_btn)
-        theme_group.setLayout(theme_layout)        
-        main_layout.insertWidget(1, theme_group)  # Insert after font settings
-        
+        theme_group.setLayout(theme_layout)
+
         # === 프롬프트 설정 그룹 추가 ===
         prompt_group = QGroupBox("프롬프트 설정")
         prompt_layout = QVBoxLayout()
@@ -418,8 +428,7 @@ class OptionDialog(QDialog):
         prompt_layout.addWidget(help_text)
 
         prompt_group.setLayout(prompt_layout)
-        main_layout.addWidget(prompt_group)
-      
+
         # 글꼴 설정 그룹
         font_group = QGroupBox("글꼴 설정")
         font_layout = QHBoxLayout()
@@ -432,7 +441,6 @@ class OptionDialog(QDialog):
         font_layout.addStretch()
 
         font_group.setLayout(font_layout)
-        main_layout.addWidget(font_group)
 
         # === 파일명 설정 그룹 추가 ===
         filename_group = QGroupBox("파일명 설정 (Filename Settings)")
@@ -486,7 +494,6 @@ class OptionDialog(QDialog):
         filename_layout.addLayout(limit_layout)
 
         filename_group.setLayout(filename_layout)
-        main_layout.addWidget(filename_group)
 
         # 태그 설정 그룹
         tag_group = QGroupBox("태그 설정")
@@ -517,8 +524,20 @@ class OptionDialog(QDialog):
         tag_layout.addWidget(tag_refresh_button)
 
         tag_group.setLayout(tag_layout)
-        main_layout.addWidget(tag_group)
-        
+
+        # 오른쪽 컬럼에 추가
+        right_column.addWidget(theme_group)
+        right_column.addWidget(prompt_group)
+        right_column.addWidget(font_group)
+        right_column.addWidget(filename_group)
+        right_column.addWidget(tag_group)
+
+        # 왼쪽과 오른쪽 컬럼을 수평 레이아웃에 추가
+        content_layout.addLayout(left_column)
+        content_layout.addLayout(right_column)
+
+        # 컨텐츠 레이아웃을 메인 레이아웃에 추가
+        main_layout.addLayout(content_layout)
 
         # 저장 & 취소 버튼
         button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)

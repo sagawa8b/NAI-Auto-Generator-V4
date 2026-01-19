@@ -38,7 +38,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.6.01.08"
+TITLE_NAME = "NAI Auto Generator V4.5_2.6.01.19"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -3830,16 +3830,16 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # 로그인 성공/실패 처리는 dialog에서 이루어집니다
 
     def show_about_dialog(self):
-        about_text = """NAI Auto Generator v4.5    
+        about_text = """NAI Auto Generator v4.5
 
         Community : https://arca.live/b/aiart
-          
+
         Original :  https://github.com/DCP-arca/NAI-Auto-Generator
 
         v4/v4.5 update : sagawa8b
-          
+
         크레딧 : https://huggingface.co/baqu2213
-                https://github.com/neggles/sd-webui-stealth-pnginfo/  
+                https://github.com/neggles/sd-webui-stealth-pnginfo/
                 https://github.com/DCP-arca/NAI-Auto-Generator
 
         Notice : "본 앱은 제3자가 개발한 앱으로 Novel AI 에서 개발하거나 관리하지 않으며, 이들 회사와는 무관합니다."
@@ -3847,8 +3847,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         ="This app is a third-party app that is not developed or managed by Novel AI is unaffiliated with those companies."
         """
         QMessageBox.about(self, 'About', about_text)
-
-        self.option_dialog.exec_()
     
 
     def set_disable_button(self, will_disable):
