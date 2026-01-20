@@ -53,7 +53,14 @@
       "sync_width": "同步宽度",
       "character_prompt": "角色提示词:",
       "reset_image_size": "重置图像大小",
-      "reset_image_size_tooltip": "将结果图像窗口恢复为默认大小"
+      "reset_image_size_tooltip": "将结果图像窗口恢复为默认大小",
+      "custom_resolution": "Custom (自定义)",
+      "session_status": "会话状态",
+      "img2img_title": "图像 to 图像",
+      "reference_image_title": "参考图像",
+      "no_uploaded_image": "未上传图像",
+      "load_image": "加载",
+      "select_folder": "文件夹"
     },
     "image_options": {
       "title": "图像选项",

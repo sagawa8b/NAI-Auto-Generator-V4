@@ -53,7 +53,14 @@
       "sync_width": "幅を同期",
       "character_prompt": "キャラクタープロンプト:",
       "reset_image_size": "画像サイズ初期化",
-      "reset_image_size_tooltip": "結果画像ウィンドウをデフォルトサイズに復元します"
+      "reset_image_size_tooltip": "結果画像ウィンドウをデフォルトサイズに復元します",
+      "custom_resolution": "Custom (直接入力)",
+      "session_status": "セッション状態",
+      "img2img_title": "画像 to 画像",
+      "reference_image_title": "リファレンス画像",
+      "no_uploaded_image": "アップロードされた画像なし",
+      "load_image": "読み込み",
+      "select_folder": "フォルダ"
     },
     "image_options": {
       "title": "画像オプション",

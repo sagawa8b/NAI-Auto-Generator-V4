@@ -86,7 +86,7 @@ def init_advanced_prompt_group(parent):
     
     neg_prompt_label = QLabel(tr('ui.negative_prompt'))
     parent.dict_ui_settings["negative_prompt"] = CompletionTextEdit()
-    parent.dict_ui_settings["negative_prompt"].setPlaceholderText("이미지에서 제외할 내용을 입력하세요...")
+    parent.dict_ui_settings["negative_prompt"].setPlaceholderText(tr('ui.negative_prompt_placeholder'))
     
     neg_prompt_widget_layout.addWidget(neg_prompt_label)
     neg_prompt_widget_layout.addWidget(parent.dict_ui_settings["negative_prompt"])
@@ -663,7 +663,7 @@ def init_main_widget(parent):
     for resolution in RESOLUTION_FAMILIY[3]:
         combo_resolution.addItem(resolution)
     
-    combo_resolution.addItem("Custom (직접 입력)")
+    combo_resolution.addItem(tr('ui.custom_resolution'))
     
     # Square (1024x1024) 항목을 기본으로 선택
     hd_index = -1
@@ -777,15 +777,15 @@ def init_main_widget(parent):
        
     
     # 생성 버튼들 추가
-    parent.button_generate_once = QPushButton("1회 생성")
+    parent.button_generate_once = QPushButton(tr('generate.once'))
     parent.button_generate_once.clicked.connect(parent.on_click_generate_once)
     generate_layout.addWidget(parent.button_generate_once)
-    
-    parent.button_generate_sett = QPushButton("세팅별 연속 생성")
+
+    parent.button_generate_sett = QPushButton(tr('generate.by_settings'))
     parent.button_generate_sett.clicked.connect(parent.on_click_generate_sett)
     generate_layout.addWidget(parent.button_generate_sett)
-    
-    parent.button_generate_auto = QPushButton("연속 생성 (Auto)")
+
+    parent.button_generate_auto = QPushButton(tr('generate.auto'))
     parent.button_generate_auto.clicked.connect(parent.on_click_generate_auto)
     generate_layout.addWidget(parent.button_generate_auto)
     
@@ -946,7 +946,7 @@ def init_main_widget(parent):
     right_widget.setLayout(right_layout)
 
     # 2.1: 결과 이미지 그룹
-    result_image_group = QGroupBox("결과 이미지 (Result Image)")
+    result_image_group = QGroupBox(tr('result.image_title'))
     result_image_layout = QVBoxLayout()
     result_image_group.setLayout(result_image_layout)
     
@@ -962,13 +962,13 @@ def init_main_widget(parent):
     hbox_image_buttons = QHBoxLayout()
     
     # 이미지 저장 버튼
-    button_save_image = QPushButton("이미지 저장")
+    button_save_image = QPushButton(tr('result.save_image'))
     button_save_image.clicked.connect(lambda: parent.image_result.save_image())
     hbox_image_buttons.addWidget(button_save_image)
     
     # 기본 크기로 복원 버튼 추가
-    button_reset_size = QPushButton("이미지 창을 기본 크기로 복원")
-    button_reset_size.setToolTip("이미지 창을 기본 크기(512x512)로 되돌립니다")
+    button_reset_size = QPushButton(tr('ui.reset_image_size'))
+    button_reset_size.setToolTip(tr('ui.reset_image_size_tooltip'))
     button_reset_size.clicked.connect(lambda: parent.image_result.reset_to_default_size())
     hbox_image_buttons.addWidget(button_reset_size)
     
@@ -981,7 +981,7 @@ def init_main_widget(parent):
 
 
     # 2.2: 결과 프롬프트 그룹
-    result_prompt_group = QGroupBox("결과 프롬프트 (Result Prompt)")
+    result_prompt_group = QGroupBox(tr('result.prompt_title'))
     result_prompt_layout = QVBoxLayout()
     result_prompt_group.setLayout(result_prompt_layout)
 
@@ -1044,7 +1044,7 @@ def init_session_status_indicator(parent):
     """세션 상태 표시기 초기화"""
     parent.session_status_indicator = QLabel("● 0%")
     parent.session_status_indicator.setStyleSheet("color: green; font-weight: bold;")
-    parent.session_status_indicator.setToolTip("세션 상태")
+    parent.session_status_indicator.setToolTip(tr('ui.session_status'))
     parent.statusBar().addPermanentWidget(parent.session_status_indicator)
 
 # 기본 프롬프트 그룹 수정
@@ -1055,17 +1055,17 @@ def init_responsive_prompt_group(parent):
     prompt_group.setLayout(prompt_layout)
 
     # 프롬프트 입력 영역
-    prompt_label = QLabel("프롬프트(Prompt):")
+    prompt_label = QLabel(tr('ui.prompt'))
     parent.dict_ui_settings["prompt"] = CompletionTextEdit()
-    parent.dict_ui_settings["prompt"].setPlaceholderText("이미지에 포함할 내용을 입력하세요...")
+    parent.dict_ui_settings["prompt"].setPlaceholderText(tr('ui.prompt_placeholder'))
     
     # 프롬프트 에디터에 대한 최소 높이 설정 (화면 크기에 따라 조정됨)
     parent.dict_ui_settings["prompt"].setMinimumHeight(100)
     
     # 네거티브 프롬프트 입력 영역
-    neg_prompt_label = QLabel("네거티브 프롬프트(Negative Prompt):")
+    neg_prompt_label = QLabel(tr('ui.negative_prompt'))
     parent.dict_ui_settings["negative_prompt"] = CompletionTextEdit()
-    parent.dict_ui_settings["negative_prompt"].setPlaceholderText("이미지에서 제외할 내용을 입력하세요...")
+    parent.dict_ui_settings["negative_prompt"].setPlaceholderText(tr('ui.negative_prompt_placeholder'))
     
     # 네거티브 프롬프트 에디터에 대한 최소 높이 설정 (화면 크기에 따라 조정됨)
     parent.dict_ui_settings["negative_prompt"].setMinimumHeight(80)
@@ -1149,7 +1149,7 @@ def show_custom_message(parent, title, message, icon_type=None):
     btn_layout = QHBoxLayout()
     btn_layout.addStretch()
     
-    ok_button = QPushButton("확인")
+    ok_button = QPushButton(tr('dialogs.ok'))
     ok_button.setAutoDefault(True)
     ok_button.setDefault(True)
     ok_button.clicked.connect(dialog.accept)
@@ -1164,7 +1164,7 @@ def set_resolution(parent, idx):
         return
 
     text = parent.combo_resolution.currentText()
-    if text == "Custom (직접 입력)":
+    if text == tr('ui.custom_resolution'):
         return
 
     try:
@@ -1219,7 +1219,7 @@ def init_advanced_group(parent):
     # Variety+ 설정 추가
     variety_layout = QHBoxLayout()
     parent.dict_ui_settings["variety_plus"] = QCheckBox("Variety+")
-    parent.dict_ui_settings["variety_plus"].setToolTip("이미지 초기 생성 단계에서 CFG를 스킵하여 더 다양한 결과 생성")
+    parent.dict_ui_settings["variety_plus"].setToolTip(tr('advanced.variety_plus_tooltip'))
     variety_layout.addWidget(parent.dict_ui_settings["variety_plus"])
     advanced_layout.addLayout(variety_layout)
     
@@ -1257,17 +1257,17 @@ class LoginStateWidget(QWidget):
         super().__init__()
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        self.state_label = QLabel("로그인 필요")
+        self.state_label = QLabel(tr('misc.not_logged_in'))
         self.state_label.setStyleSheet("color:red;")
         layout.addWidget(self.state_label)
         self.setLayout(layout)
 
     def set_logged_in(self, is_logged_in):
         if is_logged_in:
-            self.state_label.setText("로그인 됨")
+            self.state_label.setText(tr('misc.logged_in'))
             self.state_label.setStyleSheet("color:green;")
         else:
-            self.state_label.setText("로그인 필요")
+            self.state_label.setText(tr('misc.not_logged_in'))
             self.state_label.setStyleSheet("color:red;")
 
 
@@ -1275,7 +1275,7 @@ class ImageToImageWidget(QGroupBox):
     is_active_changed = pyqtSignal(bool)
 
     def __init__(self, mode, parent):
-        title = "이미지 to 이미지" if mode == "img2img" else "레퍼런스 이미지"
+        title = tr('ui.img2img_title') if mode == "img2img" else tr('ui.reference_image_title')
         super().__init__(title)
         self.parent = parent
         self.mode = mode
@@ -1293,7 +1293,7 @@ class ImageToImageWidget(QGroupBox):
         layout = QVBoxLayout()
 
         # 이미지 부분
-        self.image_label = QLabel("업로드된 이미지 없음")
+        self.image_label = QLabel(tr('ui.no_uploaded_image'))
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setSizePolicy(
             QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -1306,12 +1306,12 @@ class ImageToImageWidget(QGroupBox):
         # 왼쪽 버튼 부분
         left_button_layout = QHBoxLayout()
 
-        self.upload_button = QPushButton("불러오기")
+        self.upload_button = QPushButton(tr('ui.load_image'))
         self.upload_button.clicked.connect(
             lambda: self.parent.show_file_dialog(self.mode))
         left_button_layout.addWidget(self.upload_button)
 
-        self.open_folder_button = QPushButton("폴더")
+        self.open_folder_button = QPushButton(tr('ui.select_folder'))
         self.open_folder_button.clicked.connect(
             lambda: self.parent.show_openfolder_dialog(self.mode))
         left_button_layout.addWidget(self.open_folder_button)
@@ -1376,7 +1376,7 @@ class ImageToImageWidget(QGroupBox):
                 128, Qt.SmoothTransformation)
             self.image_label.setPixmap(scaled_pixmap)
         else:
-            self.image_label.setText("업로드된 이미지 없음")
+            self.image_label.setText(tr('ui.no_uploaded_image'))
             self.image_label.setPixmap(QPixmap())
 
         self.is_active_changed.emit(bool(src))
@@ -1387,7 +1387,7 @@ class ImageToImageWidget(QGroupBox):
         self.is_maskmode = False
         if hasattr(self, 'mask_checkbox'):
             self.mask_checkbox.setChecked(False)
-        self.image_label.setText("업로드된 이미지 없음")
+        self.image_label.setText(tr('ui.no_uploaded_image'))
         self.image_label.setPixmap(QPixmap())
         self.image_label.setCursor(Qt.ArrowCursor)
         self.is_active_changed.emit(False)
@@ -1568,7 +1568,7 @@ class ResizableImageWidget(QFrame):
         # 이미지 라벨
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setText("결과 이미지가 없습니다")
+        self.image_label.setText(tr('result.no_image'))
         self.image_label.setStyleSheet("background-color: rgba(0, 0, 0, 128);")
         self.layout.addWidget(self.image_label)
         

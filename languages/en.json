@@ -59,7 +59,14 @@
 	  "character_prompt": "Character prompt:",
 	  "position": "Position",
 	  "reset_image_size": "Reset image size",
-	  "reset_image_size_tooltip": "Restores the resulting image window to its default size"
+	  "reset_image_size_tooltip": "Restores the resulting image window to its default size",
+	  "custom_resolution": "Custom",
+	  "session_status": "Session Status",
+	  "img2img_title": "Image to Image",
+	  "reference_image_title": "Reference Image",
+	  "no_uploaded_image": "No uploaded image",
+	  "load_image": "Load",
+	  "select_folder": "Folder"
     },
     "image_options": {
       "title": "Image Options",

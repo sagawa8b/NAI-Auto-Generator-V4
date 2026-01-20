@@ -59,7 +59,14 @@
       "character_prompt": "캐릭터 프롬프트:",
       "position": "위치",
 	  "reset_image_size": "이미지 크기 초기화",
-	  "reset_image_size_tooltip": "결과 이미지 창을 기본 크기로 복원합니다"	  
+	  "reset_image_size_tooltip": "결과 이미지 창을 기본 크기로 복원합니다",
+	  "custom_resolution": "Custom (직접 입력)",
+	  "session_status": "세션 상태",
+	  "img2img_title": "이미지 to 이미지",
+	  "reference_image_title": "레퍼런스 이미지",
+	  "no_uploaded_image": "업로드된 이미지 없음",
+	  "load_image": "불러오기",
+	  "select_folder": "폴더"
     },
     "image_options": {
       "title": "Image Options",
