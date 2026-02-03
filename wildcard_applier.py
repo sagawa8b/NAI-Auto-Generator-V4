@@ -20,6 +20,9 @@ class WildcardApplier():
         self._repeat_counters = {}  # {'wildcard_name': {'current': 0, 'target': 2}}
         self._current_snapshot = {}
         self._used_keys = set()
+        # 공유 랜덤 와일드카드 캐시 - 같은 생성 사이클 내에서 동일한 값 반환
+        # Shared random wildcard cache - returns same value within a generation cycle
+        self._shared_random_cache = {}
         
     def set_src(self, src):
         # Windows에서는 백슬래시 사용하도록 정규화
@@ -75,15 +78,20 @@ class WildcardApplier():
             logger.error(f"Error loading wildcards: {e}")
 
     def create_index_snapshot(self):
-        """현재 루프카드 인덱스의 스냅샷 생성"""
+        """현재 루프카드 인덱스의 스냅샷 생성 및 공유 랜덤 캐시 초기화
+        Creates a snapshot of current loopcard indices and clears shared random cache"""
         self._current_snapshot = self._loopcard_indices.copy()
         self._used_keys = set()
+        # 새 생성 사이클마다 공유 랜덤 캐시 초기화
+        # Clear shared random cache for each new generation cycle
+        self._shared_random_cache = {}
 
     def apply_wildcards_with_snapshot(self, target_str):
-        """스냅샷된 인덱스를 사용하여 와일드카드 적용 (인덱스 증가 안함)"""
+        """스냅샷된 인덱스를 사용하여 와일드카드 적용 (인덱스 증가 안함)
+        Apply wildcards using snapshot indices (no index advancement)"""
         self.load_wildcards()
         result = target_str
-        
+
         # 루프카드 적용 (스냅샷 사용)
         index = 0
         except_list = []
@@ -93,7 +101,18 @@ class WildcardApplier():
             if len(applied_list) == 0 or index > MAX_TRY_AMOUNT:
                 break
             index += 1
-        
+
+        # 공유 랜덤 와일드카드 적용 (__=wildcard__ 형식)
+        # Apply shared random wildcards first (__=wildcard__ syntax)
+        index = 0
+        except_list = []
+        while True:
+            result, applied_list = self._apply_shared_wildcard_once(result, except_list)
+            except_list.extend(applied_list)
+            if len(applied_list) == 0 or index > MAX_TRY_AMOUNT:
+                break
+            index += 1
+
         # 일반 와일드카드 적용
         index = 0
         except_list = []
@@ -103,7 +122,7 @@ class WildcardApplier():
             if len(applied_list) == 0 or index > MAX_TRY_AMOUNT:
                 break
             index += 1
-        
+
         return result
    
     def advance_loopcard_indices(self):
@@ -149,6 +168,71 @@ class WildcardApplier():
 
         # 사용된 키 리셋
         self._used_keys.clear()
+
+    def _apply_shared_wildcard_once(self, target_str, except_list=[]):
+        """공유 랜덤 와일드카드 처리 (__=wildcard__ 형식)
+        같은 생성 사이클 내에서 동일한 와일드카드는 동일한 값을 반환합니다.
+
+        Shared random wildcard processing (__=wildcard__ syntax).
+        Same wildcard returns the same value within a generation cycle.
+
+        Example:
+            Character prompt 1: girl, __=1_chara__, before costume
+            Character prompt 2: girl, __=1_chara__, after costume
+
+            Result (both get the same random selection):
+            Character prompt 1: girl, kinomoto sakura, before costume
+            Character prompt 2: girl, kinomoto sakura, after costume
+        """
+        result = target_str
+        applied_wildcard_list = []
+        prev_point = 0
+
+        # __= 형식으로 공유 와일드카드 검색
+        # Search for shared wildcards in __=name__ format
+        while "__=" in result:
+            p_left = result.find("__=", prev_point)
+            if p_left == -1:
+                break
+
+            p_right = result.find("__", p_left + 3)  # +3 to skip __=
+            if p_right == -1:
+                logger.warning("A single __= exists in shared wildcard syntax")
+                break
+
+            str_left = result[0:p_left]
+            str_center = result[p_left + 3:p_right].lower()  # +3 to skip __=
+            str_right = result[p_right + 2:len(result)]
+
+            if str_center in self._wildcards_dict and not (str_center in except_list):
+                wc_list = self._wildcards_dict[str_center]
+                if wc_list:  # 비어있지 않은지 확인
+                    # 캐시에서 확인 - 이미 선택된 값이 있으면 재사용
+                    # Check cache - reuse if already selected
+                    if str_center in self._shared_random_cache:
+                        selected_value = self._shared_random_cache[str_center]
+                        logger.debug(f"Reusing cached shared wildcard '{str_center}': {selected_value[:50]}...")
+                    else:
+                        # 새로운 랜덤 선택 후 캐시에 저장
+                        # New random selection, save to cache
+                        selected_value = wc_list[random.randrange(0, len(wc_list))].strip()
+                        self._shared_random_cache[str_center] = selected_value
+                        logger.debug(f"New shared wildcard '{str_center}': {selected_value[:50]}...")
+
+                    str_center = selected_value
+                    applied_wildcard_list.append(str_center)
+                else:
+                    logger.warning(f"Shared wildcard '{str_center}' has no entries")
+                    str_center = "__=" + str_center + "__"
+            else:
+                logger.warning(f"Unknown shared wildcard '{str_center}'")
+                str_center = "__=" + str_center + "__"
+
+            result_left = str_left + str_center
+            prev_point = len(result_left)
+            result = result_left + str_right
+
+        return result, applied_wildcard_list
 
     def _apply_wildcard_once(self, target_str, except_list=[]):
         result = target_str
@@ -335,41 +419,58 @@ class WildcardApplier():
         return result, applied_loopcard_list
     
     def apply_wildcards(self, target_str):
-        """와일드카드와 루프카드 모두 적용"""
+        """와일드카드와 루프카드 모두 적용
+        Apply both wildcards and loopcards"""
         self.load_wildcards()
 
         result = target_str
-        
+
         # 1. 먼저 루프카드(순차) 적용
         index = 0
         except_list = []
         while True:
             result, applied_loopcard_list = self._apply_loopcard_once(result, except_list)
             except_list.extend(applied_loopcard_list)
-            
+
             if len(applied_loopcard_list) == 0:
                 break
-                
+
             index += 1
             if index > MAX_TRY_AMOUNT:
                 logger.warning("Too much recursion in loopcards")
                 break
-        
-        # 2. 와일드카드(랜덤) 적용
+
+        # 2. 공유 랜덤 와일드카드 적용 (__=wildcard__ 형식)
+        # Apply shared random wildcards (__=wildcard__ syntax)
+        index = 0
+        except_list = []
+        while True:
+            result, applied_shared_list = self._apply_shared_wildcard_once(result, except_list)
+            except_list.extend(applied_shared_list)
+
+            if len(applied_shared_list) == 0:
+                break
+
+            index += 1
+            if index > MAX_TRY_AMOUNT:
+                logger.warning("Too much recursion in shared wildcards")
+                break
+
+        # 3. 일반 와일드카드(랜덤) 적용
         index = 0
         except_list = []
         while True:
             result, applied_wildcard_list = self._apply_wildcard_once(result, except_list)
             except_list.extend(applied_wildcard_list)
-            
+
             if len(applied_wildcard_list) == 0:
                 break
-                
+
             index += 1
             if index > MAX_TRY_AMOUNT:
                 logger.warning("Too much recursion in wildcards")
                 break
-                
+
         return result
     
     

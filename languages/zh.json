@@ -206,6 +206,17 @@
       "not_logged_in": "需要登录",
       "anlas": "Anlas:",
       "unknown": "未知"
+    },
+    "options": {
+      "resolution_settings": "分辨率设置 (Resolution Settings)",
+      "anlas_resolution_warning": "※ Large和Wallpaper分辨率使用Anlas。禁用可防止意外使用。",
+      "enable_large_resolution": "启用Large分辨率（使用Anlas）",
+      "enable_large_resolution_tooltip": "Large分辨率（1472x1472、1024x1536、1536x1024）消耗Anlas",
+      "enable_wallpaper_resolution": "启用Wallpaper分辨率（使用Anlas）",
+      "enable_wallpaper_resolution_tooltip": "Wallpaper分辨率（1088x1920、1920x1088）消耗Anlas",
+      "custom_resolutions_title": "自定义分辨率",
+      "custom_resolutions_desc": "定义最多6个用于随机生成的自定义分辨率。\n※ 超过默认分辨率（1024x1024）的分辨率将消耗Anlas。",
+      "custom_resolution_n": "自定义 {}"
     }
   }
 }

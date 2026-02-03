@@ -25,10 +25,10 @@ from PyQt5.QtCore import (Qt, pyqtSignal, QObject, QTimer, QSettings, QPoint, QS
                           QCoreApplication, QThread)
 from PyQt5.QtGui import QColor, QPalette, QFont
 
-from gui_init import init_main_widget
+from gui_init import init_main_widget, _populate_resolution_combo
 from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, MiniUtilDialog, FileIODialog
 
-from consts import COLOR, DEFAULT_PARAMS, DEFAULT_PATH, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict, DEFAULT_TAGCOMPLETION_PATH
+from consts import COLOR, DEFAULT_PARAMS, DEFAULT_PATH, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict, DEFAULT_TAGCOMPLETION_PATH, DEFAULT_CUSTOM_RESOLUTIONS
 
 import naiinfo_getter
 from nai_generator import NAIGenerator, NAIAction, NAISessionManager
@@ -38,7 +38,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.6.01.19"
+TITLE_NAME = "NAI Auto Generator V4.5_2.6.02.02"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -3580,19 +3580,90 @@ class NAIAutoGeneratorWindow(QMainWindow):
     def get_now_resolution_familly_list(self):
         try:
             current_text = self.combo_resolution.currentText()
-            if current_text == "Custom (직접 입력)":
+
+            # Manual custom input
+            if current_text == tr('ui.custom_resolution') or current_text == "Custom (직접 입력)":
                 return []
-                
+
+            # Check if it's a custom resolution (Custom 1, Custom 2, Custom 3)
+            if current_text.startswith("Custom ") and "(" in current_text:
+                # Return all enabled custom resolutions
+                return self._get_custom_resolution_list()
+
             # 현재 선택된 해상도가 어느 패밀리에 속하는지 확인
             for family_idx, resolutions in RESOLUTION_FAMILIY.items():
                 if current_text in resolutions:
+                    # Check if this family is enabled
+                    if family_idx == 1:  # Large
+                        if not self.settings.value("resolution_family_large_enabled",
+                                                   DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_large_enabled"], type=bool):
+                            return []
+                    elif family_idx == 2:  # Wallpaper
+                        if not self.settings.value("resolution_family_wallpaper_enabled",
+                                                   DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_wallpaper_enabled"], type=bool):
+                            return []
                     return resolutions
-                    
+
             # 만약 찾지 못했다면 기본 HD 패밀리 반환
             return RESOLUTION_FAMILIY[0]  # 기본 해상도 모음 (HD 포함)
         except Exception as e:
             logger.error(f"Resolution family error: {e}")
             return []
+
+    def _get_custom_resolution_list(self):
+        """Get list of enabled custom resolutions for random selection"""
+        custom_resolutions = []
+        for i in range(1, 7):  # Support up to 6 custom resolutions
+            enabled = self.settings.value(f"custom_resolution_{i}_enabled",
+                                          DEFAULT_CUSTOM_RESOLUTIONS.get(f"custom_resolution_{i}_enabled", False), type=bool)
+            if enabled:
+                width = self.settings.value(f"custom_resolution_{i}_width",
+                                            DEFAULT_CUSTOM_RESOLUTIONS.get(f"custom_resolution_{i}_width", "1024"))
+                height = self.settings.value(f"custom_resolution_{i}_height",
+                                             DEFAULT_CUSTOM_RESOLUTIONS.get(f"custom_resolution_{i}_height", "1024"))
+                try:
+                    w = int(width)
+                    h = int(height)
+                    if w > 0 and h > 0:
+                        custom_resolutions.append(f"Custom {i} ({w}x{h})")
+                except (ValueError, TypeError):
+                    pass
+        return custom_resolutions
+
+    def refresh_resolution_combo(self):
+        """Refresh resolution combo box after settings change"""
+        try:
+            # Remember current selection
+            current_text = self.combo_resolution.currentText()
+            current_width = self.dict_ui_settings["width"].text()
+            current_height = self.dict_ui_settings["height"].text()
+
+            # Repopulate combo box
+            _populate_resolution_combo(self, self.combo_resolution)
+
+            # Try to restore selection
+            restored = False
+            for i in range(self.combo_resolution.count()):
+                if self.combo_resolution.itemText(i) == current_text:
+                    self.combo_resolution.setCurrentIndex(i)
+                    restored = True
+                    break
+
+            # If original selection not found, select first valid item (Normal Square)
+            if not restored:
+                for i in range(self.combo_resolution.count()):
+                    text = self.combo_resolution.itemText(i)
+                    if not text.startswith("---") and text != tr('ui.custom_resolution'):
+                        self.combo_resolution.setCurrentIndex(i)
+                        break
+
+            # Restore width/height values
+            self.dict_ui_settings["width"].setText(current_width)
+            self.dict_ui_settings["height"].setText(current_height)
+
+            logger.info("Resolution combo box refreshed")
+        except Exception as e:
+            logger.error(f"Error refreshing resolution combo: {e}")
 
     def change_path(self, code, src):
         # 절대 경로로 변환

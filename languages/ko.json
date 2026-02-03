@@ -221,6 +221,17 @@
 		"style_aware": "Style Aware",
 		"style_aware_description": "레퍼런스에서 스타일 정보 포함",
 		"error_load_image": "이미지 로딩 실패: {}"
-	}
+	},
+    "options": {
+      "resolution_settings": "해상도 설정 (Resolution Settings)",
+      "anlas_resolution_warning": "※ Large 및 Wallpaper 해상도는 Anlas를 사용합니다. 비활성화하면 실수로 사용하는 것을 방지할 수 있습니다.",
+      "enable_large_resolution": "Large 해상도 활성화 (Anlas 사용)",
+      "enable_large_resolution_tooltip": "Large 해상도 (1472x1472, 1024x1536, 1536x1024)는 Anlas를 소비합니다",
+      "enable_wallpaper_resolution": "Wallpaper 해상도 활성화 (Anlas 사용)",
+      "enable_wallpaper_resolution_tooltip": "Wallpaper 해상도 (1088x1920, 1920x1088)는 Anlas를 소비합니다",
+      "custom_resolutions_title": "커스텀 해상도",
+      "custom_resolutions_desc": "랜덤 생성에 사용할 최대 6개의 커스텀 해상도를 정의합니다.\n※ 기본 해상도(1024x1024)를 초과하는 해상도는 Anlas를 소비합니다.",
+      "custom_resolution_n": "커스텀 {}"
+    }
   }
 }

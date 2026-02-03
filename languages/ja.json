@@ -206,6 +206,17 @@
       "not_logged_in": "ログイン必要",
       "anlas": "Anlas:",
       "unknown": "不明"
+    },
+    "options": {
+      "resolution_settings": "解像度設定 (Resolution Settings)",
+      "anlas_resolution_warning": "※ LargeおよびWallpaper解像度はAnlasを使用します。無効にすると誤って使用することを防げます。",
+      "enable_large_resolution": "Large解像度を有効化（Anlas使用）",
+      "enable_large_resolution_tooltip": "Large解像度（1472x1472、1024x1536、1536x1024）はAnlasを消費します",
+      "enable_wallpaper_resolution": "Wallpaper解像度を有効化（Anlas使用）",
+      "enable_wallpaper_resolution_tooltip": "Wallpaper解像度（1088x1920、1920x1088）はAnlasを消費します",
+      "custom_resolutions_title": "カスタム解像度",
+      "custom_resolutions_desc": "ランダム生成に使用する最大6つのカスタム解像度を定義します。\n※ デフォルト解像度（1024x1024）を超える解像度はAnlasを消費します。",
+      "custom_resolution_n": "カスタム {}"
     }
   }
 }

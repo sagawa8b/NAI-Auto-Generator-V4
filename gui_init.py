@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
                              QFileDialog, QApplication, QCompleter, QFrame, QSlider)
 from PyQt5.QtCore import Qt, pyqtSignal, QSettings, QSize
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QColor, QMouseEvent, QBrush, QPalette, QDrag
-from consts import RESOLUTION_FAMILIY, COLOR
+from consts import RESOLUTION_FAMILIY, COLOR, DEFAULT_CUSTOM_RESOLUTIONS
 from completer import CompletionTextEdit
 from character_prompts_ui import CharacterPromptsContainer
 import random
@@ -15,6 +15,73 @@ from logger import get_logger
 from i18n_manager import tr
 
 logger = get_logger()
+
+
+def _populate_resolution_combo(parent, combo_resolution):
+    """Populate resolution combo box based on settings (Large/Wallpaper enable and custom resolutions)"""
+    combo_resolution.clear()
+
+    # Get settings
+    large_enabled = parent.settings.value("resolution_family_large_enabled",
+                                          DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_large_enabled"], type=bool)
+    wallpaper_enabled = parent.settings.value("resolution_family_wallpaper_enabled",
+                                              DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_wallpaper_enabled"], type=bool)
+
+    # Normal 그룹 (always enabled)
+    combo_resolution.addItem("--- Normal ---")
+    combo_resolution.setItemData(combo_resolution.count() - 1, 0, Qt.UserRole - 1)
+    for resolution in RESOLUTION_FAMILIY[0]:
+        combo_resolution.addItem(resolution)
+
+    # Large 그룹 (conditional)
+    if large_enabled:
+        combo_resolution.addItem("--- Large ---")
+        combo_resolution.setItemData(combo_resolution.count() - 1, 0, Qt.UserRole - 1)
+        for resolution in RESOLUTION_FAMILIY[1]:
+            combo_resolution.addItem(resolution)
+
+    # Wallpaper 그룹 (conditional)
+    if wallpaper_enabled:
+        combo_resolution.addItem("--- Wallpaper ---")
+        combo_resolution.setItemData(combo_resolution.count() - 1, 0, Qt.UserRole - 1)
+        for resolution in RESOLUTION_FAMILIY[2]:
+            combo_resolution.addItem(resolution)
+
+    # Low Resolution 그룹 (always enabled)
+    combo_resolution.addItem("--- Low Resolution ---")
+    combo_resolution.setItemData(combo_resolution.count() - 1, 0, Qt.UserRole - 1)
+    for resolution in RESOLUTION_FAMILIY[3]:
+        combo_resolution.addItem(resolution)
+
+    # Custom resolutions
+    custom_resolutions = []
+    for i in range(1, 7):  # Support up to 6 custom resolutions
+        enabled = parent.settings.value(f"custom_resolution_{i}_enabled",
+                                        DEFAULT_CUSTOM_RESOLUTIONS.get(f"custom_resolution_{i}_enabled", False), type=bool)
+        if enabled:
+            width = parent.settings.value(f"custom_resolution_{i}_width",
+                                          DEFAULT_CUSTOM_RESOLUTIONS.get(f"custom_resolution_{i}_width", "1024"))
+            height = parent.settings.value(f"custom_resolution_{i}_height",
+                                           DEFAULT_CUSTOM_RESOLUTIONS.get(f"custom_resolution_{i}_height", "1024"))
+            try:
+                w = int(width)
+                h = int(height)
+                if w > 0 and h > 0:
+                    custom_resolutions.append(f"Custom {i} ({w}x{h})")
+            except (ValueError, TypeError):
+                pass
+
+    # Add Custom section with separator
+    combo_resolution.addItem("--- Custom ---")
+    combo_resolution.setItemData(combo_resolution.count() - 1, 0, Qt.UserRole - 1)
+
+    if custom_resolutions:
+        # Add enabled custom resolutions
+        for res in custom_resolutions:
+            combo_resolution.addItem(res)
+    else:
+        # Only show manual input option when no custom resolutions are enabled
+        combo_resolution.addItem(tr('ui.custom_resolution'))
 
 
 class DragDropImageLabel(QLabel):
@@ -631,39 +698,8 @@ def init_main_widget(parent):
     combo_resolution = QComboBox()
     parent.combo_resolution = combo_resolution
 
-    # 그룹 제목과 해상도 추가
-    # Normal 그룹
-    combo_resolution.addItem("--- Normal ---")
-    combo_resolution.setItemData(0, 0, Qt.UserRole - 1)  # 선택 불가능하게 설정
-    
-    for resolution in RESOLUTION_FAMILIY[0]:
-        combo_resolution.addItem(resolution)
-    
-    # Large 그룹
-    combo_resolution.addItem("--- Large ---")
-    large_idx = combo_resolution.count() - 1
-    combo_resolution.setItemData(large_idx, 0, Qt.UserRole - 1)  # 선택 불가능하게 설정
-    
-    for resolution in RESOLUTION_FAMILIY[1]:
-        combo_resolution.addItem(resolution)
-    
-    # Wallpaper 그룹
-    combo_resolution.addItem("--- Wallpaper ---")
-    wallpaper_idx = combo_resolution.count() - 1
-    combo_resolution.setItemData(wallpaper_idx, 0, Qt.UserRole - 1)  # 선택 불가능하게 설정
-    
-    for resolution in RESOLUTION_FAMILIY[2]:
-        combo_resolution.addItem(resolution)
-    
-    # Low Resolution 그룹
-    combo_resolution.addItem("--- Low Resolution ---")
-    low_res_idx = combo_resolution.count() - 1
-    combo_resolution.setItemData(low_res_idx, 0, Qt.UserRole - 1)  # 선택 불가능하게 설정
-    
-    for resolution in RESOLUTION_FAMILIY[3]:
-        combo_resolution.addItem(resolution)
-    
-    combo_resolution.addItem(tr('ui.custom_resolution'))
+    # Initialize resolution combo box with settings-based filtering
+    _populate_resolution_combo(parent, combo_resolution)
     
     # Square (1024x1024) 항목을 기본으로 선택
     hd_index = -1

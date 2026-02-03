@@ -222,3 +222,34 @@ DEFAULT_PATH = {
     "path_wildcards": "./wildcards/",
     "path_models": "./models/",
 }
+
+# Custom resolution default settings
+DEFAULT_CUSTOM_RESOLUTIONS = {
+    # Custom resolution 1
+    "custom_resolution_1_enabled": False,
+    "custom_resolution_1_width": "1024",
+    "custom_resolution_1_height": "1024",
+    # Custom resolution 2
+    "custom_resolution_2_enabled": False,
+    "custom_resolution_2_width": "1280",
+    "custom_resolution_2_height": "720",
+    # Custom resolution 3
+    "custom_resolution_3_enabled": False,
+    "custom_resolution_3_width": "1920",
+    "custom_resolution_3_height": "1080",
+    # Custom resolution 4
+    "custom_resolution_4_enabled": False,
+    "custom_resolution_4_width": "1024",
+    "custom_resolution_4_height": "1024",
+    # Custom resolution 5
+    "custom_resolution_5_enabled": False,
+    "custom_resolution_5_width": "1024",
+    "custom_resolution_5_height": "1024",
+    # Custom resolution 6
+    "custom_resolution_6_enabled": False,
+    "custom_resolution_6_width": "1024",
+    "custom_resolution_6_height": "1024",
+    # Resolution family enable/disable (to prevent accidental Anlas usage)
+    "resolution_family_large_enabled": True,  # Large resolutions (uses Anlas)
+    "resolution_family_wallpaper_enabled": True,  # Wallpaper resolutions (uses Anlas)
+}

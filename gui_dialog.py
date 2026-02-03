@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (QDialog, QLabel, QPushButton, QVBoxLayout,
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, QPoint
 from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap, QImage, QPainter, QPen, QCursor
 
-from consts import DEFAULT_PATH, DEFAULT_TAGCOMPLETION_PATH
+from consts import DEFAULT_PATH, DEFAULT_TAGCOMPLETION_PATH, DEFAULT_CUSTOM_RESOLUTIONS
 
 from i18n_manager import tr
 
@@ -200,7 +200,7 @@ class OptionDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
-        self.resize(1000, 600)
+        self.resize(1000, 700)  # Increased height for more content
 
         # 메인 레이아웃 (세로)
         main_layout = QVBoxLayout()
@@ -208,11 +208,19 @@ class OptionDialog(QDialog):
         # 컨텐츠를 담을 가로 레이아웃 (2-column layout)
         content_layout = QHBoxLayout()
 
-        # 왼쪽 컬럼
-        left_column = QVBoxLayout()
+        # 왼쪽 컬럼 - with scroll area
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        left_widget = QWidget()
+        left_column = QVBoxLayout(left_widget)
 
-        # 오른쪽 컬럼
-        right_column = QVBoxLayout()
+        # 오른쪽 컬럼 - with scroll area
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        right_widget = QWidget()
+        right_column = QVBoxLayout(right_widget)
 
         # 폴더 경로 설정 그룹
         path_group = QGroupBox("폴더 경로 설정")
@@ -373,6 +381,204 @@ class OptionDialog(QDialog):
         # 왼쪽 컬럼에 추가
         left_column.addWidget(generation_group)
 
+        # === Resolution Settings Group ===
+        resolution_group = QGroupBox(tr('options.resolution_settings'))
+        resolution_layout = QVBoxLayout()
+
+        # Resolution family enable/disable (Anlas warning)
+        anlas_warning = QLabel(tr('options.anlas_resolution_warning'))
+        anlas_warning.setWordWrap(True)
+        anlas_warning.setStyleSheet("color: #D37493; font-size: 10px; padding: 2px;")
+        resolution_layout.addWidget(anlas_warning)
+
+        # Large resolution checkbox
+        self.large_resolution_checkbox = QCheckBox(tr('options.enable_large_resolution'))
+        self.large_resolution_checkbox.setToolTip(tr('options.enable_large_resolution_tooltip'))
+        self.large_resolution_checkbox.setChecked(
+            self.parent.settings.value("resolution_family_large_enabled",
+                                       DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_large_enabled"], type=bool))
+        resolution_layout.addWidget(self.large_resolution_checkbox)
+
+        # Wallpaper resolution checkbox
+        self.wallpaper_resolution_checkbox = QCheckBox(tr('options.enable_wallpaper_resolution'))
+        self.wallpaper_resolution_checkbox.setToolTip(tr('options.enable_wallpaper_resolution_tooltip'))
+        self.wallpaper_resolution_checkbox.setChecked(
+            self.parent.settings.value("resolution_family_wallpaper_enabled",
+                                       DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_wallpaper_enabled"], type=bool))
+        resolution_layout.addWidget(self.wallpaper_resolution_checkbox)
+
+        # Separator
+        resolution_layout.addSpacing(10)
+
+        # Custom resolutions title
+        custom_res_label = QLabel(tr('options.custom_resolutions_title'))
+        custom_res_label.setStyleSheet("font-weight: bold;")
+        resolution_layout.addWidget(custom_res_label)
+
+        custom_res_desc = QLabel(tr('options.custom_resolutions_desc'))
+        custom_res_desc.setWordWrap(True)
+        custom_res_desc.setStyleSheet("color: gray; font-size: 10px;")
+        resolution_layout.addWidget(custom_res_desc)
+
+        # Custom resolution 1
+        custom_res_1_layout = QHBoxLayout()
+        self.custom_res_1_checkbox = QCheckBox(tr('options.custom_resolution_n').format(1))
+        self.custom_res_1_checkbox.setChecked(
+            self.parent.settings.value("custom_resolution_1_enabled",
+                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_1_enabled"], type=bool))
+        custom_res_1_layout.addWidget(self.custom_res_1_checkbox)
+
+        self.custom_res_1_width = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_1_width",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_1_width"])))
+        self.custom_res_1_width.setMaximumWidth(60)
+        self.custom_res_1_width.setAlignment(Qt.AlignRight)
+        custom_res_1_layout.addWidget(self.custom_res_1_width)
+
+        custom_res_1_layout.addWidget(QLabel("×"))
+
+        self.custom_res_1_height = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_1_height",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_1_height"])))
+        self.custom_res_1_height.setMaximumWidth(60)
+        self.custom_res_1_height.setAlignment(Qt.AlignRight)
+        custom_res_1_layout.addWidget(self.custom_res_1_height)
+        custom_res_1_layout.addStretch()
+        resolution_layout.addLayout(custom_res_1_layout)
+
+        # Custom resolution 2
+        custom_res_2_layout = QHBoxLayout()
+        self.custom_res_2_checkbox = QCheckBox(tr('options.custom_resolution_n').format(2))
+        self.custom_res_2_checkbox.setChecked(
+            self.parent.settings.value("custom_resolution_2_enabled",
+                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_2_enabled"], type=bool))
+        custom_res_2_layout.addWidget(self.custom_res_2_checkbox)
+
+        self.custom_res_2_width = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_2_width",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_2_width"])))
+        self.custom_res_2_width.setMaximumWidth(60)
+        self.custom_res_2_width.setAlignment(Qt.AlignRight)
+        custom_res_2_layout.addWidget(self.custom_res_2_width)
+
+        custom_res_2_layout.addWidget(QLabel("×"))
+
+        self.custom_res_2_height = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_2_height",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_2_height"])))
+        self.custom_res_2_height.setMaximumWidth(60)
+        self.custom_res_2_height.setAlignment(Qt.AlignRight)
+        custom_res_2_layout.addWidget(self.custom_res_2_height)
+        custom_res_2_layout.addStretch()
+        resolution_layout.addLayout(custom_res_2_layout)
+
+        # Custom resolution 3
+        custom_res_3_layout = QHBoxLayout()
+        self.custom_res_3_checkbox = QCheckBox(tr('options.custom_resolution_n').format(3))
+        self.custom_res_3_checkbox.setChecked(
+            self.parent.settings.value("custom_resolution_3_enabled",
+                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_3_enabled"], type=bool))
+        custom_res_3_layout.addWidget(self.custom_res_3_checkbox)
+
+        self.custom_res_3_width = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_3_width",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_3_width"])))
+        self.custom_res_3_width.setMaximumWidth(60)
+        self.custom_res_3_width.setAlignment(Qt.AlignRight)
+        custom_res_3_layout.addWidget(self.custom_res_3_width)
+
+        custom_res_3_layout.addWidget(QLabel("×"))
+
+        self.custom_res_3_height = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_3_height",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_3_height"])))
+        self.custom_res_3_height.setMaximumWidth(60)
+        self.custom_res_3_height.setAlignment(Qt.AlignRight)
+        custom_res_3_layout.addWidget(self.custom_res_3_height)
+        custom_res_3_layout.addStretch()
+        resolution_layout.addLayout(custom_res_3_layout)
+
+        # Custom resolution 4
+        custom_res_4_layout = QHBoxLayout()
+        self.custom_res_4_checkbox = QCheckBox(tr('options.custom_resolution_n').format(4))
+        self.custom_res_4_checkbox.setChecked(
+            self.parent.settings.value("custom_resolution_4_enabled",
+                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_4_enabled"], type=bool))
+        custom_res_4_layout.addWidget(self.custom_res_4_checkbox)
+
+        self.custom_res_4_width = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_4_width",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_4_width"])))
+        self.custom_res_4_width.setMaximumWidth(60)
+        self.custom_res_4_width.setAlignment(Qt.AlignRight)
+        custom_res_4_layout.addWidget(self.custom_res_4_width)
+
+        custom_res_4_layout.addWidget(QLabel("×"))
+
+        self.custom_res_4_height = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_4_height",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_4_height"])))
+        self.custom_res_4_height.setMaximumWidth(60)
+        self.custom_res_4_height.setAlignment(Qt.AlignRight)
+        custom_res_4_layout.addWidget(self.custom_res_4_height)
+        custom_res_4_layout.addStretch()
+        resolution_layout.addLayout(custom_res_4_layout)
+
+        # Custom resolution 5
+        custom_res_5_layout = QHBoxLayout()
+        self.custom_res_5_checkbox = QCheckBox(tr('options.custom_resolution_n').format(5))
+        self.custom_res_5_checkbox.setChecked(
+            self.parent.settings.value("custom_resolution_5_enabled",
+                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_5_enabled"], type=bool))
+        custom_res_5_layout.addWidget(self.custom_res_5_checkbox)
+
+        self.custom_res_5_width = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_5_width",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_5_width"])))
+        self.custom_res_5_width.setMaximumWidth(60)
+        self.custom_res_5_width.setAlignment(Qt.AlignRight)
+        custom_res_5_layout.addWidget(self.custom_res_5_width)
+
+        custom_res_5_layout.addWidget(QLabel("×"))
+
+        self.custom_res_5_height = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_5_height",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_5_height"])))
+        self.custom_res_5_height.setMaximumWidth(60)
+        self.custom_res_5_height.setAlignment(Qt.AlignRight)
+        custom_res_5_layout.addWidget(self.custom_res_5_height)
+        custom_res_5_layout.addStretch()
+        resolution_layout.addLayout(custom_res_5_layout)
+
+        # Custom resolution 6
+        custom_res_6_layout = QHBoxLayout()
+        self.custom_res_6_checkbox = QCheckBox(tr('options.custom_resolution_n').format(6))
+        self.custom_res_6_checkbox.setChecked(
+            self.parent.settings.value("custom_resolution_6_enabled",
+                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_6_enabled"], type=bool))
+        custom_res_6_layout.addWidget(self.custom_res_6_checkbox)
+
+        self.custom_res_6_width = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_6_width",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_6_width"])))
+        self.custom_res_6_width.setMaximumWidth(60)
+        self.custom_res_6_width.setAlignment(Qt.AlignRight)
+        custom_res_6_layout.addWidget(self.custom_res_6_width)
+
+        custom_res_6_layout.addWidget(QLabel("×"))
+
+        self.custom_res_6_height = QLineEdit(
+            str(self.parent.settings.value("custom_resolution_6_height",
+                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_6_height"])))
+        self.custom_res_6_height.setMaximumWidth(60)
+        self.custom_res_6_height.setAlignment(Qt.AlignRight)
+        custom_res_6_layout.addWidget(self.custom_res_6_height)
+        custom_res_6_layout.addStretch()
+        resolution_layout.addLayout(custom_res_6_layout)
+
+        resolution_group.setLayout(resolution_layout)
+        left_column.addWidget(resolution_group)
+
         # === Theme Settings Group ===
         theme_group = QGroupBox("테마 설정 (Theme Settings)")
         theme_layout = QVBoxLayout()
@@ -532,9 +738,17 @@ class OptionDialog(QDialog):
         right_column.addWidget(filename_group)
         right_column.addWidget(tag_group)
 
-        # 왼쪽과 오른쪽 컬럼을 수평 레이아웃에 추가
-        content_layout.addLayout(left_column)
-        content_layout.addLayout(right_column)
+        # Add stretch to push content to top
+        left_column.addStretch()
+        right_column.addStretch()
+
+        # Set widgets on scroll areas
+        left_scroll.setWidget(left_widget)
+        right_scroll.setWidget(right_widget)
+
+        # 왼쪽과 오른쪽 스크롤 영역을 수평 레이아웃에 추가
+        content_layout.addWidget(left_scroll)
+        content_layout.addWidget(right_scroll)
 
         # 컨텐츠 레이아웃을 메인 레이아웃에 추가
         main_layout.addLayout(content_layout)
@@ -768,6 +982,39 @@ class OptionDialog(QDialog):
         self.parent.settings.setValue("quick_gen_count_3", self.quick_gen_50_spinbox.value())
         self.parent.settings.setValue("quick_gen_count_4", self.quick_gen_100_spinbox.value())
         self.parent.settings.setValue("default_generation_interval", self.default_interval_spinbox.value())
+
+        # Resolution settings save
+        self.parent.settings.setValue("resolution_family_large_enabled", self.large_resolution_checkbox.isChecked())
+        self.parent.settings.setValue("resolution_family_wallpaper_enabled", self.wallpaper_resolution_checkbox.isChecked())
+
+        # Custom resolution settings save
+        self.parent.settings.setValue("custom_resolution_1_enabled", self.custom_res_1_checkbox.isChecked())
+        self.parent.settings.setValue("custom_resolution_1_width", self.custom_res_1_width.text())
+        self.parent.settings.setValue("custom_resolution_1_height", self.custom_res_1_height.text())
+
+        self.parent.settings.setValue("custom_resolution_2_enabled", self.custom_res_2_checkbox.isChecked())
+        self.parent.settings.setValue("custom_resolution_2_width", self.custom_res_2_width.text())
+        self.parent.settings.setValue("custom_resolution_2_height", self.custom_res_2_height.text())
+
+        self.parent.settings.setValue("custom_resolution_3_enabled", self.custom_res_3_checkbox.isChecked())
+        self.parent.settings.setValue("custom_resolution_3_width", self.custom_res_3_width.text())
+        self.parent.settings.setValue("custom_resolution_3_height", self.custom_res_3_height.text())
+
+        self.parent.settings.setValue("custom_resolution_4_enabled", self.custom_res_4_checkbox.isChecked())
+        self.parent.settings.setValue("custom_resolution_4_width", self.custom_res_4_width.text())
+        self.parent.settings.setValue("custom_resolution_4_height", self.custom_res_4_height.text())
+
+        self.parent.settings.setValue("custom_resolution_5_enabled", self.custom_res_5_checkbox.isChecked())
+        self.parent.settings.setValue("custom_resolution_5_width", self.custom_res_5_width.text())
+        self.parent.settings.setValue("custom_resolution_5_height", self.custom_res_5_height.text())
+
+        self.parent.settings.setValue("custom_resolution_6_enabled", self.custom_res_6_checkbox.isChecked())
+        self.parent.settings.setValue("custom_resolution_6_width", self.custom_res_6_width.text())
+        self.parent.settings.setValue("custom_resolution_6_height", self.custom_res_6_height.text())
+
+        # Refresh resolution combo box if parent has the method
+        if hasattr(self.parent, 'refresh_resolution_combo'):
+            self.parent.refresh_resolution_combo()
 
         # 태그 완성 파일 경로 저장
         old_tag_path = self.parent.settings.value("path_tag_completion", DEFAULT_TAGCOMPLETION_PATH)

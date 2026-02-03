@@ -212,6 +212,17 @@
       "not_logged_in": "Login Required",
       "anlas": "Anlas:",
       "unknown": "Unknown"
+    },
+    "options": {
+      "resolution_settings": "Resolution Settings",
+      "anlas_resolution_warning": "※ Large and Wallpaper resolutions use Anlas. Disable to prevent accidental usage.",
+      "enable_large_resolution": "Enable Large Resolutions (Uses Anlas)",
+      "enable_large_resolution_tooltip": "Large resolutions (1472x1472, 1024x1536, 1536x1024) consume Anlas",
+      "enable_wallpaper_resolution": "Enable Wallpaper Resolutions (Uses Anlas)",
+      "enable_wallpaper_resolution_tooltip": "Wallpaper resolutions (1088x1920, 1920x1088) consume Anlas",
+      "custom_resolutions_title": "Custom Resolutions",
+      "custom_resolutions_desc": "Define up to 6 custom resolutions for random generation.\n※ Resolutions exceeding the default (1024x1024) will consume Anlas.",
+      "custom_resolution_n": "Custom {}"
     }
   }
 }
