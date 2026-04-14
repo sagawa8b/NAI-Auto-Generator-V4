@@ -5,7 +5,7 @@
 <img width="960" alt="image2" src="https://github.com/sagawa8b/NAI-Auto-Generator-V4/blob/main/nai_ui_02.png">
 <img width="960" alt="image3" src="https://github.com/sagawa8b/NAI-Auto-Generator-V4/blob/main/nai_ui_03.png">
 
-[![Version](https://img.shields.io/badge/version-4.5__2.6.01.09-blue.svg)](https://github.com/sagawa8b/NAI-Auto-Generator-V4/releases)
+[![Version](https://img.shields.io/badge/version-4.5__2.6.02.04-blue.svg)](https://github.com/sagawa8b/NAI-Auto-Generator-V4/releases)
 [![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-orange.svg)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/sagawa8b/NAI-Auto-Generator-V4/total.svg)](https://github.com/sagawa8b/NAI-Auto-Generator-V4/releases)
 

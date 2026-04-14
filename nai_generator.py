@@ -377,7 +377,9 @@ class NAIGenerator():
     def __init__(self):
         self.access_token = None
         self.username = None
-        self.password = None        
+        self.password = None
+        self.api_key = None        # pst-... 영구 API 토큰 원본
+        self.login_method = None   # "password" | "api_key"
         # 세션 관리 관련 속성 명시적 초기화
         self._last_successful_login = None
         self._last_token_check = 0
@@ -451,8 +453,13 @@ class NAIGenerator():
     def refresh_token(self):
         """토큰 갱신 최적화 - 오류 추적 및 스마트 재시도"""
         logger.debug("토큰 갱신 시도")
+
+        # API 키 로그인은 pst-... 토큰이 만료되지 않으므로 검증만 수행
+        if self.login_method == "api_key" and self.api_key:
+            return self.check_logged_in()
+
         current_time = time.time()
-        
+
         # 5분 내 이미 확인했으면 스킵 (과도한 요청 방지)
         if hasattr(self, '_last_token_check') and current_time - self._last_token_check < 300:
             return True
@@ -535,6 +542,35 @@ class NAIGenerator():
 
         return False
 
+    def try_login_with_api_key(self, api_key: str) -> bool:
+        """pst-... 형식의 영구 API 토큰으로 로그인"""
+        if not api_key or not api_key.startswith("pst-"):
+            logger.error("API 키 형식 오류: 'pst-'로 시작해야 합니다")
+            return False
+
+        self.access_token = api_key
+        self.api_key = api_key
+        self.login_method = "api_key"
+
+        # get_anlas()로 토큰 유효성 검증
+        anlas = self.get_anlas()
+        if anlas is None:
+            logger.error("API 키 검증 실패: 토큰이 유효하지 않습니다")
+            self.access_token = None
+            self.api_key = None
+            self.login_method = None
+            return False
+
+        self._last_successful_login = time.time()
+        self._last_token_check = time.time()
+        if hasattr(self, 'session_manager'):
+            self.session_manager.consecutive_errors = 0
+            self.session_manager.image_count_since_login = 0
+            self.session_manager.session_health = 1.0
+
+        logger.info("API 키 로그인 성공")
+        return True
+
     def set_param(self, param_key: NAIParam, param_value):
         # param_key type check
         assert(isinstance(param_key, NAIParam))
@@ -599,34 +635,34 @@ class NAIGenerator():
         
         # Infill 모드일 경우 모델명에 inpainting 추가
         if action == NAIAction.infill:
-            # 모델 이름에서 버전 추출
             if "4-5" in model:
                 model = "nai-diffusion-4-5-full-inpainting"
-            else:
+            elif model != "nai-diffusion-3":
                 model = "nai-diffusion-4-full-inpainting"
+            # V3는 전용 inpainting 모델이 없으므로 그대로 사용
         
-        logger.info(f"📍 [{request_id}] generate_image 메서드 시작")
+        logger.info(f"[GEN] [{request_id}] generate_image 메서드 시작")
         
         # 시드 설정
         if self.parameters["extra_noise_seed"] == -1:
             self.parameters["extra_noise_seed"] = self.parameters["seed"]
 
         # *** V4 구조에 맞게 파라미터 변환 ***
-        logger.info(f"📍 [{request_id}] V4 파라미터 변환 호출 직전")
+        logger.info(f"[GEN] [{request_id}] V4 파라미터 변환 호출 직전")
         self._prepare_v4_parameters()
-        logger.info(f"📍 [{request_id}] V4 파라미터 변환 호출 완료")
+        logger.info(f"[GEN] [{request_id}] V4 파라미터 변환 호출 완료")
 
         # *** Infill 모드일 경우 img2img 파라미터 구조화 ***
         if action == NAIAction.infill:
-            logger.info(f"📍 [{request_id}] Infill 모드 - img2img 파라미터 구조화")
+            logger.info(f"[GEN] [{request_id}] Infill 모드 - img2img 파라미터 구조화")
 
             # 마스크 존재 확인
             has_mask = "mask" in self.parameters and self.parameters["mask"] is not None
             if has_mask:
                 mask_size = len(self.parameters["mask"]) if isinstance(self.parameters["mask"], str) else 0
-                logger.info(f"✓ Mask detected in parameters - size: {mask_size} bytes")
+                logger.info(f"[OK] Mask detected in parameters - size: {mask_size} bytes")
             else:
-                logger.warning(f"⚠ WARNING: Infill mode but NO MASK in parameters!")
+                logger.warning(f"[WARN] WARNING: Infill mode but NO MASK in parameters!")
 
             # Get strength value from slider for img2img and inpaintImg2ImgStrength
             img2img_strength = self.parameters.get("strength", 0.5)
@@ -652,10 +688,10 @@ class NAIGenerator():
             if "noise" in self.parameters:
                 del self.parameters["noise"]
 
-            logger.info(f"📍 [{request_id}] img2img params: {img2img_params}")
-            logger.info(f"📍 [{request_id}] inpaintImg2ImgStrength: {img2img_strength}")
-            logger.info(f"📍 [{request_id}] Top-level strength: {self.parameters.get('strength')} (always 0.7 for infill)")
-            logger.info(f"📍 [{request_id}] Mask still in parameters: {has_mask}")
+            logger.info(f"[GEN] [{request_id}] img2img params: {img2img_params}")
+            logger.info(f"[GEN] [{request_id}] inpaintImg2ImgStrength: {img2img_strength}")
+            logger.info(f"[GEN] [{request_id}] Top-level strength: {self.parameters.get('strength')} (always 0.7 for infill)")
+            logger.info(f"[GEN] [{request_id}] Mask still in parameters: {has_mask}")
 
         url = BASE_URL + f"/ai/generate-image"
 
@@ -668,15 +704,15 @@ class NAIGenerator():
         
         # 디버깅: director_reference_* 파라미터 확인
         if "director_reference_descriptions" in self.parameters:
-            logger.info(f"📍 API 전송 데이터에 director_reference_descriptions 포함됨")
-            logger.info(f"📍 descriptions 내용: {self.parameters['director_reference_descriptions']}")
+            logger.info(f"[GEN] API 전송 데이터에 director_reference_descriptions 포함됨")
+            logger.info(f"[GEN] descriptions 내용: {self.parameters['director_reference_descriptions']}")
         if "director_reference_images" in self.parameters:
-            logger.info(f"📍 API 전송 데이터에 director_reference_images 포함됨: {len(self.parameters['director_reference_images'])}개")
+            logger.info(f"[GEN] API 전송 데이터에 director_reference_images 포함됨: {len(self.parameters['director_reference_images'])}개")
         
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
         # API 전송 직전 최종 데이터 로깅 강화
-        logger.info(f"📍 [{request_id}] API 전송 직전 최종 데이터 검증:")
+        logger.info(f"[GEN] [{request_id}] API 전송 직전 최종 데이터 검증:")
         logger.info(f"  - 모델: {model}")
         logger.info(f"  - 액션: {action.name}")
         
@@ -722,7 +758,7 @@ class NAIGenerator():
                     try:
                         error_json = response.json()
                         error_info += f", 메시지: {error_json.get('message', '알 수 없음')}"
-                    except:
+                    except Exception:
                         error_info += f", 응답: {response.text[:200]}"
                     
                     logger.error(f"API error response [ID: {request_id}] - {error_info}")
@@ -785,19 +821,37 @@ class NAIGenerator():
         return None, "최대 재시도 횟수 초과: 서버에 연결할 수 없습니다."
     
     def _prepare_v4_parameters(self):
-        """V4 API에 필요한 파라미터 구조로 변환"""
+        """V4 API에 필요한 파라미터 구조로 변환 (V3 모델은 V4 파라미터 제외)"""
         logger.debug("=== _prepare_v4_parameters 메서드 호출됨 ===")
-        logger.info("📍 _prepare_v4_parameters 메서드 시작")
-        
+        logger.info("[GEN] _prepare_v4_parameters 메서드 시작")
+
+        # V3 모델은 v4_prompt / characterPrompts 등 V4 전용 파라미터가 필요 없음
+        model = self.parameters.get("model", "")
+        if model == "nai-diffusion-3":
+            logger.info("[GEN] V3 모델 감지 — V4 전용 파라미터 변환 생략")
+            for key in [
+                "v4_prompt", "v4_negative_prompt", "v4_model_preset",
+                "characterPrompts", "use_character_coords",
+                "director_reference_descriptions", "director_reference_images",
+                "director_reference_information_extracted",
+                "director_reference_strength_values",
+                "director_reference_secondary_strength_values",
+                "reference_image_multiple", "reference_information_extracted_multiple",
+                "reference_strength_multiple", "reference_fidelity_multiple",
+            ]:
+                self.parameters.pop(key, None)
+            logger.info("[GEN] _prepare_v4_parameters 완료 (V3 모드)")
+            return
+
         # 내부 파라미터 처리 - use_character_coords 값 저장 후 제거
         use_coords = self.parameters.get("use_character_coords", False)
-        logger.info(f"📍 원본 use_character_coords: {use_coords}")
+        logger.info(f"[GEN] 원본 use_character_coords: {use_coords}")
         if "use_character_coords" in self.parameters:
             del self.parameters["use_character_coords"]
 
         # Legacy 모드 확인
         legacy_mode = bool(self.parameters.get("legacy", False))
-        logger.debug(f"📍 Legacy 모드: {legacy_mode}")
+        logger.debug(f"[GEN] Legacy 모드: {legacy_mode}")
         
         # V4 프롬프트 형식 설정
         self.parameters["v4_prompt"] = {
@@ -821,12 +875,12 @@ class NAIGenerator():
             "legacy_uc": legacy_mode
         }
         
-        logger.debug(f"📍 v4_prompt 초기 구조 생성 완료 - use_coords: {use_coords}")
+        logger.debug(f"[GEN] v4_prompt 초기 구조 생성 완료 - use_coords: {use_coords}")
         
         # 캐릭터 프롬프트 처리
         if self.parameters.get("characterPrompts") and len(self.parameters["characterPrompts"]) > 0:
             char_prompts = self.parameters["characterPrompts"]
-            logger.info(f"📍 캐릭터 프롬프트 처리 시작: {len(char_prompts)}개")
+            logger.info(f"[GEN] 캐릭터 프롬프트 처리 시작: {len(char_prompts)}개")
             
             for i, char in enumerate(char_prompts):
                 if isinstance(char, dict) and "prompt" in char:
@@ -835,28 +889,28 @@ class NAIGenerator():
                         "centers": [{"x": 0.5, "y": 0.5}]  # 기본 중앙 위치
                     }
                     
-                    logger.debug(f"📍 캐릭터 {i+1} 프롬프트: '{char['prompt'][:50]}...'")
+                    logger.debug(f"[GEN] 캐릭터 {i+1} 프롬프트: '{char['prompt'][:50]}...'")
                     
                     # 위치 정보 처리
                     if use_coords and "position" in char and char["position"]:
                         position = char["position"]
-                        logger.debug(f"📍 캐릭터 {i+1} 원본 위치 데이터: {position}, 타입: {type(position)}")
+                        logger.debug(f"[GEN] 캐릭터 {i+1} 원본 위치 데이터: {position}, 타입: {type(position)}")
                         
                         if isinstance(position, (tuple, list)) and len(position) >= 2:
                             try:
                                 position_x = float(position[0])
                                 position_y = float(position[1])
                                 char_caption["centers"] = [{"x": position_x, "y": position_y}]
-                                logger.info(f"📍 캐릭터 {i+1} 커스텀 위치 적용: x={position_x}, y={position_y}")
+                                logger.info(f"[GEN] 캐릭터 {i+1} 커스텀 위치 적용: x={position_x}, y={position_y}")
                             except Exception as e:
-                                logger.error(f"📍 캐릭터 {i+1} 위치 변환 실패: {e}")
-                                logger.debug(f"📍 원본 위치 데이터 상세: {position}")
+                                logger.error(f"[GEN] 캐릭터 {i+1} 위치 변환 실패: {e}")
+                                logger.debug(f"[GEN] 원본 위치 데이터 상세: {position}")
                     else:
-                        logger.debug(f"📍 캐릭터 {i+1} 기본 중앙 위치 사용 (use_coords={use_coords})")
+                        logger.debug(f"[GEN] 캐릭터 {i+1} 기본 중앙 위치 사용 (use_coords={use_coords})")
                     
                     # 캐릭터 프롬프트 추가
                     self.parameters["v4_prompt"]["caption"]["char_captions"].append(char_caption)
-                    logger.debug(f"📍 캐릭터 {i+1} v4_prompt에 추가됨: {char_caption}")
+                    logger.debug(f"[GEN] 캐릭터 {i+1} v4_prompt에 추가됨: {char_caption}")
                     
                     # 네거티브 프롬프트
                     neg_caption = {
@@ -865,22 +919,22 @@ class NAIGenerator():
                     }
                     self.parameters["v4_negative_prompt"]["caption"]["char_captions"].append(neg_caption)
             
-            logger.info(f"📍 캐릭터 프롬프트 처리 완료 - 총 {len(self.parameters['v4_prompt']['caption']['char_captions'])}개 변환됨")
+            logger.info(f"[GEN] 캐릭터 프롬프트 처리 완료 - 총 {len(self.parameters['v4_prompt']['caption']['char_captions'])}개 변환됨")
             
             # 최종 v4_prompt 구조 로깅
-            logger.debug(f"📍 최종 v4_prompt 구조:")
+            logger.debug(f"[GEN] 최종 v4_prompt 구조:")
             logger.debug(f"  - use_coords: {self.parameters['v4_prompt']['use_coords']}")
             logger.debug(f"  - 캐릭터 수: {len(self.parameters['v4_prompt']['caption']['char_captions'])}")
             for i, char_cap in enumerate(self.parameters['v4_prompt']['caption']['char_captions']):
                 logger.debug(f"  - 캐릭터 {i+1}: centers={char_cap['centers']}")
         else:
-            logger.debug("📍 캐릭터 프롬프트 없음 - 기본 프롬프트만 사용")
+            logger.debug("[GEN] 캐릭터 프롬프트 없음 - 기본 프롬프트만 사용")
 
         # Character Reference 처리 (캐릭터 프롬프트 처리 이후에 추가)
         if (self.parameters.get("reference_image_multiple") and 
             len(self.parameters["reference_image_multiple"]) > 0):
             
-            logger.info("📍 Character Reference 데이터 처리 중")
+            logger.info("[GEN] Character Reference 데이터 처리 중")
             
             # *** 기존 단일 reference 파라미터 제거 (충돌 방지) ***
             if "reference_image" in self.parameters:
@@ -937,13 +991,13 @@ class NAIGenerator():
                 del self.parameters["reference_fidelity_multiple"]
             
             # 디버깅 로깅
-            logger.info(f"📍 director_reference_descriptions: {descriptions}")
-            logger.info(f"📍 director_reference_images 개수: {len(ref_images)}")
-            logger.info(f"📍 director_reference_images[0] 길이: {len(ref_images[0]) if ref_images else 0}")
-            logger.info(f"📍 director_reference_information_extracted: {ref_info_extracted}")
-            logger.info(f"📍 director_reference_strength_values: {ref_strength}")
-            logger.info(f"📍 director_reference_secondary_strength_values (Fidelity): {ref_fidelity}")
-            logger.info(f"📍 Character Reference 적용 완료 - Style Aware: {style_aware}, Fidelity: {ref_fidelity[0]}")
+            logger.info(f"[GEN] director_reference_descriptions: {descriptions}")
+            logger.info(f"[GEN] director_reference_images 개수: {len(ref_images)}")
+            logger.info(f"[GEN] director_reference_images[0] 길이: {len(ref_images[0]) if ref_images else 0}")
+            logger.info(f"[GEN] director_reference_information_extracted: {ref_info_extracted}")
+            logger.info(f"[GEN] director_reference_strength_values: {ref_strength}")
+            logger.info(f"[GEN] director_reference_secondary_strength_values (Fidelity): {ref_fidelity}")
+            logger.info(f"[GEN] Character Reference 적용 완료 - Style Aware: {style_aware}, Fidelity: {ref_fidelity[0]}")
         else:
             # Character Reference가 없을 때 모든 director_reference_* 파라미터 명시적으로 제거
             self.parameters.pop("director_reference_descriptions", None)
@@ -958,9 +1012,9 @@ class NAIGenerator():
             self.parameters.pop("reference_strength_multiple", None)
             self.parameters.pop("reference_fidelity_multiple", None)
             
-            logger.info("📍 Character Reference 없음 - 모든 director_reference_* 파라미터 제거됨")
+            logger.info("[GEN] Character Reference 없음 - 모든 director_reference_* 파라미터 제거됨")
 
-        logger.info("📍 _prepare_v4_parameters 메서드 완료")
+        logger.info("[GEN] _prepare_v4_parameters 메서드 완료")
                         
     def check_logged_in(self):
         """더 나은 오류 처리를 포함한 로그인 확인"""

@@ -44,8 +44,10 @@ def _get_exifdict_from_infostr(info_str):
 def _get_naidict_from_exifdict(exif_dict):
     try:
         nai_dict = {}
-        nai_dict["prompt"] = exif_dict["prompt"].strip()
-        nai_dict["negative_prompt"] = exif_dict["uc"].strip() if "uc" in exif_dict else exif_dict["negative_prompt"].strip()
+        prompt_val = exif_dict.get("prompt", "")
+        nai_dict["prompt"] = prompt_val.strip() if isinstance(prompt_val, str) else ""
+        uc_val = exif_dict.get("uc") or exif_dict.get("negative_prompt", "")
+        nai_dict["negative_prompt"] = uc_val.strip() if isinstance(uc_val, str) else ""
 
         option_dict = {}
         for key in TARGETKEY_NAIDICT_OPTION:

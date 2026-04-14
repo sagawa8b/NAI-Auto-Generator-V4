@@ -1,6 +1,10 @@
 from PIL import Image
 import gzip
 
+from logger import get_logger
+
+logger = get_logger()
+
 
 # from https://github.com/neggles/sd-webui-stealth-pnginfo/
 def read_info_from_image_stealth(image):
@@ -110,7 +114,7 @@ def read_info_from_image_stealth(image):
                 decoded_data = byte_data.decode('utf-8', errors='ignore')
             return decoded_data
         except Exception as e:
-            print(e)
-            pass
+            logger.error(f"Error decoding stealth PNG info: {e}")
+            return None
 
     return None

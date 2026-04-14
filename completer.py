@@ -338,7 +338,7 @@ class CompletionTextEdit(QTextEdit):
         if self.completer:
             try:
                 self.disconnect(self.completer, self.insertCompletion)
-            except:
+            except Exception:
                 pass  # 이전 연결이 없을 수 있으므로 예외 무시
         self.completer = completer
         if not self.completer:
@@ -348,8 +348,8 @@ class CompletionTextEdit(QTextEdit):
         self.completer.setCaseSensitivity(False)
         try:
             self.completer.activated.connect(self.insertCompletion)
-        except:
-            logger.error("자동완성 신호 연결 실패")
+        except Exception as e:
+            logger.error(f"자동완성 신호 연결 실패: {e}")
 
     def insertCompletion(self, completion):
         # CSV 형식 처리 (태그[숫자] => 태그)

@@ -8,6 +8,10 @@ import numpy as np
 import requests
 import shutil
 
+from logger import get_logger
+
+logger = get_logger()
+
 DEFAULT_MODEL = "wd-v1-4-moat-tagger-v2"
 LIST_MODEL = ("wd-v1-4-moat-tagger-v2",
               "wd-v1-4-convnext-tagger-v2", "wd-v1-4-convnext-tagger",
@@ -16,18 +20,17 @@ LIST_MODEL = ("wd-v1-4-moat-tagger-v2",
 
 def download_file(url, dst):
     try:
-        with requests.get(url, stream=True) as response:
+        with requests.get(url, stream=True, timeout=60) as response:
             if response.status_code == 200:
                 with open(dst, 'wb') as f:
                     response.raw.decode_content = True
                     shutil.copyfileobj(response.raw, f)
                 return True
             else:
-                print(
-                    f"Failed to download file from {url}. Status code: {response.status_code}")
+                logger.error(f"Failed to download file from {url}. Status code: {response.status_code}")
                 return False
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         return False
 
 
@@ -37,9 +40,11 @@ def create_folder_if_not_exists(foldersrc):
 
 
 def convert_src_to_imagedata(img_path, quality=100):
+    if not os.path.isfile(img_path):
+        raise FileNotFoundError(f"Image file not found: {img_path}")
     img = Image.open(img_path)
     buf = io.BytesIO()
-    img.save(buf, format='png', quality=100)
+    img.save(buf, format='png', quality=quality)
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
@@ -71,7 +76,7 @@ class DanbooruTagger():
             model_name = model_name[0:-5]
         installed = self.get_installed_models()
         if not any(model_name + ".onnx" in s for s in installed):
-            print("model not installed")
+            logger.warning(f"Model not installed: {model_name}")
             return
 
         name = os.path.join(self.models_dir, model_name + ".onnx")
@@ -97,18 +102,21 @@ class DanbooruTagger():
         tags = []
         general_index = None
         character_index = None
-        with open(os.path.join(self.models_dir, model_name + ".csv")) as f:
+        with open(os.path.join(self.models_dir, model_name + ".csv"), encoding='utf-8') as f:
             reader = csv.reader(f)
             next(reader)
             for row in reader:
+                if len(row) < 3:
+                    continue
                 if general_index is None and row[2] == "0":
                     general_index = reader.line_num - 2
                 elif character_index is None and row[2] == "4":
                     character_index = reader.line_num - 2
-                if replace_underscore:
-                    tags.append(row[1].replace("_", " "))
-                else:
-                    tags.append(row[1])
+                if len(row) > 1:
+                    if replace_underscore:
+                        tags.append(row[1].replace("_", " "))
+                    else:
+                        tags.append(row[1])
 
         label_name = model.get_outputs()[0].name
         probs = model.run([label_name], {input.name: image})[0]
@@ -133,7 +141,7 @@ class DanbooruTagger():
     def download_model(self, model):
         installed = self.get_installed_models()
         if any(model + ".onnx" in s for s in installed):
-            print("model already installed")
+            logger.info(f"Model already installed: {model}")
             return True
 
         url = f"https://huggingface.co/SmilingWolf/{model}/resolve/main/"
@@ -152,8 +160,8 @@ if __name__ == '__main__':
 
     is_success = dt.download_model("wd-v1-4-moat-tagger-v2")
 
-    print(is_success)
+    logger.info(f"Download success: {is_success}")
 
     result = dt.tag(Image.open("no_image.png"))
 
-    print(result)
+    logger.info(f"Tag result: {result}")

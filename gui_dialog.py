@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (QDialog, QLabel, QPushButton, QVBoxLayout,
                              QFileDialog, QMessageBox, QRadioButton,
                              QButtonGroup, QDialogButtonBox, QWidget, QCheckBox,
                              QComboBox, QSlider, QApplication, QSpinBox, QDoubleSpinBox,
-                             QColorDialog, QScrollArea)
+                             QColorDialog, QScrollArea, QTabWidget)
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, QPoint
 from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap, QImage, QPainter, QPen, QCursor
 
@@ -31,7 +31,7 @@ class LoginDialog(QDialog):
         self.parent = parent
         self.auto_login = False
         self.setup_ui()
-        
+
     def setup_ui(self):
         self.setWindowTitle(tr('dialogs.login_title'))
         self.setFixedWidth(480)
@@ -45,145 +45,222 @@ class LoginDialog(QDialog):
             # 로그인 상태일 때 UI
             login_label = QLabel(tr('dialogs.logged_in'))
             login_label.setAlignment(Qt.AlignCenter)
-            
-            username_label = QLabel(tr('dialogs.user') + f" {self.parent.nai.username if hasattr(self.parent.nai, 'username') else tr('misc.unknown')}")
+
+            # API 키 로그인 vs ID/PW 로그인에 따라 다른 표시
+            if getattr(self.parent.nai, 'login_method', None) == "api_key":
+                username_label = QLabel(tr('dialogs.api_key_login_active'))
+            else:
+                username_label = QLabel(tr('dialogs.user') + f" {self.parent.nai.username if hasattr(self.parent.nai, 'username') and self.parent.nai.username else tr('misc.unknown')}")
             username_label.setAlignment(Qt.AlignCenter)
-            
-            username_label = QLabel(f"사용자: {self.parent.nai.username if hasattr(self.parent.nai, 'username') else '알 수 없음'}")
-            username_label.setAlignment(Qt.AlignCenter)
-            
+
             main_layout.addWidget(login_label)
             main_layout.addSpacing(15)
             main_layout.addWidget(username_label)
             main_layout.addSpacing(15)
-            
+
             # 로그아웃 버튼
-            logout_button = QPushButton("로그아웃하기")
+            logout_button = QPushButton(tr('dialogs.logout_button'))
             logout_button.clicked.connect(self.on_logout_click)
-            
+
             buttons_layout = QHBoxLayout()
             buttons_layout.addStretch()
             buttons_layout.addWidget(logout_button)
-            
+
             main_layout.addLayout(buttons_layout)
         else:
-            # 로그인되지 않은 상태일 때 UI
+            # 로그인되지 않은 상태일 때 UI — 2탭 구조
             login_label = QLabel(tr('dialogs.login_welcome'))
             login_label.setAlignment(Qt.AlignCenter)
 
-            username_label = QLabel(tr('dialogs.username'))
-            password_label = QLabel(tr('dialogs.password'))
+            # ── 탭 위젯 ──────────────────────────────────────────────
+            self.tab_widget = QTabWidget()
 
+            # Tab 0: 아이디/비밀번호
+            tab_idpw = QWidget()
+            idpw_layout = QVBoxLayout()
+
+            form_layout = QFormLayout()
             self.username_field = QLineEdit()
             self.password_field = QLineEdit()
             self.password_field.setEchoMode(QLineEdit.Password)
+            form_layout.addRow(QLabel(tr('dialogs.username')), self.username_field)
+            form_layout.addRow(QLabel(tr('dialogs.password')), self.password_field)
 
-            info_label = QLabel(
-                "※ 입력하신 아이디와 비밀번호는 Novel AI 서버에만 전송되며,\n이 앱의 서버로 전송되지 않습니다.")
-            auto_login_checkbox = QCheckBox("다음에도 자동 로그인")
+            self.idpw_auto_login_checkbox = QCheckBox(tr('dialogs.auto_login'))
+            info_label = QLabel(tr('dialogs.login_info'))
+            info_label.setWordWrap(True)
 
-            form_layout = QFormLayout()
-            form_layout.addRow(username_label, self.username_field)
-            form_layout.addRow(password_label, self.password_field)
+            idpw_layout.addLayout(form_layout)
+            idpw_layout.addWidget(self.idpw_auto_login_checkbox)
+            idpw_layout.addSpacing(5)
+            idpw_layout.addWidget(info_label)
+            idpw_layout.addStretch()
+            tab_idpw.setLayout(idpw_layout)
 
-            login_button = QPushButton("로그인하기")
+            # Tab 1: API 키
+            tab_apikey = QWidget()
+            apikey_layout = QVBoxLayout()
 
+            apikey_form = QFormLayout()
+            self.api_key_field = QLineEdit()
+            self.api_key_field.setEchoMode(QLineEdit.Password)
+            self.api_key_field.setPlaceholderText(tr('dialogs.api_key_placeholder'))
+
+            # Show/Hide 버튼
+            apikey_row_widget = QWidget()
+            apikey_row_layout = QHBoxLayout()
+            apikey_row_layout.setContentsMargins(0, 0, 0, 0)
+            self.api_key_show_btn = QPushButton(tr('dialogs.api_key_show'))
+            self.api_key_show_btn.setFixedWidth(60)
+            self.api_key_show_btn.clicked.connect(self._toggle_api_key_visibility)
+            apikey_row_layout.addWidget(self.api_key_field)
+            apikey_row_layout.addWidget(self.api_key_show_btn)
+            apikey_row_widget.setLayout(apikey_row_layout)
+            apikey_form.addRow(QLabel(tr('dialogs.api_key_label')), apikey_row_widget)
+
+            self.apikey_auto_login_checkbox = QCheckBox(tr('dialogs.auto_login'))
+            apikey_info_label = QLabel(tr('dialogs.api_key_info'))
+            apikey_info_label.setWordWrap(True)
+
+            apikey_layout.addLayout(apikey_form)
+            apikey_layout.addWidget(self.apikey_auto_login_checkbox)
+            apikey_layout.addSpacing(5)
+            apikey_layout.addWidget(apikey_info_label)
+            apikey_layout.addStretch()
+            tab_apikey.setLayout(apikey_layout)
+
+            self.tab_widget.addTab(tab_idpw, tr('dialogs.tab_idpw'))
+            self.tab_widget.addTab(tab_apikey, tr('dialogs.tab_apikey'))
+
+            # 공통 로그인 버튼
+            login_button = QPushButton(tr('dialogs.login_button'))
             buttons_layout = QHBoxLayout()
             buttons_layout.addStretch()
             buttons_layout.addWidget(login_button)
 
             main_layout.addWidget(login_label)
             main_layout.addSpacing(15)
-            main_layout.addLayout(form_layout)
-            main_layout.addWidget(auto_login_checkbox)
-            main_layout.addSpacing(15)
+            main_layout.addWidget(self.tab_widget)
+            main_layout.addSpacing(10)
             main_layout.addLayout(buttons_layout)
-            main_layout.addSpacing(15)
-            main_layout.addWidget(info_label)
 
             # 이벤트 연결
             login_button.clicked.connect(self.on_login_click)
-            auto_login_checkbox.stateChanged.connect(self.on_auto_login)
+            self.idpw_auto_login_checkbox.stateChanged.connect(self.on_auto_login)
+            self.apikey_auto_login_checkbox.stateChanged.connect(self.on_auto_login)
             self.password_field.returnPressed.connect(self.on_login_click)
+            self.api_key_field.returnPressed.connect(self.on_login_click)
 
-            # 자동 로그인 체크박스 초기 상태
+            # 이전 설정 복원
             auto_login_value = self.parent.settings.value("auto_login", False)
             if isinstance(auto_login_value, str):
                 auto_login_value = auto_login_value.lower() in ('true', 'yes', '1', 't', 'y')
-            auto_login_checkbox.setChecked(auto_login_value)
-
-            # 이전 아이디 로딩
+            self.idpw_auto_login_checkbox.setChecked(auto_login_value)
+            self.apikey_auto_login_checkbox.setChecked(auto_login_value)
             self.username_field.setText(self.parent.settings.value("username", ""))
 
+            # 저장된 login_method로 탭 복원
+            saved_method = self.parent.settings.value("login_method", "password")
+            if saved_method == "api_key":
+                self.tab_widget.setCurrentIndex(1)
+
         self.setLayout(main_layout)
+
+    def _toggle_api_key_visibility(self):
+        """API 키 필드 표시/숨김 전환"""
+        if self.api_key_field.echoMode() == QLineEdit.Password:
+            self.api_key_field.setEchoMode(QLineEdit.Normal)
+            self.api_key_show_btn.setText(tr('dialogs.api_key_hide'))
+        else:
+            self.api_key_field.setEchoMode(QLineEdit.Password)
+            self.api_key_show_btn.setText(tr('dialogs.api_key_show'))
 
     def on_auto_login(self, state):
         self.auto_login = state == Qt.Checked
 
     def on_login_click(self):
-        username = self.username_field.text()
-        password = self.password_field.text()
+        current_tab = self.tab_widget.currentIndex()
 
-        if username and password:
+        if current_tab == 0:
+            # ID/PW 로그인
+            username = self.username_field.text()
+            password = self.password_field.text()
+            if not username or not password:
+                QMessageBox.critical(self, tr('errors.title'), tr('dialogs.login_error_empty_fields'))
+                return
             self.parent.set_statusbar_text("LOGGINGIN")
-
-            # 로그인 스레드 생성
             self.login_thread = LoginThread(self.parent, self.parent.nai, username, password)
             self.login_thread.login_result.connect(self.on_login_result)
             self.login_thread.start()
-
-            # 여기서 바로 닫지 않도록 수정
-            # self.close()  # 이 줄 주석 처리
         else:
-            QMessageBox.critical(self, "오류", "아이디와 비밀번호를 입력해주세요.")
-            
+            # API 키 로그인
+            api_key = self.api_key_field.text().strip()
+            if not api_key:
+                QMessageBox.critical(self, tr('errors.title'), tr('dialogs.login_error_empty_api_key'))
+                return
+            if not api_key.startswith("pst-"):
+                QMessageBox.critical(self, tr('errors.title'), tr('dialogs.login_error_invalid_api_key'))
+                return
+            self.parent.set_statusbar_text("LOGGINGIN")
+            self.login_thread = APIKeyLoginThread(self.parent, self.parent.nai, api_key)
+            self.login_thread.login_result.connect(self.on_login_result)
+            self.login_thread.start()
+
     def on_logout_click(self):
         # 로그아웃 처리
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Question)
-        msg_box.setText("정말 로그아웃 하시겠습니까?")
-        msg_box.setWindowTitle("로그아웃 확인")
+        msg_box.setText(tr('dialogs.logout_confirm'))
+        msg_box.setWindowTitle(tr('dialogs.logout_confirm_title'))
         msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         msg_box.setDefaultButton(QMessageBox.No)
-        
+
         if msg_box.exec_() == QMessageBox.Yes:
             try:
-                # 로그아웃 처리 (NAIGenerator에 logout 메서드가 없으므로 직접 처리)
-                # 기존 로그인 정보를 리셋합니다
                 self.parent.nai.access_token = None
                 self.parent.nai.username = None
                 self.parent.nai.password = None
-                
+                self.parent.nai.api_key = None
+                self.parent.nai.login_method = None
+
                 # 부모 클래스에서 로그아웃 처리
                 self.parent.on_logout()
                 self.parent.set_auto_login(False)
-                QMessageBox.information(self, "로그아웃 완료", "로그아웃 되었습니다.")
+                QMessageBox.information(self, tr('dialogs.logout_complete_title'), tr('dialogs.logout_complete'))
                 self.close()
             except Exception as e:
-                QMessageBox.critical(self, "로그아웃 오류", f"로그아웃 처리 중 오류가 발생했습니다:\n{str(e)}")
+                QMessageBox.critical(self, tr('errors.title'), tr('dialogs.logout_error').format(str(e)))
 
     def on_login_result(self, error_code):
         if error_code == 0:
-            QMessageBox.information(self, "로그인 성공", "로그인에 성공했습니다.")
-            
+            QMessageBox.information(self, tr('dialogs.login_title'), tr('dialogs.login_success'))
+
             # 로그인 상태 업데이트
             self.parent.label_loginstate.set_logged_in(True)
             self.parent.set_statusbar_text("LOGINED")
             self.parent.set_disable_button(False)
             self.parent.refresh_anlas()
-            
+
+            # 자동 로그인 설정 저장
+            if self.auto_login:
+                self.parent.set_auto_login(True)
+
             # 로그인 성공 후 창 닫기
             self.close()
         else:
-            QMessageBox.critical(
-                self, "로그인 실패", "로그인에 실패했습니다.\n아이디와 비밀번호를 확인해주세요.")
-            self.close()  # 실패 시에도 창 닫기
+            # 현재 탭에 따라 오류 메시지 분기
+            current_tab = getattr(self, 'tab_widget', None)
+            if current_tab and current_tab.currentIndex() == 1:
+                QMessageBox.critical(self, tr('errors.title'), tr('dialogs.login_error_api_key_failed'))
+            else:
+                QMessageBox.critical(self, tr('errors.title'), tr('dialogs.login_failed'))
+            self.close()
 
     def apply_login_settings(self):
         """로그인 성공 후 UI 설정 적용"""
         if self.auto_login:
             self.parent.set_auto_login(True)
-        
+
         # 로그인 상태 업데이트
         self.parent.set_statusbar_text("LOGINED")
         self.parent.label_loginstate.set_logged_in(True)
@@ -628,6 +705,16 @@ class OptionDialog(QDialog):
 
         prompt_layout.addLayout(colors_layout)
 
+        # 오버레이 텍스트 색상 설정
+        overlay_color_layout = QHBoxLayout()
+        overlay_color_layout.addWidget(QLabel("오버레이 텍스트 색상:"))
+        self.overlay_text_color_btn = QPushButton()
+        overlay_text_color = QColor(self.parent.settings.value("overlay_text_color", "#ffffff"))
+        self.overlay_text_color_btn.setStyleSheet(f"background-color: {overlay_text_color.name()}")
+        self.overlay_text_color_btn.clicked.connect(self.pick_overlay_text_color)
+        overlay_color_layout.addWidget(self.overlay_text_color_btn)
+        prompt_layout.addLayout(overlay_color_layout)
+
         # 도움말 텍스트
         help_text = QLabel("V4 모델에서는 ::를 사용해 가중치를 직접 지정할 수 있습니다. 예: 1.5::강조할 텍스트::")
         help_text.setWordWrap(True)
@@ -802,7 +889,17 @@ class OptionDialog(QDialog):
         if color.isValid():
             self.parent.settings.setValue(setting_key, color.name())
             button.setStyleSheet(f"background-color: {color.name()}")
-    
+
+    def pick_overlay_text_color(self):
+        """오버레이 텍스트 색상 선택"""
+        current_color = QColor(self.parent.settings.value("overlay_text_color", "#ffffff"))
+        color = QColorDialog.getColor(current_color, self, "오버레이 텍스트 색상 선택")
+        if color.isValid():
+            self.parent.settings.setValue("overlay_text_color", color.name())
+            self.overlay_text_color_btn.setStyleSheet(f"background-color: {color.name()}")
+            if hasattr(self.parent, 'image_result'):
+                self.parent.image_result.apply_overlay_color(color.name())
+
     def update_artifacts_value(self):
         value = self.artifacts_slider.value() / 100.0
         self.artifacts_value.setText(f"{value:.2f}")
@@ -1298,6 +1395,20 @@ class LoginThread(QThread):
             self.login_result.emit(0)  # 성공
         else:
             self.login_result.emit(1)  # 실패
+
+
+class APIKeyLoginThread(QThread):
+    """pst-... 영구 API 토큰으로 로그인하는 스레드"""
+    login_result = pyqtSignal(int)  # 0=성공, 1=실패
+
+    def __init__(self, parent, nai, api_key):
+        super(APIKeyLoginThread, self).__init__(parent)
+        self.nai = nai
+        self.api_key = api_key
+
+    def run(self):
+        is_success = self.nai.try_login_with_api_key(self.api_key)
+        self.login_result.emit(0 if is_success else 1)
 
 
 class WorkerThread(QThread):

@@ -1,7 +1,7 @@
 # NAI Auto Generator V4.5 User Manual
 
-**Version:** V4.5_2.6.01.09  
-**Last Updated:** January 2026
+**Version:** V4.5_2.6.04.14  
+**Last Updated:** April 2026
 
 ---
 
@@ -51,12 +51,12 @@ This section guides you through the basic features for using NAI Auto Generator.
 
 Log in with your NovelAI account to activate image generation features.
 
-#### How to Login
+#### How to Login (ID / Password)
 
 1. **Login from Menu**
    - Select `Files` → `Log in`
 
-2. **Enter Account Information**
+2. **Select the "ID / Password" tab**
    - Username: NovelAI account email or username
    - Password: NovelAI account password
    - If you created an ID with Google ID linking, change (set) your password in User Settings → Account on the Web before use
@@ -69,6 +69,21 @@ Log in with your NovelAI account to activate image generation features.
    - "Login Complete" message displays in the top status bar
    - ANLAS balance displayed
 
+#### How to Login (API Key)
+
+You can log in using a NovelAI Persistent API Token.
+
+1. **Get your token**
+   - NovelAI website → Settings → Account → Click "Get Persistent API Token"
+   - Copy the token starting with `pst-`
+
+2. **Select the "API Key" tab**
+   - Select "API Key" tab in the login dialog
+   - Enter your token (must start with `pst-`)
+   - Use `Show` / `Hide` button to toggle token visibility
+
+3. **Click Login**
+
 #### Important Notes
 
 - Username and password are sent only to NovelAI servers
@@ -80,6 +95,11 @@ Log in with your NovelAI account to activate image generation features.
 ### Prompt Input
 
 Enter prompts and negative prompts for image generation.
+
+The prompt input area is organized as a **Tab UI**:
+- **Prompt tab**: Enter generation prompt
+- **Negative Prompt tab**: Enter negative prompt
+- The **character count** is displayed in real time in each tab title (e.g., `Prompt (248)`)
 
 #### Prompt
 
@@ -174,7 +194,25 @@ Syntax is automatically highlighted when entering prompts:
 
 Guide to basic image generation methods.
 
-#### Image Options
+#### Options & Settings
+
+The "Image Options" and "Advanced Settings" panels have been merged into a single **Options & Settings** panel.  
+Located at the top of the left panel, all generation parameters can be configured in one place.
+
+##### Model
+
+Select the NovelAI generation model.
+
+| Display Name | Description |
+|-------------|-------------|
+| **NAI Diffusion 4.5 Full** | Latest V4.5 full model (Default, Recommended) |
+| **NAI Diffusion 4.5 Curated** | V4.5 Curated model |
+| **NAI Diffusion 4 Full** | V4 full model |
+| **NAI Diffusion 4 Curated** | V4 Curated model |
+| **NAI Diffusion 3** | Legacy V3 model |
+
+**Note**:
+- When V3 model is selected, V4-exclusive features (Character Prompts, Character Reference, etc.) are automatically disabled
 
 ##### Size (Resolution)
 
@@ -190,9 +228,16 @@ Select desired resolution from dropdown menu:
 - 1024×1536 (Portrait)
 - 1536×1024 (Landscape)
 
+**Wallpaper Resolutions**:
+- 1088×1920 (Portrait Wide)
+- 1920×1088 (Landscape Wide)
+
+**Small Resolutions**:
+- 640×640, 512×768, 768×512
+
 **Note**:
-- For Opus tier, normal resolutions don't consume ANLAS
-- Large resolutions consume ANLAS
+- For Opus tier, Normal resolutions don't consume ANLAS
+- Large and Wallpaper resolutions consume ANLAS (can be disabled in Options)
 - Image Enhancement only supports Normal resolutions
 
 ##### Width / Height
@@ -216,6 +261,12 @@ Select the image generation algorithm.
 - **k_dpmpp_2s_ancestral**: High quality, takes some time
 - **k_dpmpp_sde**: Very high quality, takes more time
 
+##### Noise Schedule
+
+Controls how noise is applied.
+- **Default**: karras
+- **Options**: native, karras, exponential, polyexponential
+
 ##### Steps
 
 Number of iterations in the generation process.
@@ -223,6 +274,13 @@ Number of iterations in the generation process.
 - Range: 1~50
 - Higher values: More precise but takes longer
 - Recommended: 28 (default) ~ 40 (high quality)
+
+##### Prompt Guidance
+
+Controls AI's adherence to the prompt.
+- Default: 5.0
+- Low values: More creative and unpredictable results
+- High values: More faithful to prompt
 
 ##### Seed
 
@@ -234,6 +292,42 @@ Random number value that makes generation results reproducible.
 **Usage**:
 - Fix the seed of a result you like to generate similar images
 - Slightly modify only the prompt to create variations
+
+##### Prompt Guidance Rescale
+
+Set the CFG Rescale value.
+- Default: 0 (disabled)
+- Range: 0.0 ~ 1.0
+
+##### Variety+
+
+Skips CFG in early generation stages to create more diverse results.
+- Toggle with checkbox
+- Enables more diverse variations even with the same seed
+
+##### Legacy Mode
+
+Uses V3 model's prompt processing method.
+- Recommended to keep disabled for general use
+
+#### Image Generation Buttons
+
+The generation buttons are located in the **bottom bar of the result image area** on the right.
+
+| Button | Function |
+|--------|----------|
+| **Generate Once** | Generate 1 image with current settings |
+| **Auto Generate** | Open auto-generation options dialog |
+| **Save Image** | Save current result image to file |
+| **Reset Size** | Restore result image window to default size |
+
+#### Result Prompt Overlay
+
+Use the **"Show Prompt"** checkbox on the right side of the result image bottom bar.
+
+- **Enabled**: Result prompt displayed as semi-transparent overlay at the bottom of the image
+- **Disabled**: Overlay hidden
+- Overlay text color can be changed in `Files` → `Option` → Prompt Settings
 
 ---
 
@@ -379,6 +473,13 @@ Configure prompt input related features.
 Highlights syntax with colors when entering prompts.
 - Visually distinguishes curly braces, square brackets, Colon Emphasis, etc.
 - Prevents syntax errors when writing prompts
+
+##### Overlay Text Color
+
+Change the text color of the prompt overlay displayed over the result image.
+- Click the color button → select desired color in the color picker dialog
+- Default: White (#ffffff)
+- Applied immediately and persists after restart
 
 #### Font Settings
 
@@ -778,11 +879,13 @@ Feature that applies the mood and style of a reference image to new images.
 
 ## Advanced Settings
 
+> All settings below can be found in the **Options & Settings** section of the left panel.
+
 ### Variety+ (Increase Diversity)
 
 Feature that skips CFG in early generation stages to create more diverse results.
 
-- **Location**: Advanced Settings section
+- **Location**: Bottom of Options & Settings section
 - **Checkbox**: Enable/disable Variety+
 - **Effect**: Create more diverse variations even with same seed
 - **API Parameter**: Sets `skip_cfg_above_sigma = 19`
@@ -908,8 +1011,7 @@ Feature that automatically generates multiple images in succession.
 ### Auto Generation Dialog
 
 1. **Open**
-   - Click `Generate by Settings` button
-   - Or expansion button next to main generate button
+   - Click the **"Auto Generate"** button in the result image bottom bar
 
 2. **Quick Generation**
    - Start immediately with 5, 10, 50, 100 image buttons
@@ -921,8 +1023,8 @@ Feature that automatically generates multiple images in succession.
    - Ignore Errors: Continue even if generation error occurs when checked
 
 4. **Start and Stop**
-   - Start with `Auto Generate` button
-   - Stop with `Stop Generation` button
+   - After starting, the button changes to **"Stop Generation"**
+   - Click "Stop Generation" to stop
 
 ### Batch Settings Files
 
@@ -1073,7 +1175,7 @@ Can check detailed logs for troubleshooting.
 
 ## Version Information
 
-**Current Version**: V4.5_2.6.01.09  
+**Current Version**: V4.5_2.6.04.14  
 **Update History**: [GitHub Releases](https://github.com/sagawa8b/NAI-Auto-Generator-V4/releases)
 
 ---

@@ -173,12 +173,17 @@ Information Extracted: {d.get('reference_information_extracted', 1.0)}
         
     return result
 
-# 모델 목록 정의 추가
+# 모델 목록 정의 (naia.py MODELS 기준)
 NAI_MODELS = {
-    "nai-diffusion-4-full": "NAI Diffusion V4 Full",
-    "nai-diffusion-4-5-curated": "NAI Diffusion V4.5 Curated",
-    "nai-diffusion-4-5-full": "NAI Diffusion V4.5 Full"
+    "nai-diffusion-4-5-full":         "NAI Diffusion 4.5 Full",
+    "nai-diffusion-4-5-curated":      "NAI Diffusion 4.5 Curated",
+    "nai-diffusion-4-full":           "NAI Diffusion 4 Full",
+    "nai-diffusion-4-curated-preview": "NAI Diffusion 4 Curated",
+    "nai-diffusion-3":                "NAI Diffusion 3",
 }
+
+# V3 모델 ID (파라미터 처리 분기에 사용)
+V3_MODEL_ID = "nai-diffusion-3"
 
 # 기본 모델 설정
 DEFAULT_MODEL = "nai-diffusion-4-5-full"  # V4.5 Full을 기본값으로 설정
@@ -212,8 +217,7 @@ DEFAULT_PARAMS = {
     "anti_artifacts": "0.0",
     "skip_cfg_above_sigma": "null",
     "variety_plus": "False",  # 기본값 False로 설정
-    "model": "nai-diffusion-4-5-full",  # 추가
-    "v4_model_preset": "Artistic",
+    "model": "nai-diffusion-4-5-full",
 }
 
 DEFAULT_PATH = {

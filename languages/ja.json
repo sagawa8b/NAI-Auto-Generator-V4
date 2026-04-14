@@ -49,6 +49,8 @@
       "clear_all": "すべて削除",
       "character_n": "キャラクター {}",
       "position": "位置",
+      "negative_tab": "ネガティブ",
+      "char_position_clear": "位置をクリア",
       "negative_prompt_add": "ネガティブプロンプト追加",
       "sync_width": "幅を同期",
       "character_prompt": "キャラクタープロンプト:",
@@ -60,7 +62,15 @@
       "reference_image_title": "リファレンス画像",
       "no_uploaded_image": "アップロードされた画像なし",
       "load_image": "読み込み",
-      "select_folder": "フォルダ"
+      "select_folder": "フォルダ",
+      "char_position_dialog_title": "キャラクター位置選択",
+      "char_position_grid_info": "希望の位置をクリックしてください（5x5グリッド）",
+      "char_done": "完了",
+      "char_negative_prompt_label": "キャラクターネガティブプロンプト:",
+      "char_prompt_placeholder": "このキャラクターのプロンプトを入力...",
+      "char_negative_placeholder": "このキャラクターのネガティブプロンプトを入力...",
+      "char_negative_prompt_checkbox": "ネガティブプロンプトを追加",
+      "char_max_warning": "キャラクターは最大6つまでしか追加できません。"
     },
     "image_options": {
       "title": "画像オプション",
@@ -144,13 +154,16 @@
       "completed": "{}個の画像完了",
       "bulk_complete": "一括強化完了",
       "bulk_complete_msg": "{}個の画像の強化が正常に完了しました。",
-      "waiting_next": "次の画像処理まで3秒待機中... ({}/{})"
+      "waiting_next": "次の画像処理まで3秒待機中... ({}/{})",
+      "stop_button": "停止",
+      "stopped": "停止しました ({}/{}個の画像を処理済み)"
     },
     "result": {
       "image_title": "結果画像 (Result Image)",
       "no_image": "結果画像がありません",
       "save_image": "画像を保存 (Save Image)",
-      "prompt_title": "結果プロンプト (Result Prompt)"
+      "prompt_title": "結果プロンプト (Result Prompt)",
+      "overlay_toggle": "プロンプト表示"
     },
     "dialogs": {
       "login_title": "NAI API ログイン",
@@ -163,10 +176,25 @@
       "login_button": "ログイン",
       "logout_button": "ログアウト",
       "login_info": "※ 入力されたユーザー名とパスワードはNovel AIサーバーにのみ送信され、\\nこのアプリのサーバーには送信されません。",
+      "logout_confirm_title": "ログアウト確認",
       "logout_confirm": "本当にログアウトしますか？",
+      "logout_complete_title": "ログアウト完了",
       "logout_complete": "ログアウトしました。",
+      "logout_error": "ログアウト処理中にエラーが発生しました:\n{}",
       "login_success": "ログインに成功しました。",
+      "login_error_empty_fields": "ユーザー名とパスワードを入力してください。",
       "login_failed": "ログインに失敗しました。\\nユーザー名とパスワードを確認してください。",
+      "tab_idpw": "ID／パスワード",
+      "tab_apikey": "APIキー",
+      "api_key_label": "永続APIトークン:",
+      "api_key_placeholder": "pst-...トークンを入力",
+      "api_key_show": "表示",
+      "api_key_hide": "非表示",
+      "api_key_info": "NovelAI設定 → アカウント → 「永続APIトークンを取得」からトークンを取得してください。",
+      "api_key_login_active": "APIキーでログイン中",
+      "login_error_empty_api_key": "APIキーを入力してください。",
+      "login_error_invalid_api_key": "APIキーは\"pst-\"で始まる必要があります。",
+      "login_error_api_key_failed": "APIキーログインに失敗しました。トークンを確認してください。",
       "mask_paint_title": "インペインティングマスクを描く",
       "mask_paint_instruction": "ブラシで再生成したい領域を塗ってください。赤い領域がインペインティングされます。",
       "mask_brush_size": "ブラシサイズ:",
@@ -190,7 +218,25 @@
       "api_error": "API リクエストエラー",
       "generation_error": "画像生成中にエラーが発生",
       "file_save_error": "ファイル保存中にエラーが発生",
-      "file_load_error": "ファイル読み込み中にエラーが発生"
+      "file_load_error": "ファイル読み込み中にエラーが発生",
+      "generation_error_detail": "画像生成中にエラーが発生しました: {}",
+      "auth_session_expired": "セッションが期限切れです。再度ログインしてください。",
+      "gen_err_1": "サーバーから情報を取得できませんでした。",
+      "gen_err_2": "画像を開くことができません。",
+      "gen_err_3": "画像を保存できません。",
+      "gen_err_4": "予期しないエラーが発生しました。",
+      "gen_err_unknown": "不明なエラー",
+      "api_err_401": "認証に失敗しました。再度ログインしてください。",
+      "api_err_402": "Anlasが不足しています。チャージしてから再試行してください。",
+      "api_err_429": "リクエストが多すぎます。しばらくしてから再試行してください。",
+      "api_err_500": "Novel AIサーバーに問題があります。しばらくしてから再試行してください。",
+      "api_err_503": "Novel AIサービスが一時的に利用できません。しばらくしてから再試行してください。",
+      "api_err_generic": "画像の生成に問題がありました。\n\n{}",
+      "api_err_detail": "{}\n\n技術情報: {}",
+      "settings_load_caption": "読み込む設定ファイルを選択してください",
+      "settings_select_min_two": "2つ以上選択してください。",
+      "settings_txt_only": ".txtの設定ファイルのみ選択してください。",
+      "warning": "警告"
     },
     "connection": {
       "server": "サーバー:",
@@ -198,7 +244,14 @@
       "disconnected": "接続切断",
       "checking": "確認中...",
       "network_disconnected": "ネットワーク接続なし",
-      "network_restored": "インターネット接続が復旧しました。"
+      "network_restored": "インターネット接続が復旧しました。",
+      "network_error_title": "ネットワーク接続エラー",
+      "network_error_text": "インターネット接続が切断されました。",
+      "network_error_detail": "詳細: {}\n\n接続が復旧すると自動的に再試行します。",
+      "network_restored_title": "ネットワーク接続復旧",
+      "network_restored_text": "インターネット接続が復旧しました。",
+      "network_restored_detail": "画像生成を続けることができます。",
+      "reconnecting": "再接続中..."
     },
     "misc": {
       "login_state": "ログイン状態",
@@ -207,6 +260,15 @@
       "anlas": "Anlas:",
       "unknown": "不明"
     },
+	"character_reference": {
+		"title": "Character Reference",
+		"select_image": "画像を選択",
+		"remove_image": "画像を削除",
+		"no_image": "画像なし",
+		"style_aware": "Style Aware",
+		"style_aware_description": "リファレンスからスタイル情報を含める",
+		"error_load_image": "画像の読み込みに失敗しました: {}"
+	},
     "options": {
       "resolution_settings": "解像度設定 (Resolution Settings)",
       "anlas_resolution_warning": "※ LargeおよびWallpaper解像度はAnlasを使用します。無効にすると誤って使用することを防げます。",

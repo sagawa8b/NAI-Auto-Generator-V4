@@ -38,7 +38,7 @@ from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.6.02.02"
+TITLE_NAME = "NAI Auto Generator V4.5_2.6.04.10"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -51,7 +51,7 @@ def resource_path(relative_path):
     try:
         # PyInstaller 번들 실행 시
         base_path = sys._MEIPASS
-    except Exception:
+    except AttributeError:
         # 일반 Python 실행 시
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
@@ -327,6 +327,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.enhance_current_index = 0  # 현재 처리 중인 이미지 인덱스
         self.enhance_bulk_mode = False  # 벌크 모드 활성화 여부
         self.enhance_bulk_thread = None  # 벌크 처리 스레드
+        self.enhance_bulk_stopped = False  # 벌크 처리 중단 플래그
 
         self.last_generated_image = None  # 마지막 생성된 이미지 저장
 
@@ -349,6 +350,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # 기존 초기화 코드 후에 추가
         self.last_connected = True
         self.session_timer = None
+        self._connection_flash_active = False
+        self.network_error_shown = False
 
         # 언어 초기화 (기존 코드의 적절한 위치에 추가)
         saved_language = self.settings.value("language", "ko")
@@ -360,9 +363,14 @@ class NAIAutoGeneratorWindow(QMainWindow):
         
         # 테마 적용
         self.apply_theme()
+
+        # 저장된 오버레이 텍스트 색상 적용
+        overlay_color = self.settings.value("overlay_text_color", "#ffffff")
+        if hasattr(self, 'image_result'):
+            self.image_result.apply_overlay_color(overlay_color)
         
         # 라벨 생성 - 상태바에 추가
-        self.label_connection_status = QLabel("서버: 확인 중...")
+        self.label_connection_status = QLabel(tr('connection.server') + " " + tr('connection.checking'))
         self.statusBar().addPermanentWidget(self.label_connection_status)
         
         # 네트워크 모니터 설정
@@ -416,17 +424,17 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     
                     # 0.5 미만이면 즉시 강제 갱신
                     if session_health < 0.5:
-                        logging.warning("세션 상태 불량, 강제 갱신 시도")
+                        logger.warning("세션 상태 불량, 강제 갱신 시도")
                         success = self.session_manager.force_refresh()
                         
                         if success:
                             self.set_statusbar_text("logged_in")
                             self.refresh_anlas()
-                            logging.info("세션 강제 갱신 성공")
+                            logger.info("세션 강제 갱신 성공")
                         else:
                             # 실패 시 로그인 대화상자 표시 고려
                             self.set_statusbar_text("before_login")
-                            logging.warning("세션 강제 갱신 실패, 사용자 개입 필요")
+                            logger.warning("세션 강제 갱신 실패, 사용자 개입 필요")
                             
                             # 자동 로그인 옵션이 켜져 있으면 자동 재로그인 시도
                             if self.settings.value("auto_login", False):
@@ -441,16 +449,16 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         else:
                             self.set_statusbar_text("before_login")
             except Exception as e:
-                logging.error(f"세션 체크 오류: {e}")
+                logger.error(f"세션 체크 오류: {e}")
 
     def keepalive(self):
         """세션 유지를 위한 경량 API 호출"""
         if hasattr(self, 'nai') and self.nai and self.nai.access_token:
             try:
                 self.nai.get_anlas()  # 가벼운 API 호출
-                logging.debug("Keepalive 성공")
+                logger.debug("Keepalive 성공")
             except Exception as e:
-                logging.warning(f"Keepalive 실패: {e}")
+                logger.warning(f"Keepalive 실패: {e}")
 
     def update_session_status(self):
         """세션 상태 UI 업데이트"""
@@ -484,30 +492,41 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.session_status_indicator.setToolTip(tooltip)
                 
             except Exception as e:
-                logging.error(f"세션 상태 업데이트 오류: {e}")
+                logger.error(f"세션 상태 업데이트 오류: {e}")
 
     def try_auto_relogin(self):
         """자동 재로그인 시도"""
         if self.trying_auto_login:
             return  # 이미 시도 중이면 중복 방지
-            
-        logging.info("자동 재로그인 시도 중...")
+
+        logger.info("자동 재로그인 시도 중...")
         self.trying_auto_login = True
-        
-        access_token = self.settings.value("access_token", "")
-        username = self.settings.value("username", "")
-        password = self.settings.value("password", "")
-        
-        if not all([access_token, username, password]):
-            logging.error("자동 로그인 실패: 자격 증명 부족")
-            self.trying_auto_login = False
-            return
-            
+
+        login_method = self.settings.value("login_method", "password")
+
+        if login_method == "api_key":
+            api_key = self.settings.value("api_key", "")
+            if not api_key:
+                logger.error("자동 로그인 실패: API 키 없음")
+                self.trying_auto_login = False
+                return
+            self.nai.access_token = api_key
+            self.nai.api_key = api_key
+            self.nai.login_method = "api_key"
+        else:
+            access_token = self.settings.value("access_token", "")
+            username = self.settings.value("username", "")
+            password = self.settings.value("password", "")
+            if not all([access_token, username, password]):
+                logger.error("자동 로그인 실패: 자격 증명 부족")
+                self.trying_auto_login = False
+                return
+            self.nai.access_token = access_token
+            self.nai.username = username
+            self.nai.password = password
+            self.nai.login_method = "password"
+
         self.set_statusbar_text("LOGGINGIN")
-        self.nai.access_token = access_token
-        self.nai.username = username
-        self.nai.password = password
-        
         validate_thread = TokenValidateThread(self)
         validate_thread.validation_result.connect(self.on_login_result)
         validate_thread.start()
@@ -515,15 +534,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
     
     def attempt_reconnect(self):
         """연결 복구 시도 - 네트워크 복원력 향상"""
-        logging.info("연결 복구 시도 중...")
+        logger.info("연결 복구 시도 중...")
         
         # 먼저 인터넷 연결 확인
         try:
             import socket
             socket.create_connection(("www.google.com", 80), timeout=5)
-            logging.info("인터넷 연결 확인됨")
-        except:
-            logging.error("인터넷 연결 없음")
+            logger.info("인터넷 연결 확인됨")
+        except OSError:
+            logger.error("인터넷 연결 없음")
             QTimer.singleShot(60000, self.attempt_reconnect)  # 1분 후 재시도
             return
         
@@ -536,7 +555,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 if not self.nai.check_logged_in():
                     success = self.nai.refresh_token()
                     if success:
-                        logging.info("연결 복구 성공 - 재로그인됨")
+                        logger.info("연결 복구 성공 - 재로그인됨")
                         self.set_statusbar_text("LOGINED")
                         self.refresh_anlas()
                         
@@ -545,84 +564,73 @@ class NAIAutoGeneratorWindow(QMainWindow):
                             self.session_manager.consecutive_errors = 0
                             self.session_manager.image_count_since_login = 0
                     else:
-                        logging.warning("연결 복구 실패 - 재로그인 필요")
+                        logger.warning("연결 복구 실패 - 재로그인 필요")
                         # 자동 로그인 옵션 확인 및 시도
                         if self.settings.value("auto_login", False):
                             self.try_auto_relogin()
             except Exception as e:
-                logging.error(f"연결 복구 시도 중 오류: {e}")
+                logger.error(f"연결 복구 시도 중 오류: {e}")
                 QTimer.singleShot(30000, self.attempt_reconnect)  # 30초 후 재시도
     
     
-    def update_connection_status(self, is_connected, message):
-        """네트워크 연결 상태 업데이트 - 개선된 버전"""
+    def update_connection_status(self, is_connected: bool, message: str):
+        """네트워크 연결 상태 업데이트 — 팝업 없이 상태바 레이블만 사용"""
+        was_connected = getattr(self, 'last_connected', True)
+
         if is_connected:
-            self.label_connection_status.setText("서버: 연결됨")
+            label_text = "● " + tr('connection.connected')
+            self.label_connection_status.setText(label_text)
             self.label_connection_status.setStyleSheet("color: green;")
+            self.label_connection_status.setToolTip("")
+
+            if not was_connected:
+                # 끊김 → 연결됨 전환
+                logger.info("네트워크 연결 복구 감지")
+                self._flash_connection_label("lime", "green", label_text)
+                if hasattr(self, 'nai') and hasattr(self.nai, 'session_manager'):
+                    self.nai.session_manager.network_available = True
+                    QTimer.singleShot(5000, self.nai.session_manager.perform_session_check)
+
+            self.network_error_shown = False
         else:
-            self.label_connection_status.setText(f"서버: {message}")
+            short_msg = message[:60] + "..." if len(message) > 60 else message
+            label_text = "✕ " + short_msg
+            self.label_connection_status.setText(label_text)
             self.label_connection_status.setStyleSheet("color: red;")
+            self.label_connection_status.setToolTip(message)
             logger.error(f"네트워크 연결 문제: {message}")
-            
-            # 추가: 연결 상태 변경 감지 및 복구 시도
-            if hasattr(self, 'last_connected') and self.last_connected:
-                logging.warning("네트워크 연결 끊김 감지")
-                self.show_network_error_notification(message)
-                
-                # 즉시 세션 상태 업데이트
+
+            if was_connected:
+                # 연결됨 → 끊김 전환
+                logger.warning("네트워크 연결 끊김 감지")
+                self._flash_connection_label("orange", "red", label_text, message)
+                QTimer.singleShot(700, self._set_reconnecting_label)
                 if hasattr(self, 'nai') and hasattr(self.nai, 'session_manager'):
                     self.nai.session_manager.network_available = False
-        
-        # 이전 상태가 끊김에서 연결됨으로 변경된 경우
-        if is_connected and hasattr(self, 'last_connected') and not self.last_connected:
-            logging.info("네트워크 연결 복구 감지")
-            self.show_network_restored_notification()
-            
-            # 연결 복구 시 세션 검증
-            if hasattr(self, 'nai') and hasattr(self.nai, 'session_manager'):
-                self.nai.session_manager.network_available = True
-                # 5초 후 세션 상태 확인 (즉시 하면 불안정할 수 있음)
-                QTimer.singleShot(5000, self.nai.session_manager.perform_session_check)
-        
-        if hasattr(self, 'last_connected'):
-            self.last_connected = is_connected
 
-    def show_network_error_notification(self, error_message):
-        """네트워크 오류 알림 표시"""
-        from PyQt5.QtWidgets import QMessageBox
-        
-        # 중복 알림 방지를 위한 플래그
-        if not hasattr(self, 'network_error_shown') or not self.network_error_shown:
-            self.network_error_shown = True
-            
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Warning)
-            msg.setWindowTitle("네트워크 연결 오류")
-            msg.setText("인터넷 연결이 끊어졌습니다.")
-            msg.setInformativeText(f"세부 정보: {error_message}\n\n연결이 복구되면 자동으로 재시도합니다.")
-            msg.setStandardButtons(QMessageBox.Ok)
-            msg.setDefaultButton(QMessageBox.Ok)
-            
-            # 비동기적으로 표시 (UI 블로킹 방지)
-            QTimer.singleShot(100, lambda: msg.exec_())
+        self.last_connected = is_connected
 
-    def show_network_restored_notification(self):
-        """네트워크 복구 알림 표시"""
-        from PyQt5.QtWidgets import QMessageBox
-        
-        # 오류 표시 플래그 리셋
-        self.network_error_shown = False
-        
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Information)
-        msg.setWindowTitle("네트워크 연결 복구")
-        msg.setText("인터넷 연결이 복구되었습니다.")
-        msg.setInformativeText("이제 이미지 생성을 계속할 수 있습니다.")
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.setDefaultButton(QMessageBox.Ok)
-        
-        # 비동기적으로 표시 (UI 블로킹 방지)
-        QTimer.singleShot(100, lambda: msg.exec_())
+    def _flash_connection_label(self, flash_color: str, final_color: str, final_text: str, final_tooltip: str = ""):
+        """상태바 연결 레이블을 짧게 번쩍여 상태 변화를 알림 (팝업 없음)"""
+        if self._connection_flash_active:
+            return
+        self._connection_flash_active = True
+        self.label_connection_status.setStyleSheet(f"color: {flash_color}; font-weight: bold;")
+
+        def restore():
+            self.label_connection_status.setText(final_text)
+            self.label_connection_status.setStyleSheet(f"color: {final_color};")
+            if final_tooltip:
+                self.label_connection_status.setToolTip(final_tooltip)
+            self._connection_flash_active = False
+
+        QTimer.singleShot(600, restore)
+
+    def _set_reconnecting_label(self):
+        """연결 끊김 후 재연결 중 상태를 상태바에 표시"""
+        if not self.last_connected:
+            self.label_connection_status.setText("◐ " + tr('connection.reconnecting'))
+            self.label_connection_status.setStyleSheet("color: orange;")
     
     def create_collapsible_section(self, title, content_widget):
         """접기/펼치기 가능한 섹션 위젯 생성"""
@@ -1928,6 +1936,11 @@ class NAIAutoGeneratorWindow(QMainWindow):
         if self.enhance_bulk_mode and self.enhance_image_list:
             # 벌크 모드: 첫 번째 이미지부터 시작
             self.enhance_current_index = 0
+            self.enhance_bulk_stopped = False  # 중단 플래그 초기화
+            # Stop 버튼 표시 및 활성화
+            self.btn_enhance_stop.show()
+            self.btn_enhance_stop.setEnabled(True)
+            self.btn_enhance_create.setEnabled(False)  # Enhance 버튼 비활성화
             self.process_next_enhance_image()
         elif self.enhance_image:
             # 단일 모드: 현재 로드된 이미지 처리
@@ -1943,6 +1956,17 @@ class NAIAutoGeneratorWindow(QMainWindow):
     def process_next_enhance_image(self):
         """벌크 Enhancement에서 다음 이미지 처리"""
         if not self.enhance_bulk_mode or not self.enhance_image_list:
+            return
+
+        # 중단 플래그 확인
+        if self.enhance_bulk_stopped:
+            logger.info("Bulk enhancement stopped by user")
+            processed_count = self.enhance_current_index
+            self.enhance_progress_label.setText(
+                tr('enhance.stopped').format(processed_count, len(self.enhance_image_list))
+            )
+            # 벌크 모드 초기화
+            self._reset_enhance_bulk_state()
             return
 
         if self.enhance_current_index < len(self.enhance_image_list):
@@ -1976,9 +2000,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             )
 
             # 벌크 모드 초기화
-            self.enhance_bulk_mode = False
-            self.enhance_image_list = []
-            self.enhance_current_index = 0
+            self._reset_enhance_bulk_state()
 
     def update_enhance_button_state(self):
         """Enhance 버튼 상태 업데이트"""
@@ -1987,6 +2009,24 @@ class NAIAutoGeneratorWindow(QMainWindow):
             self.btn_enhance_create.setEnabled(True)
         else:
             self.btn_enhance_create.setEnabled(False)
+
+    def stop_enhance_process(self):
+        """Enhancement 프로세스 중단"""
+        if self.enhance_bulk_mode:
+            logger.info("Stopping bulk enhancement process...")
+            self.enhance_bulk_stopped = True
+            self.btn_enhance_stop.setEnabled(False)
+
+    def _reset_enhance_bulk_state(self):
+        """벌크 Enhancement 상태 초기화"""
+        self.enhance_bulk_mode = False
+        self.enhance_image_list = []
+        self.enhance_current_index = 0
+        self.enhance_bulk_stopped = False
+        # Stop 버튼 숨기고 Enhance 버튼 활성화
+        self.btn_enhance_stop.hide()
+        self.btn_enhance_stop.setEnabled(False)
+        self.update_enhance_button_state()
 
     def setup_language_menu(self):
         """언어 선택 메뉴 설정"""
@@ -2129,7 +2169,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             # 번역이 키 그대로 반환되면 기본 텍스트 사용
             if status_text == translation_key:
                 status_text = status_key.replace('_', ' ').title()
-        except:
+        except Exception:
             status_text = status_key.replace('_', ' ').title()
         
         statusbar.showMessage(status_text)
@@ -2173,17 +2213,27 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.session_timer.start(60000)  # 1분마다 확인
         
         if self.settings.value("auto_login", False):
-            access_token = self.settings.value("access_token", "")
-            username = self.settings.value("username", "")
-            password = self.settings.value("password", "")
-            if not access_token or not username or not password:
-                return
+            login_method = self.settings.value("login_method", "password")
+
+            if login_method == "api_key":
+                api_key = self.settings.value("api_key", "")
+                if not api_key:
+                    return
+                self.nai.access_token = api_key
+                self.nai.api_key = api_key
+                self.nai.login_method = "api_key"
+            else:
+                access_token = self.settings.value("access_token", "")
+                username = self.settings.value("username", "")
+                password = self.settings.value("password", "")
+                if not access_token or not username or not password:
+                    return
+                self.nai.access_token = access_token
+                self.nai.username = username
+                self.nai.password = password
+                self.nai.login_method = "password"
 
             self.set_statusbar_text("LOGGINGIN")
-            self.nai.access_token = access_token
-            self.nai.username = username
-            self.nai.password = password
-
             self.trying_auto_login = True
             validate_thread = TokenValidateThread(self)
             validate_thread.validation_result.connect(self.on_login_result)
@@ -3000,11 +3050,54 @@ class NAIAutoGeneratorWindow(QMainWindow):
         
         except Exception as e:
             # 로깅 추가
-            logging.error(f"Generate once error: {e}", exc_info=True)
+            logger.error(f"Generate once error: {e}", exc_info=True)
             # 사용자에게 오류 표시
-            QMessageBox.critical(self, "생성 오류", f"이미지 생성 중 오류 발생: {e}")
+            QMessageBox.critical(self, tr('errors.generation_error'), tr('errors.generation_error_detail').format(e))
             # 버튼 상태 복원
             self.set_disable_button(False)
+
+    def _build_flat_metadata_from_naidict(self, actual_metadata):
+        """naidict 형식의 메타데이터를 flat dict로 변환하고 characterPrompts를 재구성"""
+        flat_metadata = {
+            "prompt": actual_metadata.get("prompt", ""),
+            "negative_prompt": actual_metadata.get("negative_prompt", "")
+        }
+        if "option" in actual_metadata and isinstance(actual_metadata["option"], dict):
+            flat_metadata.update(actual_metadata["option"])
+        if "etc" in actual_metadata and isinstance(actual_metadata["etc"], dict):
+            flat_metadata.update(actual_metadata["etc"])
+
+        # v4_prompt에서 characterPrompts 재구성 (표시용)
+        if "v4_prompt" in flat_metadata and "caption" in flat_metadata["v4_prompt"]:
+            if "characterPrompts" not in flat_metadata:
+                try:
+                    char_captions = flat_metadata["v4_prompt"]["caption"].get("char_captions", [])
+                    v4_neg_prompt = flat_metadata.get("v4_negative_prompt", {})
+                    neg_char_captions = []
+                    if "caption" in v4_neg_prompt:
+                        neg_char_captions = v4_neg_prompt["caption"].get("char_captions", [])
+
+                    character_prompts = []
+                    for i, char in enumerate(char_captions):
+                        char_prompt = {
+                            "prompt": char.get("char_caption", ""),
+                            "negative_prompt": "",
+                            "position": None
+                        }
+                        if "centers" in char and len(char["centers"]) > 0:
+                            center = char["centers"][0]
+                            char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
+                        if i < len(neg_char_captions):
+                            char_prompt["negative_prompt"] = neg_char_captions[i].get("char_caption", "")
+                        character_prompts.append(char_prompt)
+
+                    if character_prompts:
+                        flat_metadata["characterPrompts"] = character_prompts
+                        logger.debug(f"Reconstructed {len(character_prompts)} character prompts from v4_prompt")
+                except Exception as e:
+                    logger.error(f"Failed to reconstruct characterPrompts from v4_prompt: {e}")
+
+        return flat_metadata
 
     def _on_result_generate(self, error_code, result_str):
         """세션 추적이 포함된 생성 결과 처리"""
@@ -3028,57 +3121,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     actual_metadata, errcode = naiinfo_getter.get_naidict_from_file(result_str)
                     if errcode == 3 and actual_metadata:
                         # 성공적으로 메타데이터를 읽었을 경우
-                        # naidict 형식을 flat dict로 변환
-                        flat_metadata = {
-                            "prompt": actual_metadata.get("prompt", ""),
-                            "negative_prompt": actual_metadata.get("negative_prompt", "")
-                        }
-
-                        # option dict의 내용을 flat_metadata에 병합
-                        if "option" in actual_metadata and isinstance(actual_metadata["option"], dict):
-                            flat_metadata.update(actual_metadata["option"])
-
-                        # etc dict의 내용도 병합
-                        if "etc" in actual_metadata and isinstance(actual_metadata["etc"], dict):
-                            flat_metadata.update(actual_metadata["etc"])
-
-                        # v4_prompt에서 characterPrompts 재구성 (표시용)
-                        if "v4_prompt" in flat_metadata and "caption" in flat_metadata["v4_prompt"]:
-                            if "characterPrompts" not in flat_metadata:  # characterPrompts가 없을 때만
-                                try:
-                                    char_captions = flat_metadata["v4_prompt"]["caption"].get("char_captions", [])
-                                    v4_neg_prompt = flat_metadata.get("v4_negative_prompt", {})
-                                    neg_char_captions = []
-
-                                    if "caption" in v4_neg_prompt:
-                                        neg_char_captions = v4_neg_prompt["caption"].get("char_captions", [])
-
-                                    # characterPrompts 배열 생성
-                                    character_prompts = []
-
-                                    for i, char in enumerate(char_captions):
-                                        char_prompt = {
-                                            "prompt": char.get("char_caption", ""),
-                                            "negative_prompt": "",
-                                            "position": None
-                                        }
-
-                                        # 위치 정보 추가 (있을 경우)
-                                        if "centers" in char and len(char["centers"]) > 0:
-                                            center = char["centers"][0]
-                                            char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
-
-                                        # 네거티브 프롬프트 추가 (존재하는 경우)
-                                        if i < len(neg_char_captions):
-                                            char_prompt["negative_prompt"] = neg_char_captions[i].get("char_caption", "")
-
-                                        character_prompts.append(char_prompt)
-
-                                    if character_prompts:
-                                        flat_metadata["characterPrompts"] = character_prompts
-                                        logger.debug(f"Reconstructed {len(character_prompts)} character prompts from v4_prompt for display")
-                                except Exception as e:
-                                    logger.error(f"Failed to reconstruct characterPrompts from v4_prompt: {e}")
+                        flat_metadata = self._build_flat_metadata_from_naidict(actual_metadata)
 
                         # 결과 프롬프트 업데이트
                         self.set_result_text(flat_metadata)
@@ -3119,23 +3162,23 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         success = self.nai.refresh_token()
                         if not success:
                             # 갱신 실패 - 로그인 대화상자 표시
-                            QMessageBox.critical(self, "인증 오류", "세션이 만료되었습니다. 다시 로그인해주세요.")
+                            QMessageBox.critical(self, tr('errors.auth_error'), tr('errors.auth_session_expired'))
                             self.show_login_dialog()
                 else:
                     # 다른 오류 처리
                     error_messages = {
-                        1: "서버에서 정보를 가져오는데 실패했습니다.",
-                        2: "이미지를 열 수 없습니다.",
-                        3: "이미지를 저장할 수 없습니다.",
-                        4: "예기치 못한 오류가 발생했습니다."
+                        1: tr('errors.gen_err_1'),
+                        2: tr('errors.gen_err_2'),
+                        3: tr('errors.gen_err_3'),
+                        4: tr('errors.gen_err_4'),
                     }
-                    error_msg = error_messages.get(error_code, "알 수 없는 오류")
-                    
-                    logging.error(f"Generation error {error_code}: {error_msg}")
-                    QMessageBox.critical(self, "생성 오류", f"{error_msg}\n{result_str}")
+                    error_msg = error_messages.get(error_code, tr('errors.gen_err_unknown'))
+
+                    logger.error(f"Generation error {error_code}: {error_msg}")
+                    QMessageBox.critical(self, tr('errors.generation_error'), f"{error_msg}\n{result_str}")
         
         except Exception as e:
-            logging.error(f"Result processing error: {e}", exc_info=True)
+            logger.error(f"Result processing error: {e}", exc_info=True)
         
         finally:
             self.set_disable_button(False)
@@ -3143,24 +3186,23 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     def show_api_error_dialog(self, error_code, error_message):
         """API 오류를 사용자 친화적으로 표시"""
-        title = "API 요청 오류"
-        
+        title = tr('errors.api_error')
+
         # 오류 코드별 사용자 친화적 메시지
         friendly_messages = {
-            401: "인증에 실패했습니다. 다시 로그인해 주세요.",
-            402: "Anlas가 부족합니다. 충전 후 다시 시도해 주세요.",
-            429: "너무 많은 요청을 보냈습니다. 잠시 후 다시 시도해 주세요.",
-            500: "Novel AI 서버에 문제가 있습니다. 잠시 후 다시 시도해 주세요.",
-            503: "Novel AI 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."
+            401: tr('errors.api_err_401'),
+            402: tr('errors.api_err_402'),
+            429: tr('errors.api_err_429'),
+            500: tr('errors.api_err_500'),
+            503: tr('errors.api_err_503'),
         }
-        
+
         # 사용자 친화적 메시지
         if error_code in friendly_messages:
-            friendly_message = friendly_messages[error_code]
-            message = f"{friendly_message}\n\n기술적 정보: {error_message}"
+            message = tr('errors.api_err_detail').format(friendly_messages[error_code], error_message)
         else:
-            message = f"이미지를 생성하는데 문제가 있습니다.\n\n{error_message}"
-        
+            message = tr('errors.api_err_generic').format(error_message)
+
         QMessageBox.critical(self, title, message)
 
     def show_error_dialog(self, title, message):
@@ -3169,18 +3211,18 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     def on_click_generate_sett(self):
         path_list, _ = QFileDialog().getOpenFileNames(self,
-                                                      caption="불러올 세팅 파일들을 선택해주세요",
+                                                      caption=tr('errors.settings_load_caption'),
                                                       filter="Txt File (*.txt)")
         if path_list:
             if len(path_list) < 2:
                 QMessageBox.information(
-                    self, '경고', "두개 이상 선택해주세요.")
+                    self, tr('errors.warning'), tr('errors.settings_select_min_two'))
                 return
 
             for path in path_list:
                 if not path.endswith(".txt") or not os.path.isfile(path):
                     QMessageBox.information(
-                        self, '경고', ".txt로 된 세팅 파일만 선택해주세요.")
+                        self, tr('errors.warning'), tr('errors.settings_txt_only'))
                     return
 
             self.on_click_generate_auto(path_list)
@@ -3205,7 +3247,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         return is_success
 
-    def on_click_generate_auto(self, setting_batch_target=[]):
+    def on_click_generate_auto(self, setting_batch_target=None):
         if not self.autogenerate_thread:
             d = GenerateDialog(self)
             if d.exec_() == QDialog.Accepted:
@@ -3263,58 +3305,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             import naiinfo_getter
             actual_metadata, errcode = naiinfo_getter.get_naidict_from_file(result_str)
             if errcode == 3 and actual_metadata:
-                # 성공적으로 메타데이터를 읽었을 경우
-                # naidict 형식을 flat dict로 변환
-                flat_metadata = {
-                    "prompt": actual_metadata.get("prompt", ""),
-                    "negative_prompt": actual_metadata.get("negative_prompt", "")
-                }
-
-                # option dict의 내용을 flat_metadata에 병합
-                if "option" in actual_metadata and isinstance(actual_metadata["option"], dict):
-                    flat_metadata.update(actual_metadata["option"])
-
-                # etc dict의 내용도 병합
-                if "etc" in actual_metadata and isinstance(actual_metadata["etc"], dict):
-                    flat_metadata.update(actual_metadata["etc"])
-
-                # v4_prompt에서 characterPrompts 재구성 (표시용)
-                if "v4_prompt" in flat_metadata and "caption" in flat_metadata["v4_prompt"]:
-                    if "characterPrompts" not in flat_metadata:  # characterPrompts가 없을 때만
-                        try:
-                            char_captions = flat_metadata["v4_prompt"]["caption"].get("char_captions", [])
-                            v4_neg_prompt = flat_metadata.get("v4_negative_prompt", {})
-                            neg_char_captions = []
-
-                            if "caption" in v4_neg_prompt:
-                                neg_char_captions = v4_neg_prompt["caption"].get("char_captions", [])
-
-                            # characterPrompts 배열 생성
-                            character_prompts = []
-
-                            for i, char in enumerate(char_captions):
-                                char_prompt = {
-                                    "prompt": char.get("char_caption", ""),
-                                    "negative_prompt": "",
-                                    "position": None
-                                }
-
-                                # 위치 정보 추가 (있을 경우)
-                                if "centers" in char and len(char["centers"]) > 0:
-                                    center = char["centers"][0]
-                                    char_prompt["position"] = [center.get("x", 0.5), center.get("y", 0.5)]
-
-                                # 네거티브 프롬프트 추가 (존재하는 경우)
-                                if i < len(neg_char_captions):
-                                    char_prompt["negative_prompt"] = neg_char_captions[i].get("char_caption", "")
-
-                                character_prompts.append(char_prompt)
-
-                            if character_prompts:
-                                flat_metadata["characterPrompts"] = character_prompts
-                                logger.debug(f"Reconstructed {len(character_prompts)} character prompts from v4_prompt for display")
-                        except Exception as e:
-                            logger.error(f"Failed to reconstruct characterPrompts from v4_prompt: {e}")
+                flat_metadata = self._build_flat_metadata_from_naidict(actual_metadata)
 
                 # 결과 프롬프트 업데이트
                 self.set_result_text(flat_metadata)
@@ -3983,6 +3974,10 @@ class NAIAutoGeneratorWindow(QMainWindow):
                                self.nai.username if is_auto_login else None)
         self.settings.setValue("password",
                                self.nai.password if is_auto_login else None)
+        self.settings.setValue("api_key",
+                               self.nai.api_key if is_auto_login else None)
+        self.settings.setValue("login_method",
+                               self.nai.login_method if is_auto_login else None)
 
     def on_logout(self):
         self.set_statusbar_text("BEFORE_LOGIN")

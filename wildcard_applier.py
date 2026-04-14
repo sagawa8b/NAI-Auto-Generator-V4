@@ -169,7 +169,7 @@ class WildcardApplier():
         # 사용된 키 리셋
         self._used_keys.clear()
 
-    def _apply_shared_wildcard_once(self, target_str, except_list=[]):
+    def _apply_shared_wildcard_once(self, target_str, except_list=None):
         """공유 랜덤 와일드카드 처리 (__=wildcard__ 형식)
         같은 생성 사이클 내에서 동일한 와일드카드는 동일한 값을 반환합니다.
 
@@ -184,6 +184,8 @@ class WildcardApplier():
             Character prompt 1: girl, kinomoto sakura, before costume
             Character prompt 2: girl, kinomoto sakura, after costume
         """
+        if except_list is None:
+            except_list = []
         result = target_str
         applied_wildcard_list = []
         prev_point = 0
@@ -234,7 +236,9 @@ class WildcardApplier():
 
         return result, applied_wildcard_list
 
-    def _apply_wildcard_once(self, target_str, except_list=[]):
+    def _apply_wildcard_once(self, target_str, except_list=None):
+        if except_list is None:
+            except_list = []
         result = target_str
 
         applied_wildcard_list = []
@@ -273,8 +277,10 @@ class WildcardApplier():
 
         return result, applied_wildcard_list
     
-    def _apply_loopcard_once(self, target_str, except_list=[]):
+    def _apply_loopcard_once(self, target_str, except_list=None):
         """루프카드 (순차 적용) 처리 - 순차 반복 기능 추가"""
+        if except_list is None:
+            except_list = []
         result = target_str
         applied_loopcard_list = []
         prev_point = 0
@@ -352,8 +358,10 @@ class WildcardApplier():
 
         return result, applied_loopcard_list
         
-    def _apply_loopcard_once_with_snapshot(self, target_str, except_list=[]):
+    def _apply_loopcard_once_with_snapshot(self, target_str, except_list=None):
         """스냅샷된 인덱스를 사용한 루프카드 처리 - 순차 반복 기능 추가"""
+        if except_list is None:
+            except_list = []
         result = target_str
         applied_loopcard_list = []
         prev_point = 0
