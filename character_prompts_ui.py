@@ -138,6 +138,48 @@ class PositionSelectorDialog(QDialog):
             traceback.print_exc()
 
 
+class ResizeHandle(QWidget):
+    """드래그로 대상 위젯의 높이를 변경하는 핸들 바"""
+
+    def __init__(self, target, min_height=120, parent=None):
+        super().__init__(parent)
+        self.target = target
+        self.min_height = min_height
+        self._drag_start_y = None
+        self._drag_start_height = None
+        self.setFixedHeight(6)
+        self.setCursor(Qt.SizeVerCursor)
+        self.setToolTip("드래그하여 높이 조절")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    def paintEvent(self, event):
+        from PyQt5.QtGui import QPainter, QColor
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor("#bbbbbb"))
+        # Draw two short grip lines in the center
+        mid_x = self.width() // 2
+        mid_y = self.height() // 2
+        painter.setPen(QColor("#888888"))
+        for dx in (-6, 0, 6):
+            painter.drawLine(mid_x + dx, mid_y - 1, mid_x + dx, mid_y + 1)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_start_y = event.globalPos().y()
+            self._drag_start_height = self.target.height()
+
+    def mouseMoveEvent(self, event):
+        if self._drag_start_y is not None:
+            delta = event.globalPos().y() - self._drag_start_y
+            new_height = max(self.min_height, self._drag_start_height + delta)
+            self.target.setFixedHeight(new_height)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_start_y = None
+            self._drag_start_height = None
+
+
 class CharacterPromptWidget(QFrame):
     """캐릭터 프롬프트를 입력하고 관리하는 위젯"""
 
@@ -160,18 +202,14 @@ class CharacterPromptWidget(QFrame):
 
         self.setup_ui()
 
-        # 수직 배치: 가로로 꽉 채우고 세로는 내용에 맞게
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        # 가로로 꽉 채우고 세로는 고정 (드래그 핸들로 변경 가능)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setFixedHeight(135)
     
-    # 새로운 메서드 추가
     def update_title(self):
         """타이틀 업데이트"""
         try:
-            header_layout = self.layout.itemAt(0).layout()
-            if header_layout:
-                title_label = header_layout.itemAt(0).widget()
-                if title_label:
-                    title_label.setText(tr('ui.character_n', self.index + 1))
+            self.title_label.setText(tr('ui.character_n', self.index + 1))
         except Exception as e:
             logger.error(f"타이틀 업데이트 중 오류: {e}")
     
@@ -181,41 +219,41 @@ class CharacterPromptWidget(QFrame):
         self.layout.setSpacing(2)
         self.setLayout(self.layout)
 
-        # 헤더 (타이틀 + 컨트롤 버튼)
-        header_layout = QHBoxLayout()
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(2)
+        # 탭 위젯 (Prompt / Negative / Position) — 헤더를 탭바 코너에 통합
+        self.prompt_tab = QTabWidget()
+        self.prompt_tab.setTabPosition(QTabWidget.North)
 
-        title_label = QLabel(tr('ui.character_n', self.index + 1))
-        title_label.setStyleSheet("font-weight: bold; color: black;")
-        header_layout.addWidget(title_label)
+        # 왼쪽 코너: 캐릭터 타이틀
+        self.title_label = QLabel(tr('ui.character_n', self.index + 1))
+        self.title_label.setStyleSheet("font-weight: bold; color: black; padding: 0px 4px;")
+        self.prompt_tab.setCornerWidget(self.title_label, Qt.TopLeftCorner)
 
-        header_layout.addStretch()
+        # 오른쪽 코너: 이동/삭제 버튼
+        corner_widget = QWidget()
+        corner_layout = QHBoxLayout(corner_widget)
+        corner_layout.setContentsMargins(0, 0, 2, 0)
+        corner_layout.setSpacing(1)
 
         move_up_btn = QPushButton("▲")
-        move_up_btn.setFixedSize(24, 22)
+        move_up_btn.setFixedSize(22, 20)
         move_up_btn.setStyleSheet("padding: 0px;")
         move_up_btn.clicked.connect(lambda: self.moved.emit(self, -1))
 
         move_down_btn = QPushButton("▼")
-        move_down_btn.setFixedSize(24, 22)
+        move_down_btn.setFixedSize(22, 20)
         move_down_btn.setStyleSheet("padding: 0px;")
         move_down_btn.clicked.connect(lambda: self.moved.emit(self, 1))
 
         delete_btn = QPushButton("✕")
-        delete_btn.setFixedSize(24, 22)
+        delete_btn.setFixedSize(22, 20)
         delete_btn.setStyleSheet("padding: 0px;")
         delete_btn.clicked.connect(lambda: self.deleted.emit(self))
 
-        header_layout.addWidget(move_up_btn)
-        header_layout.addWidget(move_down_btn)
-        header_layout.addWidget(delete_btn)
+        corner_layout.addWidget(move_up_btn)
+        corner_layout.addWidget(move_down_btn)
+        corner_layout.addWidget(delete_btn)
 
-        self.layout.addLayout(header_layout)
-
-        # ── 탭 위젯 (Prompt / Negative / Position) ──────────────────
-        self.prompt_tab = QTabWidget()
-        self.prompt_tab.setTabPosition(QTabWidget.North)
+        self.prompt_tab.setCornerWidget(corner_widget, Qt.TopRightCorner)
 
         # Tab 0: 메인 프롬프트
         self.prompt_edit = CompletionTextEdit(enable_image_drop=False)
@@ -241,8 +279,14 @@ class CharacterPromptWidget(QFrame):
         # 탭 레이블에 문자 수 업데이트 연결
         self.prompt_edit.textChanged.connect(self._update_prompt_tab_label)
         self.neg_prompt_edit.textChanged.connect(self._update_neg_tab_label)
+        # 위치 탭 선택 시 높이 자동 확장
+        self.prompt_tab.currentChanged.connect(self._on_tab_changed)
 
         self.layout.addWidget(self.prompt_tab, 1)
+
+        # 높이 조절 핸들
+        self.resize_handle = ResizeHandle(self, min_height=120)
+        self.layout.addWidget(self.resize_handle)
 
     def _update_prompt_tab_label(self):
         count = len(self.prompt_edit.toPlainText())
@@ -264,7 +308,20 @@ class CharacterPromptWidget(QFrame):
         else:
             self.prompt_tab.setTabText(2, tr('ui.position'))
             self.prompt_tab.setTabToolTip(2, "")
-    
+
+    # 위치 탭 선택 시 그리드(5×5, 버튼 40px)가 ~320px 필요 → 자동 확장
+    _POSITION_TAB_MIN_HEIGHT = 320
+
+    def _on_tab_changed(self, index):
+        if index == 2:  # 위치 탭
+            if self.height() < self._POSITION_TAB_MIN_HEIGHT:
+                self._height_before_position = self.height()
+                self.setFixedHeight(self._POSITION_TAB_MIN_HEIGHT)
+        else:
+            if hasattr(self, '_height_before_position'):
+                self.setFixedHeight(self._height_before_position)
+                del self._height_before_position
+
     def get_data(self):
         """캐릭터 프롬프트 데이터 반환"""
         neg_text = self.neg_prompt_edit.toPlainText()
@@ -314,14 +371,6 @@ class CharacterPromptsContainer(QWidget):
         
         # 전체 컨테이너 스타일 설정
         self.setStyleSheet("QLabel { color: black; } QCheckBox { color: black; }")
-        
-        # 캐릭터 프롬프트 설명
-        info_layout = QHBoxLayout()
-        info_layout.setContentsMargins(0, 0, 0, 0)  # 여백 제거
-        info_label = QLabel(tr('ui.character_prompt_info'))
-        info_label.setWordWrap(True)
-        info_layout.addWidget(info_label)
-        self.main_layout.addLayout(info_layout)
         
         # AI 위치 선택 여부 체크박스
         controls_layout = QHBoxLayout()

@@ -140,7 +140,7 @@ class I18nManager(QObject):
                     "title": "Generate",
                     "once": "1회 생성",
                     "by_settings": "세팅별 연속 생성",
-                    "auto": "연속 생성 (Auto)",
+                    "auto": "연속 생성",
                     "stop": "생성 중지"
                 },
                 "folders": {
@@ -150,10 +150,10 @@ class I18nManager(QObject):
                     "settings": "세팅 파일 폴더"
                 },
                 "result": {
-                    "image_title": "결과 이미지 (Result Image)",
+                    "image_title": "결과 이미지",
                     "no_image": "결과 이미지가 없습니다",
-                    "save_image": "이미지 저장 (Save Image)",
-                    "prompt_title": "결과 프롬프트 (Result Prompt)"
+                    "save_image": "이미지 저장",
+                    "prompt_title": "결과 프롬프트"
                 },
                 "dialogs": {
                     "login_title": "NAI API 로그인",

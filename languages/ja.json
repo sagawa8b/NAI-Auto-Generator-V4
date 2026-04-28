@@ -15,7 +15,7 @@
       "view": "表示",
       "toggle_panel": "結果パネル切替",
       "reset_image_size": "画像ウィンドウサイズリセット",
-	  "reset_layout": "レイアウトリセット",
+      "reset_layout": "レイアウトリセット",
       "etc": "その他(Etc)",
       "about": "作成者について(About)"
     },
@@ -38,7 +38,8 @@
     "ui": {
       "languages": "言語",
       "prompt_group": "プロンプト",
-      "prompt": "プロンプト(Prompt):",
+      "prompt": "プロンプト",
+      "base_prompt": "Baseプロンプト",
       "negative_prompt": "ネガティブプロンプト(Negative Prompt):",
       "prompt_placeholder": "画像に含める内容を入力してください...",
       "negative_prompt_placeholder": "画像から除外する内容を入力してください...",
@@ -97,23 +98,23 @@
       "title": "生成",
       "once": "1回生成",
       "by_settings": "設定別連続生成",
-      "auto": "連続生成 (Auto)",
+      "auto": "連続生成",
       "stop": "生成停止"
     },
-	"generate_dialog": {
-	  "title": "連続生成オプション",
-	  "preset_group": "連続生成枚数 (クリック即座生成)",
-	  "manual_group": "連続生成手動入力",
-	  "settings_group": "その他設定",
-	  "count_5": "5枚",
-	  "count_10": "10枚",
-	  "count_50": "50枚",
-	  "count_100": "100枚",
-	  "count_label": "生成回数:",
-	  "count_unlimited": "(-1 = 無制限)",
-	  "delay_label": "生成間隔(秒):",
-	  "ignore_error": "生成エラーを無視"
-	},
+    "generate_dialog": {
+      "title": "連続生成オプション",
+      "preset_group": "連続生成枚数 (クリック即座生成)",
+      "manual_group": "連続生成手動入力",
+      "settings_group": "その他設定",
+      "count_5": "5枚",
+      "count_10": "10枚",
+      "count_50": "50枚",
+      "count_100": "100枚",
+      "count_label": "生成回数:",
+      "count_unlimited": "(-1 = 無制限)",
+      "delay_label": "生成間隔(秒):",
+      "ignore_error": "生成エラーを無視"
+    },
     "folders": {
       "title": "フォルダ",
       "results": "生成結果フォルダ",
@@ -159,10 +160,10 @@
       "stopped": "停止しました ({}/{}個の画像を処理済み)"
     },
     "result": {
-      "image_title": "結果画像 (Result Image)",
+      "image_title": "結果画像",
       "no_image": "結果画像がありません",
-      "save_image": "画像を保存 (Save Image)",
-      "prompt_title": "結果プロンプト (Result Prompt)",
+      "save_image": "画像を保存",
+      "prompt_title": "結果プロンプト",
       "overlay_toggle": "プロンプト表示"
     },
     "dialogs": {
@@ -235,8 +236,7 @@
       "api_err_detail": "{}\n\n技術情報: {}",
       "settings_load_caption": "読み込む設定ファイルを選択してください",
       "settings_select_min_two": "2つ以上選択してください。",
-      "settings_txt_only": ".txtの設定ファイルのみ選択してください。",
-      "warning": "警告"
+      "settings_txt_only": ".txtの設定ファイルのみ選択してください。"
     },
     "connection": {
       "server": "サーバー:",
@@ -260,15 +260,15 @@
       "anlas": "Anlas:",
       "unknown": "不明"
     },
-	"character_reference": {
-		"title": "Character Reference",
-		"select_image": "画像を選択",
-		"remove_image": "画像を削除",
-		"no_image": "画像なし",
-		"style_aware": "Style Aware",
-		"style_aware_description": "リファレンスからスタイル情報を含める",
-		"error_load_image": "画像の読み込みに失敗しました: {}"
-	},
+    "character_reference": {
+      "title": "Character Reference",
+      "select_image": "画像を選択",
+      "remove_image": "画像を削除",
+      "no_image": "画像なし",
+      "style_aware": "Style Aware",
+      "style_aware_description": "リファレンスからスタイル情報を含める",
+      "error_load_image": "画像の読み込みに失敗しました: {}"
+    },
     "options": {
       "resolution_settings": "解像度設定 (Resolution Settings)",
       "anlas_resolution_warning": "※ LargeおよびWallpaper解像度はAnlasを使用します。無効にすると誤って使用することを防げます。",
@@ -279,6 +279,22 @@
       "custom_resolutions_title": "カスタム解像度",
       "custom_resolutions_desc": "ランダム生成に使用する最大6つのカスタム解像度を定義します。\n※ デフォルト解像度（1024x1024）を超える解像度はAnlasを消費します。",
       "custom_resolution_n": "カスタム {}"
+    },
+    "options_nav": {
+      "folders": "フォルダ",
+      "folders_desc": "生成結果・設定ファイル・ワイルドカードのフォルダを設定します。",
+      "filename": "ファイル名",
+      "filename_desc": "保存ファイル名の形式を設定します。",
+      "generation": "連続生成",
+      "generation_desc": "連続生成ボタンのデフォルト生成数と間隔を設定します。",
+      "resolution": "解像度",
+      "resolution_desc": "解像度の有効化とカスタム解像度スロットを設定します。",
+      "interface": "インターフェース",
+      "interface_desc": "テーマ・フォントサイズ・プロンプト色の設定を変更します。",
+      "tags": "タグ補完",
+      "tags_desc": "タグ自動補完ファイルのパスを設定します。",
+      "log": "ログ設定",
+      "log_desc": "デバッグモードとログ設定を管理します。"
     }
   }
 }

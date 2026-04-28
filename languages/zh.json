@@ -15,7 +15,7 @@
       "view": "查看",
       "toggle_panel": "切换结果面板",
       "reset_image_size": "重置图像窗口大小",
-	  "reset_layout": "重置布局",
+      "reset_layout": "重置布局",
       "etc": "其他(Etc)",
       "about": "关于(About)"
     },
@@ -38,7 +38,8 @@
     "ui": {
       "languages": "语言",
       "prompt_group": "提示词",
-      "prompt": "提示词(Prompt):",
+      "prompt": "提示词",
+      "base_prompt": "基础提示词",
       "negative_prompt": "负面提示词(Negative Prompt):",
       "prompt_placeholder": "请输入要包含在图像中的内容...",
       "negative_prompt_placeholder": "请输入要从图像中排除的内容...",
@@ -97,23 +98,23 @@
       "title": "生成",
       "once": "生成一次",
       "by_settings": "按设置连续生成",
-      "auto": "连续生成 (Auto)",
+      "auto": "连续生成",
       "stop": "停止生成"
     },
-	"generate_dialog": {
-	  "title": "连续生成选项",
-	  "preset_group": "连续生成数量 (点击即时生成)",
-	  "manual_group": "连续生成手动输入", 
-	  "settings_group": "其他设置",
-	  "count_5": "5张",
-	  "count_10": "10张",
-	  "count_50": "50张",
-	  "count_100": "100张",
-	  "count_label": "生成次数:",
-	  "count_unlimited": "(-1 = 无限制)",
-	  "delay_label": "生成间隔(秒):",
-	  "ignore_error": "忽略生成错误"
-	},
+    "generate_dialog": {
+      "title": "连续生成选项",
+      "preset_group": "连续生成数量 (点击即时生成)",
+      "manual_group": "连续生成手动输入",
+      "settings_group": "其他设置",
+      "count_5": "5张",
+      "count_10": "10张",
+      "count_50": "50张",
+      "count_100": "100张",
+      "count_label": "生成次数:",
+      "count_unlimited": "(-1 = 无限制)",
+      "delay_label": "生成间隔(秒):",
+      "ignore_error": "忽略生成错误"
+    },
     "folders": {
       "title": "文件夹",
       "results": "生成结果文件夹",
@@ -159,10 +160,10 @@
       "stopped": "已停止 ({}/{}张图像已处理)"
     },
     "result": {
-      "image_title": "结果图像 (Result Image)",
+      "image_title": "结果图像",
       "no_image": "没有结果图像",
-      "save_image": "保存图像 (Save Image)",
-      "prompt_title": "结果提示词 (Result Prompt)",
+      "save_image": "保存图像",
+      "prompt_title": "结果提示词",
       "overlay_toggle": "显示提示词"
     },
     "dialogs": {
@@ -235,8 +236,7 @@
       "api_err_detail": "{}\n\n技术信息: {}",
       "settings_load_caption": "请选择要加载的设置文件",
       "settings_select_min_two": "请选择两个或更多文件。",
-      "settings_txt_only": "请仅选择.txt格式的设置文件。",
-      "warning": "警告"
+      "settings_txt_only": "请仅选择.txt格式的设置文件。"
     },
     "connection": {
       "server": "服务器:",
@@ -260,15 +260,15 @@
       "anlas": "Anlas:",
       "unknown": "未知"
     },
-	"character_reference": {
-		"title": "Character Reference",
-		"select_image": "选择图片",
-		"remove_image": "删除图片",
-		"no_image": "无图片",
-		"style_aware": "Style Aware",
-		"style_aware_description": "包含参考图片的风格信息",
-		"error_load_image": "图片加载失败: {}"
-	},
+    "character_reference": {
+      "title": "Character Reference",
+      "select_image": "选择图片",
+      "remove_image": "删除图片",
+      "no_image": "无图片",
+      "style_aware": "Style Aware",
+      "style_aware_description": "包含参考图片的风格信息",
+      "error_load_image": "图片加载失败: {}"
+    },
     "options": {
       "resolution_settings": "分辨率设置 (Resolution Settings)",
       "anlas_resolution_warning": "※ Large和Wallpaper分辨率使用Anlas。禁用可防止意外使用。",
@@ -279,6 +279,22 @@
       "custom_resolutions_title": "自定义分辨率",
       "custom_resolutions_desc": "定义最多6个用于随机生成的自定义分辨率。\n※ 超过默认分辨率（1024x1024）的分辨率将消耗Anlas。",
       "custom_resolution_n": "自定义 {}"
+    },
+    "options_nav": {
+      "folders": "文件夹",
+      "folders_desc": "设置生成结果、设置文件及通配符文件夹的路径。",
+      "filename": "文件名",
+      "filename_desc": "配置保存文件名的格式。",
+      "generation": "连续生成",
+      "generation_desc": "设置生成按钮的默认生成数量和间隔。",
+      "resolution": "分辨率",
+      "resolution_desc": "配置分辨率启用选项及自定义分辨率槽。",
+      "interface": "界面",
+      "interface_desc": "调整主题、字体大小和提示词颜色设置。",
+      "tags": "标签补全",
+      "tags_desc": "设置标签自动补全文件的路径。",
+      "log": "日志设置",
+      "log_desc": "管理调试模式和日志设置。"
     }
   }
 }

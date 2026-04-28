@@ -12,8 +12,9 @@ from PyQt5.QtWidgets import (QDialog, QLabel, QPushButton, QVBoxLayout,
                              QFileDialog, QMessageBox, QRadioButton,
                              QButtonGroup, QDialogButtonBox, QWidget, QCheckBox,
                              QComboBox, QSlider, QApplication, QSpinBox, QDoubleSpinBox,
-                             QColorDialog, QScrollArea, QTabWidget)
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, QPoint
+                             QColorDialog, QScrollArea, QTabWidget,
+                             QListWidget, QListWidgetItem, QStackedWidget, QFrame)
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, QPoint, QSize
 from PyQt5.QtGui import QFont, QColor, QPalette, QPixmap, QImage, QPainter, QPen, QCursor
 
 from consts import DEFAULT_PATH, DEFAULT_TAGCOMPLETION_PATH, DEFAULT_CUSTOM_RESOLUTIONS
@@ -277,481 +278,148 @@ class OptionDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
-        self.resize(1000, 700)  # Increased height for more content
+        self.resize(860, 600)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 8)
+        main_layout.setSpacing(0)
 
-        # 메인 레이아웃 (세로)
-        main_layout = QVBoxLayout()
+        # ── nav + stacked content ──────────────────────────────
+        body_layout = QHBoxLayout()
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
 
-        # 컨텐츠를 담을 가로 레이아웃 (2-column layout)
-        content_layout = QHBoxLayout()
+        # Left navigation list
+        self.nav_list = QListWidget()
+        self.nav_list.setFixedWidth(170)
+        self.nav_list.setFrameShape(QFrame.NoFrame)
+        for label in [
+            tr('options_nav.folders'),
+            tr('options_nav.filename'),
+            tr('options_nav.generation'),
+            tr('options_nav.resolution'),
+            tr('options_nav.interface'),
+            tr('options_nav.tags'),
+            tr('options_nav.log'),
+        ]:
+            item = QListWidgetItem(label)
+            item.setSizeHint(QSize(0, 38))
+            self.nav_list.addItem(item)
 
-        # 왼쪽 컬럼 - with scroll area
-        left_scroll = QScrollArea()
-        left_scroll.setWidgetResizable(True)
-        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        left_widget = QWidget()
-        left_column = QVBoxLayout(left_widget)
+        # Vertical divider
+        v_line = QFrame()
+        v_line.setFrameShape(QFrame.VLine)
+        v_line.setFrameShadow(QFrame.Sunken)
 
-        # 오른쪽 컬럼 - with scroll area
-        right_scroll = QScrollArea()
-        right_scroll.setWidgetResizable(True)
-        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        right_widget = QWidget()
-        right_column = QVBoxLayout(right_widget)
+        # Right stacked pages
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self._build_folders_page())
+        self.stack.addWidget(self._build_filename_page())
+        self.stack.addWidget(self._build_generation_page())
+        self.stack.addWidget(self._build_resolution_page())
+        self.stack.addWidget(self._build_interface_page())
+        self.stack.addWidget(self._build_tags_page())
+        self.stack.addWidget(self._build_log_page())
 
-        # 폴더 경로 설정 그룹
-        path_group = QGroupBox("폴더 경로 설정")
-        path_layout = QVBoxLayout()
+        self.nav_list.currentRowChanged.connect(self.stack.setCurrentIndex)
+        self.nav_list.setCurrentRow(0)
 
-        # 로깅 설정 그룹
-        log_group = QGroupBox("로그 설정")
-        log_layout = QVBoxLayout()
+        body_layout.addWidget(self.nav_list)
+        body_layout.addWidget(v_line)
+        body_layout.addWidget(self.stack, 1)
+        main_layout.addLayout(body_layout, 1)
 
-        # 결과 저장 폴더
-        output_label = QLabel("결과 저장 폴더:")
+        # ── Save / Cancel buttons ──────────────────────────────
+        btn_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        btn_box.accepted.connect(self.save_option)
+        btn_box.rejected.connect(self.reject)
+        btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(8, 4, 8, 0)
+        btn_row.addStretch()
+        btn_row.addWidget(btn_box)
+        main_layout.addLayout(btn_row)
+
+        self.setLayout(main_layout)
+
+    # ── page frame helper ──────────────────────────────────────
+    def _make_page_frame(self, title, description):
+        """Returns (page_widget, content_layout) — scrollable settings page."""
+        page = QWidget()
+        outer = QVBoxLayout(page)
+        outer.setContentsMargins(24, 16, 24, 8)
+        outer.setSpacing(4)
+
+        lbl_title = QLabel(title)
+        f = lbl_title.font()
+        f.setPointSize(14)
+        f.setBold(True)
+        lbl_title.setFont(f)
+        outer.addWidget(lbl_title)
+
+        lbl_desc = QLabel(description)
+        lbl_desc.setStyleSheet("color: gray; font-size: 10px;")
+        outer.addWidget(lbl_desc)
+
+        h_sep = QFrame()
+        h_sep.setFrameShape(QFrame.HLine)
+        h_sep.setFrameShadow(QFrame.Sunken)
+        outer.addWidget(h_sep)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        inner_w = QWidget()
+        inner_l = QVBoxLayout(inner_w)
+        inner_l.setContentsMargins(0, 8, 0, 8)
+        inner_l.setSpacing(10)
+        scroll.setWidget(inner_w)
+        outer.addWidget(scroll, 1)
+
+        return page, inner_l
+
+    # ── page builders ──────────────────────────────────────────
+    def _build_folders_page(self):
+        page, cl = self._make_page_frame(
+            tr('options_nav.folders'), tr('options_nav.folders_desc'))
+
+        def path_row(label_text, line_edit, key):
+            row = QHBoxLayout()
+            lbl = QLabel(label_text)
+            lbl.setFixedWidth(160)
+            btn = QPushButton("찾아보기")
+            btn.clicked.connect(lambda _, k=key: self.browse_folder(k))
+            row.addWidget(lbl)
+            row.addWidget(line_edit, 1)
+            row.addWidget(btn)
+            return row
+
         path_results = self.parent.settings.value("path_results", DEFAULT_PATH["path_results"])
         if os.name == 'nt':
             path_results = os.path.normpath(path_results)
         self.output_path = QLineEdit(path_results)
-        output_button = QPushButton("찾아보기")
-        output_button.clicked.connect(lambda: self.browse_folder("path_results"))
-        output_layout = QHBoxLayout()
-        output_layout.addWidget(output_label)
-        output_layout.addWidget(self.output_path)
-        output_layout.addWidget(output_button)
-        path_layout.addLayout(output_layout)
+        cl.addLayout(path_row("결과 저장 폴더:", self.output_path, "path_results"))
 
-        # 세팅 파일 저장 폴더
-        settings_label = QLabel("세팅 파일 저장 폴더:")
         self.settings_path = QLineEdit(
             self.parent.settings.value("path_settings", DEFAULT_PATH["path_settings"]))
-        settings_button = QPushButton("찾아보기")
-        settings_button.clicked.connect(lambda: self.browse_folder("path_settings"))
-        settings_layout = QHBoxLayout()
-        settings_layout.addWidget(settings_label)
-        settings_layout.addWidget(self.settings_path)
-        settings_layout.addWidget(settings_button)
-        path_layout.addLayout(settings_layout)
+        cl.addLayout(path_row("세팅 파일 저장 폴더:", self.settings_path, "path_settings"))
 
-        # 와일드카드 파일 폴더
-        wildcards_label = QLabel("와일드카드 파일 폴더:")
         self.wildcards_path = QLineEdit(
             self.parent.settings.value("path_wildcards", DEFAULT_PATH["path_wildcards"]))
-        wildcards_button = QPushButton("찾아보기")
-        wildcards_button.clicked.connect(lambda: self.browse_folder("path_wildcards"))
-        wildcards_layout = QHBoxLayout()
-        wildcards_layout.addWidget(wildcards_label)
-        wildcards_layout.addWidget(self.wildcards_path)
-        wildcards_layout.addWidget(wildcards_button)
-        path_layout.addLayout(wildcards_layout)
+        cl.addLayout(path_row("와일드카드 파일 폴더:", self.wildcards_path, "path_wildcards"))
 
-        # 모델 파일 폴더
-        #models_label = QLabel("모델 파일 폴더:")
-        #self.models_path = QLineEdit(
-            #self.parent.settings.value("path_models", DEFAULT_PATH["path_models"]))
-        #models_button = QPushButton("찾아보기")
-        #models_button.clicked.connect(lambda: self.browse_folder("path_models"))
-        #models_layout = QHBoxLayout()
-        #models_layout.addWidget(models_label)
-        #models_layout.addWidget(self.models_path)
-        #models_layout.addWidget(models_button)
-        #path_layout.addLayout(models_layout)
+        cl.addStretch()
+        return page
 
-        # 디버그 모드 체크박스
-        self.debug_mode_checkbox = QCheckBox("디버그 모드 활성화")
-        self.debug_mode_checkbox.setToolTip("활성화하면 상세한 로그가 파일에 기록됩니다")
-        self.debug_mode_checkbox.setChecked(self.parent.settings.value("debug_mode", False, type=bool))
-        log_layout.addWidget(self.debug_mode_checkbox)
-        
-        # 로그 수준 선택 UI 간소화
-        log_level_layout = QHBoxLayout()
-        log_level_layout.addWidget(QLabel("로그 상세 수준:"))
-        self.log_level_combo = QComboBox()
-        self.log_level_combo.addItems(["NORMAL", "DETAILED"])
+    def _build_filename_page(self):
+        page, cl = self._make_page_frame(
+            tr('options_nav.filename'), tr('options_nav.filename_desc'))
 
-        # 설정에서 저장된 로그 수준 가져오기
-        current_level = self.parent.settings.value("log_level", "NORMAL")
-        index = self.log_level_combo.findText(current_level)
-        if index >= 0:
-            self.log_level_combo.setCurrentIndex(index)
+        cl.addWidget(QLabel("파일명 형식 (Filename Format):"))
+        self.filename_format_input = QLineEdit(
+            self.parent.settings.value("filename_format", "[datetime]_[prompt]"))
+        cl.addWidget(self.filename_format_input)
 
-        log_level_layout.addWidget(self.log_level_combo)
-        log_layout.addLayout(log_level_layout)
-
-        # 로그 수준 설명 라벨
-        log_level_desc = QLabel("NORMAL: 일반적인 작업 정보, DETAILED: 상세한 디버깅 정보")
-        log_level_desc.setWordWrap(True)
-        log_layout.addWidget(log_level_desc)
-
-        # 로그 폴더 경로
-        log_path_layout = QHBoxLayout()
-        log_path_layout.addWidget(QLabel("로그 파일 위치:"))
-        self.log_path = QLineEdit(self.parent.settings.value("log_folder", os.path.join(os.path.expanduser("~"), "NAI-Auto-Generator", "logs")))
-        log_path_layout.addWidget(self.log_path)
-        log_path_button = QPushButton("찾아보기")
-        log_path_button.clicked.connect(lambda: self.browse_folder("log_folder"))
-        log_path_layout.addWidget(log_path_button)
-        log_layout.addLayout(log_path_layout)
-
-        # 로그 폴더 열기 버튼
-        open_log_layout = QHBoxLayout()
-        open_log_button = QPushButton("로그 폴더 열기")
-        open_log_button.clicked.connect(self.open_log_folder)
-        open_log_layout.addWidget(open_log_button)
-        log_layout.addLayout(open_log_layout)
-
-        log_group.setLayout(log_layout)
-
-        path_group.setLayout(path_layout)
-
-        # 왼쪽 컬럼에 추가
-        left_column.addWidget(path_group)
-        left_column.addWidget(log_group)
-
-        # === 연속생성 설정 그룹 추가 ===
-        generation_group = QGroupBox("연속생성 설정 (Generation Settings)")
-        generation_layout = QVBoxLayout()
-        
-        # Quick Generation 매수 설정
-        quick_gen_layout = QHBoxLayout()
-        quick_gen_layout.addWidget(QLabel("Quick Generation 매수:"))
-        
-        self.quick_gen_5_spinbox = QSpinBox()
-        self.quick_gen_5_spinbox.setRange(1, 9999)
-        self.quick_gen_5_spinbox.setValue(int(self.parent.settings.value("quick_gen_count_1", 5)))
-        quick_gen_layout.addWidget(QLabel("1번 버튼:"))
-        quick_gen_layout.addWidget(self.quick_gen_5_spinbox)
-        
-        self.quick_gen_10_spinbox = QSpinBox()
-        self.quick_gen_10_spinbox.setRange(1, 9999)
-        self.quick_gen_10_spinbox.setValue(int(self.parent.settings.value("quick_gen_count_2", 10)))
-        quick_gen_layout.addWidget(QLabel("2번 버튼:"))
-        quick_gen_layout.addWidget(self.quick_gen_10_spinbox)
-        
-        self.quick_gen_50_spinbox = QSpinBox()
-        self.quick_gen_50_spinbox.setRange(1, 9999)
-        self.quick_gen_50_spinbox.setValue(int(self.parent.settings.value("quick_gen_count_3", 50)))
-        quick_gen_layout.addWidget(QLabel("3번 버튼:"))
-        quick_gen_layout.addWidget(self.quick_gen_50_spinbox)
-        
-        self.quick_gen_100_spinbox = QSpinBox()
-        self.quick_gen_100_spinbox.setRange(1, 9999)
-        self.quick_gen_100_spinbox.setValue(int(self.parent.settings.value("quick_gen_count_4", 100)))
-        quick_gen_layout.addWidget(QLabel("4번 버튼:"))
-        quick_gen_layout.addWidget(self.quick_gen_100_spinbox)
-        
-        generation_layout.addLayout(quick_gen_layout)
-        
-        # 기본 생성 간격 설정
-        interval_layout = QHBoxLayout()
-        interval_layout.addWidget(QLabel("기본 생성 간격(초):"))
-        self.default_interval_spinbox = QDoubleSpinBox()
-        self.default_interval_spinbox.setRange(0.1, 3600.0)
-        self.default_interval_spinbox.setDecimals(1)
-        self.default_interval_spinbox.setValue(float(self.parent.settings.value("default_generation_interval", 3.0)))
-        interval_layout.addWidget(self.default_interval_spinbox)
-        interval_layout.addStretch()
-        generation_layout.addLayout(interval_layout)
-
-        generation_group.setLayout(generation_layout)
-
-        # 왼쪽 컬럼에 추가
-        left_column.addWidget(generation_group)
-
-        # === Resolution Settings Group ===
-        resolution_group = QGroupBox(tr('options.resolution_settings'))
-        resolution_layout = QVBoxLayout()
-
-        # Resolution family enable/disable (Anlas warning)
-        anlas_warning = QLabel(tr('options.anlas_resolution_warning'))
-        anlas_warning.setWordWrap(True)
-        anlas_warning.setStyleSheet("color: #D37493; font-size: 10px; padding: 2px;")
-        resolution_layout.addWidget(anlas_warning)
-
-        # Large resolution checkbox
-        self.large_resolution_checkbox = QCheckBox(tr('options.enable_large_resolution'))
-        self.large_resolution_checkbox.setToolTip(tr('options.enable_large_resolution_tooltip'))
-        self.large_resolution_checkbox.setChecked(
-            self.parent.settings.value("resolution_family_large_enabled",
-                                       DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_large_enabled"], type=bool))
-        resolution_layout.addWidget(self.large_resolution_checkbox)
-
-        # Wallpaper resolution checkbox
-        self.wallpaper_resolution_checkbox = QCheckBox(tr('options.enable_wallpaper_resolution'))
-        self.wallpaper_resolution_checkbox.setToolTip(tr('options.enable_wallpaper_resolution_tooltip'))
-        self.wallpaper_resolution_checkbox.setChecked(
-            self.parent.settings.value("resolution_family_wallpaper_enabled",
-                                       DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_wallpaper_enabled"], type=bool))
-        resolution_layout.addWidget(self.wallpaper_resolution_checkbox)
-
-        # Separator
-        resolution_layout.addSpacing(10)
-
-        # Custom resolutions title
-        custom_res_label = QLabel(tr('options.custom_resolutions_title'))
-        custom_res_label.setStyleSheet("font-weight: bold;")
-        resolution_layout.addWidget(custom_res_label)
-
-        custom_res_desc = QLabel(tr('options.custom_resolutions_desc'))
-        custom_res_desc.setWordWrap(True)
-        custom_res_desc.setStyleSheet("color: gray; font-size: 10px;")
-        resolution_layout.addWidget(custom_res_desc)
-
-        # Custom resolution 1
-        custom_res_1_layout = QHBoxLayout()
-        self.custom_res_1_checkbox = QCheckBox(tr('options.custom_resolution_n').format(1))
-        self.custom_res_1_checkbox.setChecked(
-            self.parent.settings.value("custom_resolution_1_enabled",
-                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_1_enabled"], type=bool))
-        custom_res_1_layout.addWidget(self.custom_res_1_checkbox)
-
-        self.custom_res_1_width = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_1_width",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_1_width"])))
-        self.custom_res_1_width.setMaximumWidth(60)
-        self.custom_res_1_width.setAlignment(Qt.AlignRight)
-        custom_res_1_layout.addWidget(self.custom_res_1_width)
-
-        custom_res_1_layout.addWidget(QLabel("×"))
-
-        self.custom_res_1_height = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_1_height",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_1_height"])))
-        self.custom_res_1_height.setMaximumWidth(60)
-        self.custom_res_1_height.setAlignment(Qt.AlignRight)
-        custom_res_1_layout.addWidget(self.custom_res_1_height)
-        custom_res_1_layout.addStretch()
-        resolution_layout.addLayout(custom_res_1_layout)
-
-        # Custom resolution 2
-        custom_res_2_layout = QHBoxLayout()
-        self.custom_res_2_checkbox = QCheckBox(tr('options.custom_resolution_n').format(2))
-        self.custom_res_2_checkbox.setChecked(
-            self.parent.settings.value("custom_resolution_2_enabled",
-                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_2_enabled"], type=bool))
-        custom_res_2_layout.addWidget(self.custom_res_2_checkbox)
-
-        self.custom_res_2_width = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_2_width",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_2_width"])))
-        self.custom_res_2_width.setMaximumWidth(60)
-        self.custom_res_2_width.setAlignment(Qt.AlignRight)
-        custom_res_2_layout.addWidget(self.custom_res_2_width)
-
-        custom_res_2_layout.addWidget(QLabel("×"))
-
-        self.custom_res_2_height = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_2_height",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_2_height"])))
-        self.custom_res_2_height.setMaximumWidth(60)
-        self.custom_res_2_height.setAlignment(Qt.AlignRight)
-        custom_res_2_layout.addWidget(self.custom_res_2_height)
-        custom_res_2_layout.addStretch()
-        resolution_layout.addLayout(custom_res_2_layout)
-
-        # Custom resolution 3
-        custom_res_3_layout = QHBoxLayout()
-        self.custom_res_3_checkbox = QCheckBox(tr('options.custom_resolution_n').format(3))
-        self.custom_res_3_checkbox.setChecked(
-            self.parent.settings.value("custom_resolution_3_enabled",
-                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_3_enabled"], type=bool))
-        custom_res_3_layout.addWidget(self.custom_res_3_checkbox)
-
-        self.custom_res_3_width = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_3_width",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_3_width"])))
-        self.custom_res_3_width.setMaximumWidth(60)
-        self.custom_res_3_width.setAlignment(Qt.AlignRight)
-        custom_res_3_layout.addWidget(self.custom_res_3_width)
-
-        custom_res_3_layout.addWidget(QLabel("×"))
-
-        self.custom_res_3_height = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_3_height",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_3_height"])))
-        self.custom_res_3_height.setMaximumWidth(60)
-        self.custom_res_3_height.setAlignment(Qt.AlignRight)
-        custom_res_3_layout.addWidget(self.custom_res_3_height)
-        custom_res_3_layout.addStretch()
-        resolution_layout.addLayout(custom_res_3_layout)
-
-        # Custom resolution 4
-        custom_res_4_layout = QHBoxLayout()
-        self.custom_res_4_checkbox = QCheckBox(tr('options.custom_resolution_n').format(4))
-        self.custom_res_4_checkbox.setChecked(
-            self.parent.settings.value("custom_resolution_4_enabled",
-                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_4_enabled"], type=bool))
-        custom_res_4_layout.addWidget(self.custom_res_4_checkbox)
-
-        self.custom_res_4_width = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_4_width",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_4_width"])))
-        self.custom_res_4_width.setMaximumWidth(60)
-        self.custom_res_4_width.setAlignment(Qt.AlignRight)
-        custom_res_4_layout.addWidget(self.custom_res_4_width)
-
-        custom_res_4_layout.addWidget(QLabel("×"))
-
-        self.custom_res_4_height = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_4_height",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_4_height"])))
-        self.custom_res_4_height.setMaximumWidth(60)
-        self.custom_res_4_height.setAlignment(Qt.AlignRight)
-        custom_res_4_layout.addWidget(self.custom_res_4_height)
-        custom_res_4_layout.addStretch()
-        resolution_layout.addLayout(custom_res_4_layout)
-
-        # Custom resolution 5
-        custom_res_5_layout = QHBoxLayout()
-        self.custom_res_5_checkbox = QCheckBox(tr('options.custom_resolution_n').format(5))
-        self.custom_res_5_checkbox.setChecked(
-            self.parent.settings.value("custom_resolution_5_enabled",
-                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_5_enabled"], type=bool))
-        custom_res_5_layout.addWidget(self.custom_res_5_checkbox)
-
-        self.custom_res_5_width = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_5_width",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_5_width"])))
-        self.custom_res_5_width.setMaximumWidth(60)
-        self.custom_res_5_width.setAlignment(Qt.AlignRight)
-        custom_res_5_layout.addWidget(self.custom_res_5_width)
-
-        custom_res_5_layout.addWidget(QLabel("×"))
-
-        self.custom_res_5_height = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_5_height",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_5_height"])))
-        self.custom_res_5_height.setMaximumWidth(60)
-        self.custom_res_5_height.setAlignment(Qt.AlignRight)
-        custom_res_5_layout.addWidget(self.custom_res_5_height)
-        custom_res_5_layout.addStretch()
-        resolution_layout.addLayout(custom_res_5_layout)
-
-        # Custom resolution 6
-        custom_res_6_layout = QHBoxLayout()
-        self.custom_res_6_checkbox = QCheckBox(tr('options.custom_resolution_n').format(6))
-        self.custom_res_6_checkbox.setChecked(
-            self.parent.settings.value("custom_resolution_6_enabled",
-                                       DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_6_enabled"], type=bool))
-        custom_res_6_layout.addWidget(self.custom_res_6_checkbox)
-
-        self.custom_res_6_width = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_6_width",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_6_width"])))
-        self.custom_res_6_width.setMaximumWidth(60)
-        self.custom_res_6_width.setAlignment(Qt.AlignRight)
-        custom_res_6_layout.addWidget(self.custom_res_6_width)
-
-        custom_res_6_layout.addWidget(QLabel("×"))
-
-        self.custom_res_6_height = QLineEdit(
-            str(self.parent.settings.value("custom_resolution_6_height",
-                                           DEFAULT_CUSTOM_RESOLUTIONS["custom_resolution_6_height"])))
-        self.custom_res_6_height.setMaximumWidth(60)
-        self.custom_res_6_height.setAlignment(Qt.AlignRight)
-        custom_res_6_layout.addWidget(self.custom_res_6_height)
-        custom_res_6_layout.addStretch()
-        resolution_layout.addLayout(custom_res_6_layout)
-
-        resolution_group.setLayout(resolution_layout)
-        left_column.addWidget(resolution_group)
-
-        # === Theme Settings Group ===
-        theme_group = QGroupBox("테마 설정 (Theme Settings)")
-        theme_layout = QVBoxLayout()
-    
-        # Theme selection
-        theme_selector_layout = QHBoxLayout()
-        theme_selector_layout.addWidget(QLabel("테마 모드:"))
-        self.theme_combo = QComboBox()
-        self.theme_combo.addItems(["기본 테마 (System Default)", "어두운 모드 (Dark)", "밝은 모드 (Light)"])
-        # Load saved theme
-        saved_theme = self.parent.settings.value("theme_mode", "기본 테마 (System Default)")
-        self.theme_combo.setCurrentText(saved_theme)
-        theme_selector_layout.addWidget(self.theme_combo, 1)
-        theme_layout.addLayout(theme_selector_layout)
-
-        # Accent color
-        self.accent_color_btn = QPushButton("액센트 색상 변경")
-        self.accent_color_btn.clicked.connect(self.pick_accent_color)
-        theme_layout.addWidget(self.accent_color_btn)
-        theme_group.setLayout(theme_layout)
-
-        # === 프롬프트 설정 그룹 추가 ===
-        prompt_group = QGroupBox("프롬프트 설정")
-        prompt_layout = QVBoxLayout()
-
-        # 가중치 하이라이트 활성화 체크박스
-        self.emphasis_highlight_checkbox = QCheckBox("가중치 하이라이트 활성화 (::)")
-        self.emphasis_highlight_checkbox.setChecked(self.parent.settings.value("emphasis_highlight", True, type=bool))
-        self.emphasis_highlight_checkbox.setToolTip("프롬프트 내 가중치 구문(1.5::텍스트::)을 색상으로 강조합니다")
-        prompt_layout.addWidget(self.emphasis_highlight_checkbox)
-
-        # 가중치 하이라이트 색상 설정
-        colors_layout = QHBoxLayout()
-        colors_layout.addWidget(QLabel("강조(>1) 색상:"))
-        self.high_emphasis_btn = QPushButton()
-        high_emphasis_color = QColor(self.parent.settings.value("high_emphasis_color", "#6495ED"))
-        self.high_emphasis_btn.setStyleSheet(f"background-color: {high_emphasis_color.name()}")
-        self.high_emphasis_btn.clicked.connect(lambda: self.pick_emphasis_color("high"))
-        colors_layout.addWidget(self.high_emphasis_btn)
-
-        colors_layout.addWidget(QLabel("약화(<1) 색상:"))
-        self.low_emphasis_btn = QPushButton()
-        low_emphasis_color = QColor(self.parent.settings.value("low_emphasis_color", "#A9A9A9"))
-        self.low_emphasis_btn.setStyleSheet(f"background-color: {low_emphasis_color.name()}")
-        self.low_emphasis_btn.clicked.connect(lambda: self.pick_emphasis_color("low"))
-        colors_layout.addWidget(self.low_emphasis_btn)
-
-        prompt_layout.addLayout(colors_layout)
-
-        # 오버레이 텍스트 색상 설정
-        overlay_color_layout = QHBoxLayout()
-        overlay_color_layout.addWidget(QLabel("오버레이 텍스트 색상:"))
-        self.overlay_text_color_btn = QPushButton()
-        overlay_text_color = QColor(self.parent.settings.value("overlay_text_color", "#ffffff"))
-        self.overlay_text_color_btn.setStyleSheet(f"background-color: {overlay_text_color.name()}")
-        self.overlay_text_color_btn.clicked.connect(self.pick_overlay_text_color)
-        overlay_color_layout.addWidget(self.overlay_text_color_btn)
-        prompt_layout.addLayout(overlay_color_layout)
-
-        # 도움말 텍스트
-        help_text = QLabel("V4 모델에서는 ::를 사용해 가중치를 직접 지정할 수 있습니다. 예: 1.5::강조할 텍스트::")
-        help_text.setWordWrap(True)
-        prompt_layout.addWidget(help_text)
-
-        prompt_group.setLayout(prompt_layout)
-
-        # 글꼴 설정 그룹
-        font_group = QGroupBox("글꼴 설정")
-        font_layout = QHBoxLayout()
-
-        font_layout.addWidget(QLabel("글꼴 크기:"))
-        self.font_size_spinbox = QSpinBox()
-        self.font_size_spinbox.setRange(8, 32)
-        self.font_size_spinbox.setValue(int(self.parent.settings.value("nag_font_size", 18)))
-        font_layout.addWidget(self.font_size_spinbox)
-        font_layout.addStretch()
-
-        font_group.setLayout(font_layout)
-
-        # === 파일명 설정 그룹 추가 ===
-        filename_group = QGroupBox("파일명 설정 (Filename Settings)")
-        filename_layout = QVBoxLayout()
-
-        # 파일명 포맷 설정
-        format_layout = QVBoxLayout()
-        format_label = QLabel("파일명 형식 (Filename Format):")
-        format_layout.addWidget(format_label)
-
-        self.filename_format_input = QLineEdit()
-        default_format = self.parent.settings.value("filename_format", "[datetime]_[prompt]")
-        self.filename_format_input.setText(default_format)
-        format_layout.addWidget(self.filename_format_input)
-
-        # 도움말 텍스트
         format_help = QLabel(
-            "사용 가능한 플레이스홀더:\n"
             "[datetime] - 날짜+시간 (251118_11240833)\n"
             "[date] - 날짜만 (251118)\n"
             "[time] - 시간만 (11240833)\n"
@@ -761,92 +429,305 @@ class OptionDialog(QDialog):
             "\n예시: [datetime]_[prompt] → 251118_11240833_1girl dancing.png"
         )
         format_help.setWordWrap(True)
-        format_help.setStyleSheet("color: gray; font-size: 10px; padding: 5px;")
-        format_layout.addWidget(format_help)
+        format_help.setStyleSheet("color: gray; font-size: 10px; padding: 4px;")
+        cl.addWidget(format_help)
 
-        filename_layout.addLayout(format_layout)
-
-        # 프롬프트/캐릭터 길이 제한 설정
         limit_layout = QHBoxLayout()
-
         limit_layout.addWidget(QLabel("프롬프트 단어 수 제한:"))
         self.prompt_word_limit_spinbox = QSpinBox()
         self.prompt_word_limit_spinbox.setRange(5, 200)
-        self.prompt_word_limit_spinbox.setValue(int(self.parent.settings.value("filename_prompt_word_limit", 50)))
+        self.prompt_word_limit_spinbox.setValue(
+            int(self.parent.settings.value("filename_prompt_word_limit", 50)))
         self.prompt_word_limit_spinbox.setToolTip("파일명에 포함할 프롬프트의 최대 문자 수")
         limit_layout.addWidget(self.prompt_word_limit_spinbox)
-
+        limit_layout.addSpacing(20)
         limit_layout.addWidget(QLabel("캐릭터 단어 수 제한:"))
         self.character_word_limit_spinbox = QSpinBox()
         self.character_word_limit_spinbox.setRange(5, 200)
-        self.character_word_limit_spinbox.setValue(int(self.parent.settings.value("filename_character_word_limit", 30)))
+        self.character_word_limit_spinbox.setValue(
+            int(self.parent.settings.value("filename_character_word_limit", 30)))
         self.character_word_limit_spinbox.setToolTip("파일명에 포함할 캐릭터 프롬프트의 최대 문자 수")
         limit_layout.addWidget(self.character_word_limit_spinbox)
-
         limit_layout.addStretch()
-        filename_layout.addLayout(limit_layout)
+        cl.addLayout(limit_layout)
 
-        filename_group.setLayout(filename_layout)
+        cl.addStretch()
+        return page
 
-        # 태그 설정 그룹
-        tag_group = QGroupBox("태그 설정")
-        tag_layout = QVBoxLayout()
+    def _build_generation_page(self):
+        page, cl = self._make_page_frame(
+            tr('options_nav.generation'), tr('options_nav.generation_desc'))
 
-        # 태그 완성 파일 경로
-        tag_file_label = QLabel("태그 자동완성 파일 (Tag Completion File):")
+        quick_title = QLabel("Quick Generation 매수:")
+        quick_title.setStyleSheet("font-weight: bold;")
+        cl.addWidget(quick_title)
+
+        for attr, default, label in [
+            ('quick_gen_5_spinbox',   5,   "1번 버튼:"),
+            ('quick_gen_10_spinbox',  10,  "2번 버튼:"),
+            ('quick_gen_50_spinbox',  50,  "3번 버튼:"),
+            ('quick_gen_100_spinbox', 100, "4번 버튼:"),
+        ]:
+            row = QHBoxLayout()
+            lbl = QLabel(label)
+            lbl.setFixedWidth(80)
+            spinbox = QSpinBox()
+            spinbox.setRange(1, 9999)
+            key = f"quick_gen_count_{['quick_gen_5_spinbox','quick_gen_10_spinbox','quick_gen_50_spinbox','quick_gen_100_spinbox'].index(attr)+1}"
+            spinbox.setValue(int(self.parent.settings.value(key, default)))
+            setattr(self, attr, spinbox)
+            row.addWidget(lbl)
+            row.addWidget(spinbox)
+            row.addStretch()
+            cl.addLayout(row)
+
+        cl.addSpacing(8)
+        interval_row = QHBoxLayout()
+        interval_row.addWidget(QLabel("기본 생성 간격(초):"))
+        self.default_interval_spinbox = QDoubleSpinBox()
+        self.default_interval_spinbox.setRange(0.1, 3600.0)
+        self.default_interval_spinbox.setDecimals(1)
+        self.default_interval_spinbox.setValue(
+            float(self.parent.settings.value("default_generation_interval", 3.0)))
+        interval_row.addWidget(self.default_interval_spinbox)
+        interval_row.addStretch()
+        cl.addLayout(interval_row)
+
+        cl.addStretch()
+        return page
+
+    def _build_resolution_page(self):
+        page, cl = self._make_page_frame(
+            tr('options_nav.resolution'), tr('options_nav.resolution_desc'))
+
+        anlas_warning = QLabel(tr('options.anlas_resolution_warning'))
+        anlas_warning.setWordWrap(True)
+        anlas_warning.setStyleSheet("color: #D37493; font-size: 10px; padding: 2px;")
+        cl.addWidget(anlas_warning)
+
+        self.large_resolution_checkbox = QCheckBox(tr('options.enable_large_resolution'))
+        self.large_resolution_checkbox.setToolTip(tr('options.enable_large_resolution_tooltip'))
+        self.large_resolution_checkbox.setChecked(self.parent.settings.value(
+            "resolution_family_large_enabled",
+            DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_large_enabled"], type=bool))
+        cl.addWidget(self.large_resolution_checkbox)
+
+        self.wallpaper_resolution_checkbox = QCheckBox(tr('options.enable_wallpaper_resolution'))
+        self.wallpaper_resolution_checkbox.setToolTip(tr('options.enable_wallpaper_resolution_tooltip'))
+        self.wallpaper_resolution_checkbox.setChecked(self.parent.settings.value(
+            "resolution_family_wallpaper_enabled",
+            DEFAULT_CUSTOM_RESOLUTIONS["resolution_family_wallpaper_enabled"], type=bool))
+        cl.addWidget(self.wallpaper_resolution_checkbox)
+
+        cl.addSpacing(8)
+        custom_title = QLabel(tr('options.custom_resolutions_title'))
+        custom_title.setStyleSheet("font-weight: bold;")
+        cl.addWidget(custom_title)
+        custom_desc = QLabel(tr('options.custom_resolutions_desc'))
+        custom_desc.setWordWrap(True)
+        custom_desc.setStyleSheet("color: gray; font-size: 10px;")
+        cl.addWidget(custom_desc)
+
+        for n in range(1, 7):
+            row = QHBoxLayout()
+            chk = QCheckBox(tr('options.custom_resolution_n').format(n))
+            chk.setChecked(self.parent.settings.value(
+                f"custom_resolution_{n}_enabled",
+                DEFAULT_CUSTOM_RESOLUTIONS[f"custom_resolution_{n}_enabled"], type=bool))
+            setattr(self, f"custom_res_{n}_checkbox", chk)
+
+            w_edit = QLineEdit(str(self.parent.settings.value(
+                f"custom_resolution_{n}_width",
+                DEFAULT_CUSTOM_RESOLUTIONS[f"custom_resolution_{n}_width"])))
+            w_edit.setMaximumWidth(60)
+            w_edit.setAlignment(Qt.AlignRight)
+            setattr(self, f"custom_res_{n}_width", w_edit)
+
+            h_edit = QLineEdit(str(self.parent.settings.value(
+                f"custom_resolution_{n}_height",
+                DEFAULT_CUSTOM_RESOLUTIONS[f"custom_resolution_{n}_height"])))
+            h_edit.setMaximumWidth(60)
+            h_edit.setAlignment(Qt.AlignRight)
+            setattr(self, f"custom_res_{n}_height", h_edit)
+
+            row.addWidget(chk)
+            row.addWidget(w_edit)
+            row.addWidget(QLabel("×"))
+            row.addWidget(h_edit)
+            row.addStretch()
+            cl.addLayout(row)
+
+        cl.addStretch()
+        return page
+
+    def _build_interface_page(self):
+        page, cl = self._make_page_frame(
+            tr('options_nav.interface'), tr('options_nav.interface_desc'))
+
+        # Theme
+        theme_title = QLabel("테마 설정")
+        theme_title.setStyleSheet("font-weight: bold;")
+        cl.addWidget(theme_title)
+
+        theme_row = QHBoxLayout()
+        theme_row.addWidget(QLabel("테마 모드:"))
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItems(["기본 테마 (System Default)", "어두운 모드 (Dark)", "밝은 모드 (Light)"])
+        self.theme_combo.setCurrentText(
+            self.parent.settings.value("theme_mode", "기본 테마 (System Default)"))
+        theme_row.addWidget(self.theme_combo, 1)
+        cl.addLayout(theme_row)
+
+        accent_row = QHBoxLayout()
+        self.accent_color_btn = QPushButton("액센트 색상 변경")
+        self.accent_color_btn.clicked.connect(self.pick_accent_color)
+        accent_row.addWidget(self.accent_color_btn)
+        accent_row.addStretch()
+        cl.addLayout(accent_row)
+
+        cl.addSpacing(10)
+
+        # Font
+        font_title = QLabel("글꼴 설정")
+        font_title.setStyleSheet("font-weight: bold;")
+        cl.addWidget(font_title)
+
+        font_row = QHBoxLayout()
+        font_row.addWidget(QLabel("글꼴 크기:"))
+        self.font_size_spinbox = QSpinBox()
+        self.font_size_spinbox.setRange(8, 32)
+        self.font_size_spinbox.setValue(int(self.parent.settings.value("nag_font_size", 18)))
+        font_row.addWidget(self.font_size_spinbox)
+        font_row.addStretch()
+        cl.addLayout(font_row)
+
+        cl.addSpacing(10)
+
+        # Prompt colors
+        prompt_title = QLabel("프롬프트 설정")
+        prompt_title.setStyleSheet("font-weight: bold;")
+        cl.addWidget(prompt_title)
+
+        self.emphasis_highlight_checkbox = QCheckBox("가중치 하이라이트 활성화 (::)")
+        self.emphasis_highlight_checkbox.setChecked(
+            self.parent.settings.value("emphasis_highlight", True, type=bool))
+        self.emphasis_highlight_checkbox.setToolTip(
+            "프롬프트 내 가중치 구문(1.5::텍스트::)을 색상으로 강조합니다")
+        cl.addWidget(self.emphasis_highlight_checkbox)
+
+        colors_row = QHBoxLayout()
+        colors_row.addWidget(QLabel("강조(>1) 색상:"))
+        self.high_emphasis_btn = QPushButton()
+        high_color = QColor(self.parent.settings.value("high_emphasis_color", "#6495ED"))
+        self.high_emphasis_btn.setStyleSheet(f"background-color: {high_color.name()}")
+        self.high_emphasis_btn.setFixedWidth(40)
+        self.high_emphasis_btn.clicked.connect(lambda: self.pick_emphasis_color("high"))
+        colors_row.addWidget(self.high_emphasis_btn)
+        colors_row.addSpacing(16)
+        colors_row.addWidget(QLabel("약화(<1) 색상:"))
+        self.low_emphasis_btn = QPushButton()
+        low_color = QColor(self.parent.settings.value("low_emphasis_color", "#A9A9A9"))
+        self.low_emphasis_btn.setStyleSheet(f"background-color: {low_color.name()}")
+        self.low_emphasis_btn.setFixedWidth(40)
+        self.low_emphasis_btn.clicked.connect(lambda: self.pick_emphasis_color("low"))
+        colors_row.addWidget(self.low_emphasis_btn)
+        colors_row.addStretch()
+        cl.addLayout(colors_row)
+
+        overlay_row = QHBoxLayout()
+        overlay_row.addWidget(QLabel("오버레이 텍스트 색상:"))
+        self.overlay_text_color_btn = QPushButton()
+        overlay_color = QColor(self.parent.settings.value("overlay_text_color", "#ffffff"))
+        self.overlay_text_color_btn.setStyleSheet(f"background-color: {overlay_color.name()}")
+        self.overlay_text_color_btn.setFixedWidth(40)
+        self.overlay_text_color_btn.clicked.connect(self.pick_overlay_text_color)
+        overlay_row.addWidget(self.overlay_text_color_btn)
+        overlay_row.addStretch()
+        cl.addLayout(overlay_row)
+
+        help_text = QLabel(
+            "V4 모델에서는 ::를 사용해 가중치를 직접 지정할 수 있습니다. 예: 1.5::강조할 텍스트::")
+        help_text.setWordWrap(True)
+        help_text.setStyleSheet("color: gray; font-size: 10px;")
+        cl.addWidget(help_text)
+
+        cl.addStretch()
+        return page
+
+    def _build_tags_page(self):
+        page, cl = self._make_page_frame(
+            tr('options_nav.tags'), tr('options_nav.tags_desc'))
+
+        cl.addWidget(QLabel("태그 자동완성 파일 (Tag Completion File):"))
+
+        tag_row = QHBoxLayout()
         self.tag_completion_path = QLineEdit(
             self.parent.settings.value("path_tag_completion", DEFAULT_TAGCOMPLETION_PATH))
-        tag_file_button = QPushButton("찾아보기")
-        tag_file_button.clicked.connect(self.browse_tag_file)
-        tag_file_layout = QHBoxLayout()
-        tag_file_layout.addWidget(tag_file_label)
-        tag_file_layout.addWidget(self.tag_completion_path)
-        tag_file_layout.addWidget(tag_file_button)
-        tag_layout.addLayout(tag_file_layout)
+        tag_btn = QPushButton("찾아보기")
+        tag_btn.clicked.connect(self.browse_tag_file)
+        tag_row.addWidget(self.tag_completion_path, 1)
+        tag_row.addWidget(tag_btn)
+        cl.addLayout(tag_row)
 
-        # 태그 파일 경로 도움말
         tag_help = QLabel("※ CSV 파일 형식: tag_name[post_count] (한 줄에 하나씩)")
         tag_help.setWordWrap(True)
         tag_help.setStyleSheet("color: gray; font-size: 10px;")
-        tag_layout.addWidget(tag_help)
+        cl.addWidget(tag_help)
 
-        # 태그 새로고침 버튼
-        tag_refresh_button = QPushButton("태그 새로고침")
-        tag_refresh_button.setToolTip("태그 목록을 다시 로드합니다.\n태그 파일 변경 후 사용하세요.")
-        tag_refresh_button.clicked.connect(self.refresh_tags)
-        tag_layout.addWidget(tag_refresh_button)
+        refresh_btn = QPushButton("태그 새로고침")
+        refresh_btn.setToolTip("태그 목록을 다시 로드합니다.\n태그 파일 변경 후 사용하세요.")
+        refresh_btn.clicked.connect(self.refresh_tags)
+        cl.addWidget(refresh_btn)
 
-        tag_group.setLayout(tag_layout)
+        cl.addStretch()
+        return page
 
-        # 오른쪽 컬럼에 추가
-        right_column.addWidget(theme_group)
-        right_column.addWidget(prompt_group)
-        right_column.addWidget(font_group)
-        right_column.addWidget(filename_group)
-        right_column.addWidget(tag_group)
+    def _build_log_page(self):
+        page, cl = self._make_page_frame(
+            tr('options_nav.log'), tr('options_nav.log_desc'))
 
-        # Add stretch to push content to top
-        left_column.addStretch()
-        right_column.addStretch()
+        self.debug_mode_checkbox = QCheckBox("디버그 모드 활성화")
+        self.debug_mode_checkbox.setToolTip("활성화하면 상세한 로그가 파일에 기록됩니다")
+        self.debug_mode_checkbox.setChecked(
+            self.parent.settings.value("debug_mode", False, type=bool))
+        cl.addWidget(self.debug_mode_checkbox)
 
-        # Set widgets on scroll areas
-        left_scroll.setWidget(left_widget)
-        right_scroll.setWidget(right_widget)
+        level_row = QHBoxLayout()
+        level_row.addWidget(QLabel("로그 상세 수준:"))
+        self.log_level_combo = QComboBox()
+        self.log_level_combo.addItems(["NORMAL", "DETAILED"])
+        current_level = self.parent.settings.value("log_level", "NORMAL")
+        idx = self.log_level_combo.findText(current_level)
+        if idx >= 0:
+            self.log_level_combo.setCurrentIndex(idx)
+        level_row.addWidget(self.log_level_combo)
+        level_row.addStretch()
+        cl.addLayout(level_row)
 
-        # 왼쪽과 오른쪽 스크롤 영역을 수평 레이아웃에 추가
-        content_layout.addWidget(left_scroll)
-        content_layout.addWidget(right_scroll)
+        log_desc = QLabel("NORMAL: 일반적인 작업 정보, DETAILED: 상세한 디버깅 정보")
+        log_desc.setWordWrap(True)
+        log_desc.setStyleSheet("color: gray; font-size: 10px;")
+        cl.addWidget(log_desc)
 
-        # 컨텐츠 레이아웃을 메인 레이아웃에 추가
-        main_layout.addLayout(content_layout)
+        cl.addSpacing(8)
 
-        # 저장 & 취소 버튼
-        button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.save_option)
-        button_box.rejected.connect(self.reject)
-        main_layout.addWidget(button_box)
+        log_path_row = QHBoxLayout()
+        log_path_row.addWidget(QLabel("로그 파일 위치:"))
+        self.log_path = QLineEdit(self.parent.settings.value(
+            "log_folder",
+            os.path.join(os.path.expanduser("~"), "NAI-Auto-Generator", "logs")))
+        log_path_btn = QPushButton("찾아보기")
+        log_path_btn.clicked.connect(lambda: self.browse_folder("log_folder"))
+        log_path_row.addWidget(self.log_path, 1)
+        log_path_row.addWidget(log_path_btn)
+        cl.addLayout(log_path_row)
 
-        self.setLayout(main_layout)
+        open_log_btn = QPushButton("로그 폴더 열기")
+        open_log_btn.clicked.connect(self.open_log_folder)
+        cl.addWidget(open_log_btn)
+
+        cl.addStretch()
+        return page
 
     def open_log_folder(self):
         """로그 폴더 열기"""

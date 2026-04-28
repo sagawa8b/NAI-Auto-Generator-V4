@@ -1,4 +1,7 @@
 import re
+from dataclasses import dataclass
+from typing import Optional
+
 from PyQt5.QtWidgets import QCompleter, QTextEdit
 from PyQt5.QtGui import QTextCursor, QTextCharFormat, QFont, QColor
 from PyQt5.QtCore import Qt, QStringListModel
@@ -8,6 +11,73 @@ from logger import get_logger
 logger = get_logger()
 
 # complete_target_stringset = string.ascii_letters + string.digits + "~!#$%^&*_+?.-="
+
+
+@dataclass
+class TagData:
+    name: str
+    post_count: int
+
+
+def parse_tag_line(line: str) -> Optional[TagData]:
+    """
+    지원 형식:
+    - "태그명[게시물수]"  (예: "1girl[5097077]")
+    - "태그명,게시물수"   (CSV 형식)
+    - "태그명"           (게시물수 없음 → 0)
+    잘못된 형식은 None 반환 + 로그 경고.
+    """
+    if not line or not line.strip():
+        return None
+
+    line = line.strip()
+
+    # Format 1: 태그명[게시물수]
+    if '[' in line or ']' in line:
+        if not (line.count('[') == 1 and line.count(']') == 1 and line.endswith(']')):
+            logger.warning(f"대괄호 불일치: {line}")
+            return None
+        bracket_start = line.index('[')
+        name = line[:bracket_start]
+        count_str = line[bracket_start + 1:-1]
+        if not name:
+            logger.warning(f"빈 태그명: {line}")
+            return None
+        try:
+            post_count = int(count_str)
+        except ValueError:
+            logger.warning(f"게시물수가 숫자가 아님: {line}")
+            return None
+        if post_count < 0:
+            logger.warning(f"음수 게시물수: {line}")
+            return None
+        return TagData(name=name, post_count=post_count)
+
+    # Format 2: 태그명,게시물수 (CSV)
+    if ',' in line:
+        parts = line.split(',', 1)
+        name = parts[0].strip()
+        count_str = parts[1].strip()
+        if not name:
+            logger.warning(f"빈 태그명: {line}")
+            return None
+        try:
+            post_count = int(count_str)
+        except ValueError:
+            logger.warning(f"게시물수가 숫자가 아님: {line}")
+            return None
+        if post_count < 0:
+            logger.warning(f"음수 게시물수: {line}")
+            return None
+        return TagData(name=name, post_count=post_count)
+
+    # Format 3: 태그명 (게시물수 없음)
+    return TagData(name=line, post_count=0)
+
+
+def format_tag_display(tag: TagData) -> str:
+    """TagData → "태그명[게시물수]" 형식 문자열"""
+    return f"{tag.name}[{tag.post_count}]"
 
 
 class CustomCompleter(QCompleter):
@@ -22,39 +92,34 @@ class CustomCompleter(QCompleter):
 
     def setCompletionPrefix(self, prefix):
         self.prefix = prefix
-        
-        # 최소 2글자 이상부터 검색 (성능 향상)
         if len(prefix) < 2:
             self.model.setStringList([])
             super().setCompletionPrefix(prefix)
             return
-            
-        is_add_mode = len(self.prefix) > 3
-        prefix_lower = self.prefix.lower()
-        filtered_words = []
+
+        # 공백 → 언더스코어 변환
+        normalized = prefix.replace(" ", "_").lower()
+        is_add_mode = len(normalized) > 3
+
+        prefix_matches = []
         contains_matches = []
 
-        # 전체 태그 검색 (조기 중단 최적화로 성능 보장)
-        for i in range(len(self.words)):
-            word = self.words[i]
+        for word in self.words:
             word_lower = word.lower()
-            if word_lower.startswith(prefix_lower):
-                filtered_words.append(word)
-                # 시작 일치 항목이 일정 수 이상이면 중단
-                if len(filtered_words) > 50:
-                    break
-            elif is_add_mode and prefix_lower in word_lower:
-                contains_matches.append(word)
-                # 포함 일치 항목이 일정 수 이상이면 중단
-                if len(contains_matches) > 50:
-                    break
+            # "[숫자]" 부분 제거 후 비교
+            tag_part = word_lower.split('[')[0] if '[' in word_lower else word_lower
+            if tag_part.startswith(normalized):
+                if len(prefix_matches) < 50:
+                    prefix_matches.append(word)
+            elif is_add_mode and normalized in tag_part:
+                if len(contains_matches) < 50:
+                    contains_matches.append(word)
+            # Early exit when both lists are full
+            if len(prefix_matches) >= 50 and len(contains_matches) >= 50:
+                break
 
-        # 최대 표시 항목 제한
-        if is_add_mode:
-            filtered_words.extend(sorted(contains_matches)[:50])
-        
-        # 목록 업데이트
-        self.model.setStringList(filtered_words)
+        filtered = prefix_matches + contains_matches
+        self.model.setStringList(filtered)
         super().setCompletionPrefix(prefix)
         self.complete()
 

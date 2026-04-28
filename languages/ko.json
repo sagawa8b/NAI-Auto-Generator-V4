@@ -3,7 +3,7 @@
   "language_code": "ko",
   "translations": {
     "menu": {
-	  "languages": "언어",
+      "languages": "언어",
       "file": "파일(Files)",
       "open_file": "파일 열기(Open file)",
       "save_settings": "설정 저장(Save Settings)",
@@ -15,7 +15,7 @@
       "view": "보기",
       "toggle_panel": "결과 패널 토글",
       "reset_image_size": "이미지 창 크기 초기화",
-	  "reset_layout": "레이아웃 초기화",
+      "reset_layout": "레이아웃 초기화",
       "etc": "기타(Etc)",
       "about": "만든 이(About)"
     },
@@ -36,9 +36,10 @@
       "tags_reloaded": "태그 자동완성이 새로고침되었습니다."
     },
     "ui": {
-	  "languages": "언어",
+      "languages": "언어",
       "prompt_group": "프롬프트",
-	  "prompt": "프롬프트(Prompt):",
+      "prompt": "프롬프트",
+      "base_prompt": "Base 프롬프트",
       "negative_prompt": "네거티브 프롬프트(Negative Prompt):",
       "prompt_placeholder": "이미지에 포함할 내용을 입력하세요...",
       "negative_prompt_placeholder": "이미지에서 제외할 내용을 입력하세요...",
@@ -54,15 +55,15 @@
       "position": "위치",
       "negative_tab": "네거티브",
       "char_position_clear": "위치 초기화",
-	  "reset_image_size": "이미지 크기 초기화",
-	  "reset_image_size_tooltip": "결과 이미지 창을 기본 크기로 복원합니다",
-	  "custom_resolution": "Custom (직접 입력)",
-	  "session_status": "세션 상태",
-	  "img2img_title": "이미지 to 이미지",
-	  "reference_image_title": "레퍼런스 이미지",
-	  "no_uploaded_image": "업로드된 이미지 없음",
-	  "load_image": "불러오기",
-	  "select_folder": "폴더",
+      "reset_image_size": "이미지 크기 초기화",
+      "reset_image_size_tooltip": "결과 이미지 창을 기본 크기로 복원합니다",
+      "custom_resolution": "Custom (직접 입력)",
+      "session_status": "세션 상태",
+      "img2img_title": "이미지 to 이미지",
+      "reference_image_title": "레퍼런스 이미지",
+      "no_uploaded_image": "업로드된 이미지 없음",
+      "load_image": "불러오기",
+      "select_folder": "폴더",
       "char_position_dialog_title": "캐릭터 위치 선택",
       "char_position_grid_info": "원하는 위치를 클릭하세요 (5x5 그리드)",
       "char_done": "완료",
@@ -97,23 +98,23 @@
       "title": "Generate",
       "once": "1회 생성",
       "by_settings": "세팅별 연속 생성",
-      "auto": "연속 생성 (Auto)",
+      "auto": "연속 생성",
       "stop": "생성 중지"
     },
-	"generate_dialog": {
-	  "title": "연속 생성 옵션",
-	  "preset_group": "연속생성 매수 (클릭 즉시 생성)",
-	  "manual_group": "연속생성 수동 입력",
-	  "settings_group": "기타 설정",
-	  "count_5": "5장",
-	  "count_10": "10장", 
-	  "count_50": "50장",
-	  "count_100": "100장",
-	  "count_label": "생성 횟수:",
-	  "count_unlimited": "(-1 = 무제한)",
-	  "delay_label": "생성 간격(초):",
-	  "ignore_error": "생성 오류 무시하기"
-	},
+    "generate_dialog": {
+      "title": "연속 생성 옵션",
+      "preset_group": "연속생성 매수 (클릭 즉시 생성)",
+      "manual_group": "연속생성 수동 입력",
+      "settings_group": "기타 설정",
+      "count_5": "5장",
+      "count_10": "10장",
+      "count_50": "50장",
+      "count_100": "100장",
+      "count_label": "생성 횟수:",
+      "count_unlimited": "(-1 = 무제한)",
+      "delay_label": "생성 간격(초):",
+      "ignore_error": "생성 오류 무시하기"
+    },
     "folders": {
       "title": "폴더",
       "results": "생성 결과 폴더",
@@ -159,10 +160,10 @@
       "stopped": "중지됨 ({}/{}개 이미지 처리됨)"
     },
     "result": {
-      "image_title": "결과 이미지 (Result Image)",
+      "image_title": "결과 이미지",
       "no_image": "결과 이미지가 없습니다",
-      "save_image": "이미지 저장 (Save Image)",
-      "prompt_title": "결과 프롬프트 (Result Prompt)",
+      "save_image": "이미지 저장",
+      "prompt_title": "결과 프롬프트",
       "overlay_toggle": "프롬프트 결과 표시"
     },
     "dialogs": {
@@ -235,8 +236,7 @@
       "api_err_detail": "{}\n\n기술적 정보: {}",
       "settings_load_caption": "불러올 세팅 파일들을 선택해주세요",
       "settings_select_min_two": "두개 이상 선택해주세요.",
-      "settings_txt_only": ".txt로 된 세팅 파일만 선택해주세요.",
-      "warning": "경고"
+      "settings_txt_only": ".txt로 된 세팅 파일만 선택해주세요."
     },
     "connection": {
       "server": "서버:",
@@ -260,15 +260,15 @@
       "anlas": "Anlas:",
       "unknown": "알 수 없음"
     },
-	"character_reference": {
-		"title": "Character Reference",
-		"select_image": "이미지 선택",
-		"remove_image": "이미지 제거",
-		"no_image": "이미지 없음",
-		"style_aware": "Style Aware",
-		"style_aware_description": "레퍼런스에서 스타일 정보 포함",
-		"error_load_image": "이미지 로딩 실패: {}"
-	},
+    "character_reference": {
+      "title": "Character Reference",
+      "select_image": "이미지 선택",
+      "remove_image": "이미지 제거",
+      "no_image": "이미지 없음",
+      "style_aware": "Style Aware",
+      "style_aware_description": "레퍼런스에서 스타일 정보 포함",
+      "error_load_image": "이미지 로딩 실패: {}"
+    },
     "options": {
       "resolution_settings": "해상도 설정 (Resolution Settings)",
       "anlas_resolution_warning": "※ Large 및 Wallpaper 해상도는 Anlas를 사용합니다. 비활성화하면 실수로 사용하는 것을 방지할 수 있습니다.",
@@ -279,6 +279,22 @@
       "custom_resolutions_title": "커스텀 해상도",
       "custom_resolutions_desc": "랜덤 생성에 사용할 최대 6개의 커스텀 해상도를 정의합니다.\n※ 기본 해상도(1024x1024)를 초과하는 해상도는 Anlas를 소비합니다.",
       "custom_resolution_n": "커스텀 {}"
+    },
+    "options_nav": {
+      "folders": "폴더 경로",
+      "folders_desc": "생성 결과, 설정 파일, 와일드카드 폴더 경로를 설정합니다.",
+      "filename": "파일명 설정",
+      "filename_desc": "저장되는 파일명 형식을 설정합니다.",
+      "generation": "연속 생성",
+      "generation_desc": "연속 생성 버튼의 기본 생성 수와 간격을 설정합니다.",
+      "resolution": "해상도",
+      "resolution_desc": "해상도 활성화 및 커스텀 해상도를 설정합니다.",
+      "interface": "인터페이스",
+      "interface_desc": "테마, 글꼴 크기, 프롬프트 색상 등 인터페이스 설정을 변경합니다.",
+      "tags": "태그 자동완성",
+      "tags_desc": "태그 자동완성 파일 경로를 설정합니다.",
+      "log": "로그 설정",
+      "log_desc": "디버그 모드 및 로그 설정을 관리합니다."
     }
   }
 }

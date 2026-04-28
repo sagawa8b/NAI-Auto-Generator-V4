@@ -34,11 +34,12 @@ import naiinfo_getter
 from nai_generator import NAIGenerator, NAIAction, NAISessionManager
 from wildcard_applier import WildcardApplier
 from danbooru_tagger import DanbooruTagger
+from completer import parse_tag_line, format_tag_display, TagData
 from logger import get_logger
 logger = get_logger()
 
 
-TITLE_NAME = "NAI Auto Generator V4.5_2.6.04.10"
+TITLE_NAME = "NAI Auto Generator V4.5_2.6.04.28"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
@@ -3337,7 +3338,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         """ if is_autogenrate else ""
         self.button_generate_auto.setStyleSheet(stylesheet)
         self.button_generate_auto.setText(
-            "생성 중지" if is_autogenrate else "연속 생성")
+            tr('generate.stop') if is_autogenrate else tr('generate.auto'))
         self.button_generate_auto.setDisabled(False)
 
     def apply_wildcards(self, prompt):
@@ -4284,21 +4285,14 @@ class CompletionTagLoadThread(QThread):
             # CSV 파일 처리
             if os.path.exists(tag_path):
                 logger.error(f"태그 파일 로딩 중: {tag_path}")
-                if tag_path.endswith('.csv'):
-                    with open(tag_path, "r", encoding='utf8') as f:
-                        for line in f:
-                            line = line.strip()
-                            if ',' in line:  # CSV 형식 확인
-                                parts = line.split(',')
-                                if len(parts) >= 2:
-                                    tag = parts[0]
-                                    count = parts[1]
-                                    tag_list.append(f"{tag}[{count}]")
-                            else:  # 일반 텍스트 형식
-                                tag_list.append(line)
-                else:
-                    with open(tag_path, "r", encoding='utf8') as f:
-                        tag_list = [line.strip() for line in f.readlines()]
+                tags = []
+                with open(tag_path, "r", encoding='utf8') as f:
+                    for line in f:
+                        parsed = parse_tag_line(line)
+                        if parsed is not None:
+                            tags.append(parsed)
+                tags = sorted(tags, key=lambda t: t.post_count, reverse=True)
+                tag_list = [format_tag_display(t) for t in tags]
                         
                 logger.info(f"태그 로딩 완료: {len(tag_list)}개 태그")
                 

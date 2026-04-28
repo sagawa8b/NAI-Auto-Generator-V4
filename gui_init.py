@@ -139,7 +139,7 @@ def init_advanced_prompt_group(parent):
     # Tab 0: 메인 프롬프트
     parent.dict_ui_settings["prompt"] = CompletionTextEdit()
     parent.dict_ui_settings["prompt"].setPlaceholderText(tr('ui.prompt_placeholder'))
-    tab_widget.addTab(parent.dict_ui_settings["prompt"], tr('ui.prompt'))
+    tab_widget.addTab(parent.dict_ui_settings["prompt"], tr('ui.base_prompt'))
 
     # Tab 1: 네거티브 프롬프트
     parent.dict_ui_settings["negative_prompt"] = CompletionTextEdit()
@@ -149,7 +149,7 @@ def init_advanced_prompt_group(parent):
     # 탭 레이블에 문자 수 업데이트
     def update_prompt_tab_label():
         count = len(parent.dict_ui_settings["prompt"].toPlainText())
-        label = tr('ui.prompt') if count == 0 else f"{tr('ui.prompt')} ({count})"
+        label = tr('ui.base_prompt') if count == 0 else f"{tr('ui.base_prompt')} ({count})"
         tab_widget.setTabText(0, label)
 
     def update_neg_tab_label():
@@ -964,10 +964,9 @@ def init_main_widget(parent):
     parent.button_generate_auto.clicked.connect(parent.on_click_generate_auto)
     hbox_image_buttons.addWidget(parent.button_generate_auto)
 
-    # 세팅별 연속 생성은 UI에 표시하지 않고 내부에서만 사용
     parent.button_generate_sett = QPushButton(tr('generate.by_settings'))
     parent.button_generate_sett.clicked.connect(parent.on_click_generate_sett)
-    parent.button_generate_sett.setVisible(False)
+    hbox_image_buttons.addWidget(parent.button_generate_sett)
 
     # 구분선
     btn_separator = QFrame()
