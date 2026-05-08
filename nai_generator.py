@@ -6,6 +6,7 @@ import random
 import json
 import io
 import time
+import threading
 import zipfile
 import logging
 from enum import Enum
@@ -57,7 +58,7 @@ class NAISessionManager:
         self.logger = logging.getLogger('nai_session_manager')
         self.logger.setLevel(logging.INFO)
     
-    def update(self):
+    def update(self) -> float:
         """정기적으로 호출할 통합 세션 관리 함수 - 적응형 간격 적용"""
         current_time = time.time()
         
@@ -103,7 +104,7 @@ class NAISessionManager:
         self._update_session_health()
         return self.session_health
     
-    def check_network_availability(self):
+    def check_network_availability(self) -> bool:
         """네트워크 연결 가능 여부 확인 (추가)"""
         try:
             # DNS 서버 체크 - 가볍게 확인
@@ -137,7 +138,7 @@ class NAISessionManager:
         # 종합 건강도 계산
         self.session_health = min(1.0, (error_factor * 0.4) + (count_factor * 0.4) + (time_factor * 0.2))
     
-    def perform_session_check(self):
+    def perform_session_check(self) -> bool:
         """전체 세션 유효성 확인 - 오류 처리 강화"""
         try:
             if not self.nai.check_logged_in():
@@ -211,7 +212,7 @@ class NAISessionManager:
                 return self.perform_session_check()
             return False
             
-    def force_refresh(self):
+    def force_refresh(self) -> bool:
         """타이밍과 관계없이 강제 토큰 갱신 - 재시도 로직 추가"""
         max_attempts = 3
         backoff_factor = 1.5
@@ -239,7 +240,7 @@ class NAISessionManager:
         self.consecutive_errors += 1
         return False
             
-    def increment_image_count(self):
+    def increment_image_count(self) -> int:
         """각 이미지 생성 후 호출 - 활동 기록"""
         self.image_count_since_login += 1
         self.last_activity_time = time.time()
@@ -385,6 +386,7 @@ class NAIGenerator():
         self._last_token_check = 0
         self._last_successful_check = 0
         self._estimated_token_lifetime = 24 * 3600  # 초기 예상: 24시간
+        self._refresh_lock = threading.Lock()
         
         self.parameters = {
             # 기본 입력
@@ -450,8 +452,19 @@ class NAIGenerator():
                         
         }
     
-    def refresh_token(self):
+    def refresh_token(self) -> bool:
         """토큰 갱신 최적화 - 오류 추적 및 스마트 재시도"""
+        if not self._refresh_lock.acquire(blocking=False):
+            logger.debug("토큰 갱신 이미 진행 중 - 스킵")
+            return True
+
+        try:
+            return self._refresh_token_locked()
+        finally:
+            self._refresh_lock.release()
+
+    def _refresh_token_locked(self) -> bool:
+        """refresh_token 내부 구현 - _refresh_lock 보유 상태에서 호출"""
         logger.debug("토큰 갱신 시도")
 
         # API 키 로그인은 pst-... 토큰이 만료되지 않으므로 검증만 수행
@@ -513,7 +526,7 @@ class NAIGenerator():
         return False
         
         
-    def try_login(self, username, password):
+    def try_login(self, username: str, password: str) -> bool:
         # get_access_key
         access_key = argon_hash(username, password, 64, "novelai_data_access_key")[:64]
         try:
@@ -571,7 +584,7 @@ class NAIGenerator():
         logger.info("API 키 로그인 성공")
         return True
 
-    def set_param(self, param_key: NAIParam, param_value):
+    def set_param(self, param_key: NAIParam, param_value) -> None:
         # param_key type check
         assert(isinstance(param_key, NAIParam))
         # param_value type check
@@ -580,7 +593,7 @@ class NAIGenerator():
 
         self.parameters[param_key.name] = param_value
 
-    def set_param_dict(self, param_dict):
+    def set_param_dict(self, param_dict: dict) -> None:
         # V4 API에서만 사용하는 특별한 파라미터들
         special_params = ["legacy_v3_extend", "noise_schedule", "params_version",
                           "characterPrompts", "v4_prompt", "v4_negative_prompt", "model",
@@ -604,7 +617,7 @@ class NAIGenerator():
                     logger.debug(f"파라미터 무시: {k} (원인: {e})")
                     continue
 
-    def get_anlas(self):
+    def get_anlas(self) -> int | None:
         try:
             response = requests.get(BASE_URL_DEPRE + "/user/subscription", headers={
                 "Authorization": f"Bearer {self.access_token}"})
@@ -619,208 +632,158 @@ class NAIGenerator():
 
         return None
 
-    def generate_image(self, action: NAIAction):
-        assert(isinstance(action, NAIAction))
-        
-        logger.debug("=== generate_image 메서드 시작 ===")
-        
-        
-        # 요청 추적을 위한 ID 생성
+    def generate_image(self, action: NAIAction) -> bytes | tuple[None, str]:
+        assert isinstance(action, NAIAction)
+
         import uuid
         request_id = str(uuid.uuid4())[:8]
         logger.info(f"Image generation request started [ID: {request_id}] - {action.name}")
 
-        # 모델 선택 (파라미터에서 가져오기)
-        model = self.parameters.get("model", "nai-diffusion-4-5-curated")
-        
-        # Infill 모드일 경우 모델명에 inpainting 추가
-        if action == NAIAction.infill:
-            if "4-5" in model:
-                model = "nai-diffusion-4-5-full-inpainting"
-            elif model != "nai-diffusion-3":
-                model = "nai-diffusion-4-full-inpainting"
-            # V3는 전용 inpainting 모델이 없으므로 그대로 사용
-        
-        logger.info(f"[GEN] [{request_id}] generate_image 메서드 시작")
-        
-        # 시드 설정
+        model = self._resolve_model(action)
+
         if self.parameters["extra_noise_seed"] == -1:
             self.parameters["extra_noise_seed"] = self.parameters["seed"]
 
-        # *** V4 구조에 맞게 파라미터 변환 ***
-        logger.info(f"[GEN] [{request_id}] V4 파라미터 변환 호출 직전")
         self._prepare_v4_parameters()
-        logger.info(f"[GEN] [{request_id}] V4 파라미터 변환 호출 완료")
 
-        # *** Infill 모드일 경우 img2img 파라미터 구조화 ***
         if action == NAIAction.infill:
-            logger.info(f"[GEN] [{request_id}] Infill 모드 - img2img 파라미터 구조화")
+            self._prepare_infill_params(request_id)
 
-            # 마스크 존재 확인
-            has_mask = "mask" in self.parameters and self.parameters["mask"] is not None
-            if has_mask:
-                mask_size = len(self.parameters["mask"]) if isinstance(self.parameters["mask"], str) else 0
-                logger.info(f"[OK] Mask detected in parameters - size: {mask_size} bytes")
-            else:
-                logger.warning(f"[WARN] WARNING: Infill mode but NO MASK in parameters!")
-
-            # Get strength value from slider for img2img and inpaintImg2ImgStrength
-            img2img_strength = self.parameters.get("strength", 0.5)
-
-            # img2img 네스트 객체 생성 (웹 UI 구조와 일치)
-            img2img_params = {
-                "strength": img2img_strength,
-                "color_correct": True
-            }
-
-            # img2img 객체를 parameters에 추가
-            self.parameters["img2img"] = img2img_params
-
-            # 웹 UI와 동일하게 inpaintImg2ImgStrength 추가 (슬라이더 값 사용)
-            self.parameters["inpaintImg2ImgStrength"] = img2img_strength
-
-            # Top-level strength는 웹 UI와 동일하게 ALWAYS 0.7로 설정
-            # 웹 UI 관찰: img2img.strength=0.5, inpaintImg2ImgStrength=0.5, strength=0.7
-            # 세 가지 strength 값이 서로 다른 목적을 가짐
-            self.parameters["strength"] = 0.7  # 항상 0.7 (웹 UI와 동일)
-
-            # noise는 img2img 객체에 포함하지 않음 (웹 UI와 일치)
-            if "noise" in self.parameters:
-                del self.parameters["noise"]
-
-            logger.info(f"[GEN] [{request_id}] img2img params: {img2img_params}")
-            logger.info(f"[GEN] [{request_id}] inpaintImg2ImgStrength: {img2img_strength}")
-            logger.info(f"[GEN] [{request_id}] Top-level strength: {self.parameters.get('strength')} (always 0.7 for infill)")
-            logger.info(f"[GEN] [{request_id}] Mask still in parameters: {has_mask}")
-
-        url = BASE_URL + f"/ai/generate-image"
-
+        url = BASE_URL + "/ai/generate-image"
         data = {
             "input": self.parameters["prompt"],
             "model": model,
             "action": action.name,
             "parameters": self.parameters,
         }
-        
-        # 디버깅: director_reference_* 파라미터 확인
-        if "director_reference_descriptions" in self.parameters:
-            logger.info(f"[GEN] API 전송 데이터에 director_reference_descriptions 포함됨")
-            logger.info(f"[GEN] descriptions 내용: {self.parameters['director_reference_descriptions']}")
-        if "director_reference_images" in self.parameters:
-            logger.info(f"[GEN] API 전송 데이터에 director_reference_images 포함됨: {len(self.parameters['director_reference_images'])}개")
-        
         headers = {"Authorization": f"Bearer {self.access_token}"}
 
-        # API 전송 직전 최종 데이터 로깅 강화
-        logger.info(f"[GEN] [{request_id}] API 전송 직전 최종 데이터 검증:")
-        logger.info(f"  - 모델: {model}")
-        logger.info(f"  - 액션: {action.name}")
-        
-        if "v4_prompt" in self.parameters:
-            v4_prompt = self.parameters["v4_prompt"]
-            logger.info(f"  - v4_prompt use_coords: {v4_prompt.get('use_coords', False)}")
-            char_captions = v4_prompt["caption"].get("char_captions", [])
-            logger.info(f"  - 캐릭터 수: {len(char_captions)}")
-            
-            for i, char_caption in enumerate(char_captions):
-                centers = char_caption.get('centers', [])
-                prompt_preview = char_caption.get('char_caption', '')[:30] + '...'
-                logger.info(f"  - 캐릭터 {i+1}: '{prompt_preview}' -> {centers}")
-        
-        # 캐릭터 프롬프트 로깅 (기존 코드 개선)
-        if "characterPrompts" in self.parameters:
-            logger.debug(f"[{request_id}] 원본 characterPrompts: {len(self.parameters['characterPrompts'])}개")
-        
-        # 네트워크 상태 확인 추가
+        self._log_preflight(request_id, model, action)
+
         if hasattr(self, 'session_manager') and not self.session_manager.network_available:
             logger.error("네트워크 연결 없음 - 이미지 생성 요청 실패")
             return None, "인터넷 연결이 없습니다. 네트워크 상태를 확인해주세요."
-        
-        # 재시도 메커니즘 개선
+
+        return self._execute_api_request(url, data, headers, request_id)
+
+    # ── generate_image 헬퍼 ──────────────────────────────────────────────
+
+    def _resolve_model(self, action: NAIAction) -> str:
+        """action 에 맞는 최종 모델 이름을 반환한다."""
+        model = self.parameters.get("model", "nai-diffusion-4-5-curated")
+        if action == NAIAction.infill:
+            if "4-5" in model:
+                model = "nai-diffusion-4-5-full-inpainting"
+            elif model != "nai-diffusion-3":
+                model = "nai-diffusion-4-full-inpainting"
+        return model
+
+    def _prepare_infill_params(self, request_id: str) -> None:
+        """Infill 액션에 필요한 img2img 파라미터를 self.parameters 에 구성한다."""
+        logger.info(f"[GEN] [{request_id}] Infill 모드 - img2img 파라미터 구조화")
+
+        has_mask = "mask" in self.parameters and self.parameters["mask"] is not None
+        if has_mask:
+            mask_size = len(self.parameters["mask"]) if isinstance(self.parameters["mask"], str) else 0
+            logger.info(f"[OK] Mask detected in parameters - size: {mask_size} bytes")
+        else:
+            logger.warning("[WARN] Infill mode but NO MASK in parameters!")
+
+        img2img_strength = self.parameters.get("strength", 0.5)
+        img2img_params = {"strength": img2img_strength, "color_correct": True}
+
+        self.parameters["img2img"] = img2img_params
+        self.parameters["inpaintImg2ImgStrength"] = img2img_strength
+        # Top-level strength는 웹 UI와 동일하게 항상 0.7
+        self.parameters["strength"] = 0.7
+        self.parameters.pop("noise", None)
+
+        logger.info(f"[GEN] [{request_id}] img2img params: {img2img_params}")
+        logger.info(f"[GEN] [{request_id}] inpaintImg2ImgStrength: {img2img_strength}")
+
+    def _log_preflight(self, request_id: str, model: str, action: NAIAction) -> None:
+        """API 전송 직전 요청 내용을 INFO 레벨로 기록한다."""
+        if "director_reference_descriptions" in self.parameters:
+            logger.info("[GEN] API 전송 데이터에 director_reference_descriptions 포함됨")
+        if "director_reference_images" in self.parameters:
+            logger.info(f"[GEN] director_reference_images: {len(self.parameters['director_reference_images'])}개")
+
+        logger.info(f"[GEN] [{request_id}] 모델: {model}, 액션: {action.name}")
+
+        if "v4_prompt" in self.parameters:
+            v4_prompt = self.parameters["v4_prompt"]
+            char_captions = v4_prompt["caption"].get("char_captions", [])
+            logger.info(f"[GEN] v4_prompt use_coords={v4_prompt.get('use_coords', False)}, 캐릭터 수={len(char_captions)}")
+            for i, cc in enumerate(char_captions):
+                logger.info(f"  - 캐릭터 {i+1}: '{cc.get('char_caption','')[:30]}...' -> {cc.get('centers',[])} ")
+
+        if "characterPrompts" in self.parameters:
+            logger.debug(f"[{request_id}] 원본 characterPrompts: {len(self.parameters['characterPrompts'])}개")
+
+    def _execute_api_request(
+        self, url: str, data: dict, headers: dict, request_id: str
+    ) -> bytes | tuple[None, str]:
+        """지수 백오프 재시도를 포함한 API POST 요청을 수행한다."""
         max_retries = 3
-        retry_delay = 3  # 초 단위
-        dns_error_occurred = False
-        
+        retry_delay = 3
+
         for retry in range(max_retries):
             try:
-                logger.info(f"API request attempt [ID: {request_id}] - attempt {retry+1}/{max_retries}")
+                logger.info(f"API request attempt [ID: {request_id}] - {retry+1}/{max_retries}")
                 response = requests.post(url, json=data, headers=headers, timeout=60)
-                
-                # 상태 코드 확인
-                if response.status_code == 200 or response.status_code == 201:
-                    logger.info(f"API request successful [ID: {request_id}] - status code: {response.status_code}")
+
+                if response.status_code in (200, 201):
+                    logger.info(f"API request successful [ID: {request_id}] - {response.status_code}")
                     if hasattr(self, 'session_manager'):
-                        self.session_manager.consecutive_errors = 0  # 오류 카운터 리셋
+                        self.session_manager.consecutive_errors = 0
                     return response.content
-                else:
-                    # 오류 응답 분석
-                    error_info = f"상태 코드: {response.status_code}"
-                    try:
-                        error_json = response.json()
-                        error_info += f", 메시지: {error_json.get('message', '알 수 없음')}"
-                    except Exception:
-                        error_info += f", 응답: {response.text[:200]}"
-                    
-                    logger.error(f"API error response [ID: {request_id}] - {error_info}")
-                    
-                    # 특정 오류에 따른 처리
-                    if response.status_code == 401:
-                        if self.refresh_token():  # 토큰 갱신 시도
-                            logger.info(f"Token refreshed, retrying request [ID: {request_id}]")
-                            continue  # 요청 재시도
-                        return None, "인증 오류: 로그인이 필요합니다."
-                    elif response.status_code == 402:
-                        return None, "결제 필요: Anlas가 부족합니다."
-                    elif response.status_code >= 500:
-                        # 서버 오류는 더 긴 대기 시간으로 재시도
-                        wait_time = retry_delay * (2 ** retry)
-                        logger.warning(f"서버 오류, {wait_time}초 후 재시도... [ID: {request_id}]")
-                        time.sleep(wait_time)
+
+                # 오류 응답 분석
+                try:
+                    error_msg = response.json().get('message', '알 수 없음')
+                except Exception:
+                    error_msg = response.text[:200]
+                logger.error(f"API error [ID: {request_id}] {response.status_code}: {error_msg}")
+
+                if response.status_code == 401:
+                    if self.refresh_token():
                         continue
-                        
-            except requests.exceptions.Timeout:
-                logger.error(f"API request timeout [ID: {request_id}] - attempt {retry+1}/{max_retries}")
-                wait_time = retry_delay * (2 ** retry)
-                time.sleep(wait_time)
-                continue
-                
-            except requests.exceptions.ConnectionError as e:
-                logger.error(f"API request connection error [ID: {request_id}]: {str(e)}")
-                
-                # DNS 오류 감지 (getaddrinfo failed 포함)
-                if "getaddrinfo failed" in str(e) or "NameResolutionError" in str(e):
-                    dns_error_occurred = True
-                    if hasattr(self, 'session_manager'):
-                        self.session_manager.network_available = False
-                        self.session_manager.check_network_availability()  # 즉시 네트워크 상태 확인
-                    
-                    logger.error(f"DNS 해석 실패 - 네트워크 연결 문제")
-                    return None, "인터넷 연결 문제: 서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요."
-                
-                # 일반 연결 오류는 지수 백오프로 재시도
-                wait_time = retry_delay * (2 ** retry)
-                logger.warning(f"연결 오류, {wait_time}초 후 재시도... [ID: {request_id}]")
-                time.sleep(wait_time)
-                continue
-                    
-            except Exception as e:
-                logger.error(f"API request exception [ID: {request_id}]: {str(e)}", exc_info=True)
-                
-                # 마지막 시도가 아니면 재시도
-                if retry < max_retries - 1:
+                    return None, "인증 오류: 로그인이 필요합니다."
+                if response.status_code == 402:
+                    return None, "결제 필요: Anlas가 부족합니다."
+                if response.status_code >= 500:
                     wait_time = retry_delay * (2 ** retry)
-                    logger.warning(f"예외 발생, {wait_time}초 후 재시도... [ID: {request_id}]")
+                    logger.warning(f"서버 오류, {wait_time}초 후 재시도... [ID: {request_id}]")
                     time.sleep(wait_time)
                     continue
-                return None, f"API 요청 오류: {str(e)}"
 
-        # DNS 오류가 발생했다면 다른 메시지 제공
-        if dns_error_occurred:
-            return None, "인터넷 연결 문제: 서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요."
-            
+            except requests.exceptions.Timeout:
+                wait_time = retry_delay * (2 ** retry)
+                logger.error(f"API timeout [ID: {request_id}] attempt {retry+1}")
+                time.sleep(wait_time)
+                continue
+
+            except requests.exceptions.ConnectionError as e:
+                logger.error(f"API connection error [ID: {request_id}]: {e}")
+                if "getaddrinfo failed" in str(e) or "NameResolutionError" in str(e):
+                    if hasattr(self, 'session_manager'):
+                        self.session_manager.network_available = False
+                        self.session_manager.check_network_availability()
+                    return None, "인터넷 연결 문제: 서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요."
+                wait_time = retry_delay * (2 ** retry)
+                time.sleep(wait_time)
+                continue
+
+            except Exception as e:
+                logger.error(f"API exception [ID: {request_id}]: {e}", exc_info=True)
+                if retry < max_retries - 1:
+                    time.sleep(retry_delay * (2 ** retry))
+                    continue
+                return None, f"API 요청 오류: {e}"
+
         return None, "최대 재시도 횟수 초과: 서버에 연결할 수 없습니다."
     
-    def _prepare_v4_parameters(self):
+    def _prepare_v4_parameters(self) -> None:
         """V4 API에 필요한 파라미터 구조로 변환 (V3 모델은 V4 파라미터 제외)"""
         logger.debug("=== _prepare_v4_parameters 메서드 호출됨 ===")
         logger.info("[GEN] _prepare_v4_parameters 메서드 시작")
@@ -1016,7 +979,7 @@ class NAIGenerator():
 
         logger.info("[GEN] _prepare_v4_parameters 메서드 완료")
                         
-    def check_logged_in(self):
+    def check_logged_in(self) -> bool:
         """더 나은 오류 처리를 포함한 로그인 확인"""
         if not self.access_token:
             return False

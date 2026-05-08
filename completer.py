@@ -420,18 +420,34 @@ class CompletionTextEdit(QTextEdit):
         # CSV 형식 처리 (태그[숫자] => 태그)
         actual_text = completion.split('[')[0] if '[' in completion else completion
         actual_text = actual_text.replace("_", " ")
-        
+
         tc = self.textCursor()
-        extra = len(actual_text) - len(self.completer.completionPrefix())
-        tc.movePosition(QTextCursor.Left)
-        tc.movePosition(QTextCursor.EndOfWord)
-        tc.insertText(actual_text[-extra:])
+        pos = tc.position()
+        text = self.toPlainText()
+
+        # 현재 태그 토큰의 시작 위치를 역방향으로 검색 (쉼표/개행까지)
+        start = pos
+        while start > 0 and text[start - 1] not in (',', '\n'):
+            start -= 1
+        current_token = text[start:pos].lstrip()
+
+        # 현재 토큰 전체를 선택하고 완성 텍스트로 교체
+        tc.setPosition(pos - len(current_token))
+        tc.setPosition(pos, QTextCursor.KeepAnchor)
+        tc.insertText(actual_text)
         self.setTextCursor(tc)
 
     def textUnderCursor(self):
         tc = self.textCursor()
-        tc.select(QTextCursor.WordUnderCursor)
-        return tc.selectedText()
+        pos = tc.position()
+        text = self.toPlainText()
+
+        # 쉼표/개행 이전까지 역방향 검색하여 현재 태그 토큰 반환
+        # (Qt WordUnderCursor는 '-'를 단어 경계로 처리하여 태그가 분리되는 문제 해결)
+        start = pos
+        while start > 0 and text[start - 1] not in (',', '\n'):
+            start -= 1
+        return text[start:pos].lstrip()
 
     def keyPressEvent(self, event):
         if self.completer:

@@ -176,6 +176,8 @@ class ResizeHandle(QWidget):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
+            if self._drag_start_y is not None and hasattr(self.target, 'on_user_resize'):
+                self.target.on_user_resize(self.target.height())
             self._drag_start_y = None
             self._drag_start_height = None
 
@@ -204,8 +206,12 @@ class CharacterPromptWidget(QFrame):
 
         # 가로로 꽉 채우고 세로는 고정 (드래그 핸들로 변경 가능)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setFixedHeight(135)
-    
+        saved_height = self.settings.value("character_card_height", 135, type=int)
+        self.setFixedHeight(saved_height)
+
+    def on_user_resize(self, height):
+        self.settings.setValue("character_card_height", height)
+
     def update_title(self):
         """타이틀 업데이트"""
         try:

@@ -5,7 +5,7 @@
 <img width="960" alt="image2" src="https://github.com/sagawa8b/NAI-Auto-Generator-V4/blob/main/nai_ui_02.png">
 <img width="960" alt="image3" src="https://github.com/sagawa8b/NAI-Auto-Generator-V4/blob/main/nai_ui_03.png">
 
-[![Version](https://img.shields.io/badge/version-4.5__2.6.02.04-blue.svg)](https://github.com/sagawa8b/NAI-Auto-Generator-V4/releases)
+[![Version](https://img.shields.io/badge/version-4.5__2.6.04.28-blue.svg)](https://github.com/sagawa8b/NAI-Auto-Generator-V4/releases)
 [![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-orange.svg)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/sagawa8b/NAI-Auto-Generator-V4/total.svg)](https://github.com/sagawa8b/NAI-Auto-Generator-V4/releases)
 
@@ -24,8 +24,11 @@ NovelAI 웹 인터페이스에서 제공하지 않는 자동화 기능들을 제
 - **👤 고급 캐릭터 제어** - Character Prompts와 Character Reference를 통한 정밀한 캐릭터 생성
 - **🖼️ 이미지 편집** - Image to Image, Enhancement, Inpainting 기능
 - **🎭 Vibe Transfer** - 참조 이미지의 분위기와 스타일 적용
-- **⚡ 자동화 기능** - 와일드카드, 배치 생성, 자동 생성 등 워크플로우 최적화
+- **⚡ 자동화 기능** - 와일드카드, 배치 생성, 자동 생성, 일시정지/재개 등 워크플로우 최적화
 - **🌍 다국어 지원** - 한국어, 영어, 일본어, 중국어 인터페이스
+- **🔒 보안** - OS Keyring 기반 자격증명 저장, 로그 민감정보 자동 마스킹
+- **✅ 입력 검증** - 생성 파라미터 자동 검증으로 오류 사전 방지
+- **🏷️ 태그 자동완성** - Danbooru 태그 DB 기반 스마트 자동완성
 
 ### 🚀 빠른 시작
 
@@ -87,7 +90,40 @@ cd NAI-Auto-Generator-V4
 pip install -r requirements.txt
 
 # 실행
-python main.py
+python gui.py
+```
+
+**테스트 실행**
+```bash
+pip install pytest
+pytest tests/ -v
+```
+
+### 📁 프로젝트 구조
+
+```
+NAI-Auto-V4/
+├── gui.py                   - 메인 윈도우 (Mixin 조합)
+├── gui_init.py              - 위젯 초기화 & 레이아웃
+├── gui_generation.py        - 이미지 생성 로직 (Mixin)
+├── gui_enhance.py           - 이미지 향상 (Mixin)
+├── gui_workers.py           - QThread 워커 클래스
+├── gui_network.py           - 네트워크 모니터링 (Mixin)
+├── gui_settings_io.py       - 설정 저장/로드 (Mixin)
+├── gui_image_handlers.py    - 이미지 핸들링 (Mixin)
+├── gui_credentials.py       - 자격증명 보안 저장
+├── gui_dialog.py            - 다이얼로그 윈도우
+├── gui_utils.py             - 유틸리티 함수
+├── nai_generator.py         - NovelAI API 클라이언트
+├── wildcard_applier.py      - 와일드카드 확장 엔진
+├── completer.py             - 태그 자동완성
+├── validation.py            - 입력 파라미터 검증
+├── i18n_manager.py          - 다국어 관리
+├── logger.py                - 로깅 시스템
+├── consts.py                - 상수 & 기본값
+├── languages/               - 번역 파일 (ko/en/ja/zh)
+├── tests/                   - 단위 테스트
+└── wildcards/               - 와일드카드 파일
 ```
 
 ### 📜 라이선스
@@ -130,8 +166,11 @@ It provides automated features not available in the NovelAI web interface, enabl
 - **👤 Advanced Character Control** - Precise character generation via Character Prompts and Character Reference
 - **🖼️ Image Editing** - Image to Image, Enhancement, Inpainting features
 - **🎭 Vibe Transfer** - Apply mood and style from reference images
-- **⚡ Automation** - Wildcards, batch generation, auto-generation for workflow optimization
+- **⚡ Automation** - Wildcards, batch generation, auto-generation with pause/resume for workflow optimization
 - **🌍 Multi-language Support** - Korean, English, Japanese, Chinese interface
+- **🔒 Security** - OS Keyring credential storage, automatic log sensitive data masking
+- **✅ Input Validation** - Automatic parameter validation to prevent errors
+- **🏷️ Tag Autocomplete** - Smart autocomplete based on Danbooru tag database
 
 ### 🚀 Quick Start
 
@@ -192,7 +231,40 @@ cd NAI-Auto-Generator-V4
 pip install -r requirements.txt
 
 # Run
-python main.py
+python gui.py
+```
+
+**Run Tests**
+```bash
+pip install pytest
+pytest tests/ -v
+```
+
+### 📁 Project Structure
+
+```
+NAI-Auto-V4/
+├── gui.py                   - Main window (Mixin composition)
+├── gui_init.py              - Widget initialization & layout
+├── gui_generation.py        - Image generation logic (Mixin)
+├── gui_enhance.py           - Image enhancement (Mixin)
+├── gui_workers.py           - QThread worker classes
+├── gui_network.py           - Network monitoring (Mixin)
+├── gui_settings_io.py       - Settings save/load (Mixin)
+├── gui_image_handlers.py    - Image handling (Mixin)
+├── gui_credentials.py       - Credential secure storage
+├── gui_dialog.py            - Dialog windows
+├── gui_utils.py             - Utility functions
+├── nai_generator.py         - NovelAI API client
+├── wildcard_applier.py      - Wildcard expansion engine
+├── completer.py             - Tag autocomplete
+├── validation.py            - Input parameter validation
+├── i18n_manager.py          - i18n manager
+├── logger.py                - Logging system
+├── consts.py                - Constants & defaults
+├── languages/               - Translation files (ko/en/ja/zh)
+├── tests/                   - Unit tests
+└── wildcards/               - Wildcard files
 ```
 
 ### 📜 License

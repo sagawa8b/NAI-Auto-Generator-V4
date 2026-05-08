@@ -2,6 +2,70 @@
 
 ---
 
+## V4.5_2.6.05.08 (2026-05-08)
+
+### 🏗️ GUI 모듈화 리팩토링
+
+- `gui.py`(4,600줄)를 7개 Mixin 모듈로 분리하여 유지보수성 대폭 향상
+  - `gui_generation.py` — 이미지 생성 로직
+  - `gui_enhance.py` — 이미지 향상
+  - `gui_workers.py` — QThread 워커 클래스
+  - `gui_network.py` — 네트워크 모니터링
+  - `gui_settings_io.py` — 설정 저장/로드
+  - `gui_image_handlers.py` — 이미지 핸들링
+  - `gui_utils.py` — 유틸리티 함수
+
+### 🔒 보안 강화
+
+- `gui_credentials.py` 추가: OS Keyring을 통한 자격증명 안전 저장 (비밀번호, API 토큰)
+- `logger.py`에 민감정보 마스킹 필터 추가: Bearer 토큰, pst- API 키, 비밀번호가 로그에 노출되지 않음
+
+### ✅ 입력 검증 시스템
+
+- `validation.py` 추가: 생성 파라미터(너비, 높이, 스텝, 시드, CFG 스케일) 범위 검증
+- 생성 버튼 클릭 시 잘못된 값 사전 차단, 4개 언어 오류 메시지 지원
+
+### ⏸️ 자동 생성 일시정지/재개
+
+- 자동 생성 중 **일시정지** 버튼으로 생성 흐름을 일시 중단 가능
+- **재개** 버튼으로 중단 지점부터 이어서 생성
+- 상태바에 **프로그레스 바** 추가: 자동 생성 진행 상황 시각적 표시
+
+### 🔧 API 클라이언트 리팩토링
+
+- `nai_generator.py`의 `generate_image()` 메서드를 4개 헬퍼로 분리 (`_resolve_model`, `_prepare_infill_params`, `_log_preflight`, `_execute_api_request`)
+- `threading.Lock` 기반 토큰 갱신으로 동시 호출 시 경합 방지
+- 전체 API 메서드에 타입 힌트 추가
+
+### 🏷️ 태그 자동완성 개선
+
+- 쉼표/개행 기반 토큰 파싱으로 변경: 하이픈(`-`) 포함 태그가 분리되지 않는 문제 해결
+- 예: `long-hair` 입력 시 `long`과 `hair`로 분리되지 않고 정확히 매칭
+
+### 🐛 버그 수정
+
+- `gui_generation.py`: 인페인팅 시 `numpy` import 누락으로 `NameError` 발생하던 문제 수정
+- `gui_generation.py`: `BytesIO()` → `io.BytesIO()` 참조 오류 수정
+- `i18n_manager.py`: bare `except:` → `except (IndexError, KeyError):` 예외 처리 개선
+- `gui_init.py`: bare `except:` → `except Exception:` 수정
+
+### 🧪 테스트 & CI
+
+- `tests/test_input_validation.py` — 입력 검증 29개 테스트
+- `tests/test_i18n_manager.py` — 번역 키 완전성 12개 테스트
+- `tests/test_nai_generator.py` — API 클라이언트 20개 테스트
+- `.github/workflows/test.yml` — GitHub Actions CI 워크플로우 추가
+- `setup.cfg` — mypy/flake8 정적 분석 설정
+
+### 📝 기타
+
+- `wildcard_applier.py`: 모든 public 메서드에 타입 힌트 추가
+- `character_prompts_ui.py`: 캐릭터 카드 리사이즈 높이 저장/복원
+- `requirements.txt`: `keyring>=23.0.0` 의존성 추가
+- `README.md` 문서 업데이트
+
+---
+
 ## V4.5_2.6.04.28 (2026-04-28)
 
 ### 🔁 세팅별 연속 생성 버튼 UI 노출

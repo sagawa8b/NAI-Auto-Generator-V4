@@ -833,7 +833,7 @@ class OptionDialog(QDialog):
     def refresh_tags(self):
         """태그 자동 완성 새로고침"""
         # 기존 캐시 초기화
-        from gui import CompletionTagLoadThread
+        from gui_workers import CompletionTagLoadThread
         CompletionTagLoadThread.cached_tags = None
         
         # 부모 창의 tags_loaded 플래그 초기화
@@ -1001,7 +1001,7 @@ class OptionDialog(QDialog):
 
         # 태그 파일 경로가 변경되었다면 캐시 초기화 및 재로드 제안
         if old_tag_path != new_tag_path:
-            from gui import CompletionTagLoadThread
+            from gui_workers import CompletionTagLoadThread
             CompletionTagLoadThread.cached_tags = None
             if hasattr(self.parent, '_tags_loaded'):
                 delattr(self.parent, '_tags_loaded')

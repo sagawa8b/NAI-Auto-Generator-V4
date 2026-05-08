@@ -1,8 +1,34 @@
 import os
+import re
 import logging
 import datetime
 import sys
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+
+
+# Bearer 토큰, pst- API 키, 비밀번호 필드를 로그에서 마스킹
+_SENSITIVE_PATTERNS = [
+    (re.compile(r'(Bearer\s+)\S+', re.IGNORECASE), r'\1***'),
+    (re.compile(r'(pst-)\S+', re.IGNORECASE), r'\1***'),
+    (re.compile(r'("key"\s*:\s*")[^"]+(")', re.IGNORECASE), r'\1***\2'),
+    (re.compile(r'(access[_-]?token["\s:=]+)[^\s,"\']+', re.IGNORECASE), r'\1***'),
+    (re.compile(r'(password["\s:=]+)[^\s,"\']+', re.IGNORECASE), r'\1***'),
+]
+
+
+class _SensitiveDataFilter(logging.Filter):
+    """로그 출력시에 민감 정보를 마스킹한다"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.msg = _mask(str(record.msg))
+        record.args = tuple(_mask(str(a)) if isinstance(a, str) else a for a in record.args) if record.args else record.args
+        return True
+
+
+def _mask(text: str) -> str:
+    for pattern, replacement in _SENSITIVE_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
 
 class NAILogger:
     """NAI Auto Generator 로그 시스템"""
@@ -30,7 +56,10 @@ class NAILogger:
         self.debug_mode = False
         self.max_log_size = 10 * 1024 * 1024  # 10MB
         self.backup_count = 5
-        
+
+        # 민감정보 마스킹 필터 (싱글톤이므로 한 번만 생성)
+        self._sensitive_filter = _SensitiveDataFilter()
+
         # 포맷터 설정
         self.default_formatter = logging.Formatter(
             '%(asctime)s - %(levelname)s - %(message)s'
@@ -70,8 +99,9 @@ class NAILogger:
         
         # 콘솔 핸들러 설정
         self.console_handler = logging.StreamHandler()
-        self.console_handler.setLevel(logging.INFO)  # 항상 INFO 이상으로 설정
-        self.console_handler.setFormatter(self.default_formatter)  # 항상 기본 포맷터 사용
+        self.console_handler.setLevel(logging.INFO)
+        self.console_handler.setFormatter(self.default_formatter)
+        self.console_handler.addFilter(self._sensitive_filter)
         
         # 기본 로그 파일 핸들러 설정
         log_file = os.path.join(self.log_folder, f"nai_generator_{datetime.datetime.now().strftime('%Y%m%d')}.log")
@@ -83,6 +113,7 @@ class NAILogger:
         )
         self.file_handler.setLevel(logging.INFO)
         self.file_handler.setFormatter(self.default_formatter)
+        self.file_handler.addFilter(self._sensitive_filter)
         self.logger.addHandler(self.file_handler)
         
         # 디버그 모드일 경우 디버그 로그 파일 핸들러 추가
@@ -96,6 +127,7 @@ class NAILogger:
             )
             self.debug_file_handler.setLevel(logging.DEBUG)
             self.debug_file_handler.setFormatter(self.debug_formatter)
+            self.debug_file_handler.addFilter(self._sensitive_filter)
             self.logger.addHandler(self.debug_file_handler)
         
         self.logger.info(f"로그 시스템 초기화 - 모드: {'디버그' if debug_mode else '일반'}")

@@ -24,13 +24,13 @@ class WildcardApplier():
         # Shared random wildcard cache - returns same value within a generation cycle
         self._shared_random_cache = {}
         
-    def set_src(self, src):
+    def set_src(self, src: str) -> None:
         # Windows에서는 백슬래시 사용하도록 정규화
         if os.name == 'nt':
             src = os.path.normpath(src)
         self.src_wildcards_folder = src
 
-    def load_wildcards(self):
+    def load_wildcards(self) -> None:
         self._wildcards_dict.clear()
         
         # 와일드카드 폴더가 존재하는지 확인
@@ -77,7 +77,7 @@ class WildcardApplier():
         except Exception as e:
             logger.error(f"Error loading wildcards: {e}")
 
-    def create_index_snapshot(self):
+    def create_index_snapshot(self) -> None:
         """현재 루프카드 인덱스의 스냅샷 생성 및 공유 랜덤 캐시 초기화
         Creates a snapshot of current loopcard indices and clears shared random cache"""
         self._current_snapshot = self._loopcard_indices.copy()
@@ -86,7 +86,7 @@ class WildcardApplier():
         # Clear shared random cache for each new generation cycle
         self._shared_random_cache = {}
 
-    def apply_wildcards_with_snapshot(self, target_str):
+    def apply_wildcards_with_snapshot(self, target_str: str) -> str:
         """스냅샷된 인덱스를 사용하여 와일드카드 적용 (인덱스 증가 안함)
         Apply wildcards using snapshot indices (no index advancement)"""
         self.load_wildcards()
@@ -125,7 +125,7 @@ class WildcardApplier():
 
         return result
    
-    def advance_loopcard_indices(self):
+    def advance_loopcard_indices(self) -> None:
         """사용된 루프카드 인덱스만 다음으로 진행 (반복 카운터 고려)"""
         for key_data in list(self._used_keys):  # 실제 사용된 키만
             # key_data는 "wildcard_name" 또는 "wildcard_name*repeat_count" 형식
@@ -169,7 +169,7 @@ class WildcardApplier():
         # 사용된 키 리셋
         self._used_keys.clear()
 
-    def _apply_shared_wildcard_once(self, target_str, except_list=None):
+    def _apply_shared_wildcard_once(self, target_str: str, except_list: list | None = None) -> tuple[str, list]:
         """공유 랜덤 와일드카드 처리 (__=wildcard__ 형식)
         같은 생성 사이클 내에서 동일한 와일드카드는 동일한 값을 반환합니다.
 
@@ -236,7 +236,7 @@ class WildcardApplier():
 
         return result, applied_wildcard_list
 
-    def _apply_wildcard_once(self, target_str, except_list=None):
+    def _apply_wildcard_once(self, target_str: str, except_list: list | None = None) -> tuple[str, list]:
         if except_list is None:
             except_list = []
         result = target_str
@@ -277,7 +277,7 @@ class WildcardApplier():
 
         return result, applied_wildcard_list
     
-    def _apply_loopcard_once(self, target_str, except_list=None):
+    def _apply_loopcard_once(self, target_str: str, except_list: list | None = None) -> tuple[str, list]:
         """루프카드 (순차 적용) 처리 - 순차 반복 기능 추가"""
         if except_list is None:
             except_list = []
@@ -358,7 +358,7 @@ class WildcardApplier():
 
         return result, applied_loopcard_list
         
-    def _apply_loopcard_once_with_snapshot(self, target_str, except_list=None):
+    def _apply_loopcard_once_with_snapshot(self, target_str: str, except_list: list | None = None) -> tuple[str, list]:
         """스냅샷된 인덱스를 사용한 루프카드 처리 - 순차 반복 기능 추가"""
         if except_list is None:
             except_list = []
@@ -426,9 +426,8 @@ class WildcardApplier():
 
         return result, applied_loopcard_list
     
-    def apply_wildcards(self, target_str):
-        """와일드카드와 루프카드 모두 적용
-        Apply both wildcards and loopcards"""
+    def apply_wildcards(self, target_str: str) -> str:
+        """와일드카드와 루프카드 모두 적용"""
         self.load_wildcards()
 
         result = target_str

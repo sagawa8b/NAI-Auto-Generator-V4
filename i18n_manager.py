@@ -397,7 +397,8 @@ class I18nManager(QObject):
         if args:
             try:
                 return value.format(*args)
-            except:
+            except (IndexError, KeyError):
+                logger.warning(f"번역 포맷 실패 (키: {key_path}, 인자: {args})")
                 return value
         
         return value

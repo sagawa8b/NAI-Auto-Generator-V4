@@ -968,6 +968,11 @@ def init_main_widget(parent):
     parent.button_generate_sett.clicked.connect(parent.on_click_generate_sett)
     hbox_image_buttons.addWidget(parent.button_generate_sett)
 
+    parent.button_pause_auto = QPushButton(tr('generate.pause'))
+    parent.button_pause_auto.clicked.connect(parent.on_click_pause_autogenerate)
+    parent.button_pause_auto.hide()
+    hbox_image_buttons.addWidget(parent.button_pause_auto)
+
     # 구분선
     btn_separator = QFrame()
     btn_separator.setFrameShape(QFrame.VLine)
@@ -1521,7 +1526,7 @@ def set_sampler_by_api_value(parent, api_value):
         try:
             if hasattr(parent, 'dict_ui_settings') and "sampler" in parent.dict_ui_settings:
                 parent.dict_ui_settings["sampler"].setCurrentIndex(0)
-        except:
+        except Exception:
             pass
     
 
